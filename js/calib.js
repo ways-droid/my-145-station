@@ -1,300 +1,244 @@
 "use strict";
-/* ======================= ÉTALONNAGE ======================= */
-/* colonnes de l'atelier, dans l'ordre (codes stables : recu, en_cours et a_livrer existaient déjà) */
-/* NewTool → Picked → Lab → Calibrated → Dropped → Done */
-const WORK_COLS = [
-  ["recu", "NewTool", "blue"], ["picked", "Picked", "yellow"], ["labo", "Lab", "orange"], ["a_livrer", "Calibrated", "green"], ["dropped", "Dropped", "red"], ["done", "Done", "grey"]];
-/* anciens statuts rangés dans la colonne la plus proche */
-const COL_OF = { evaluation: "recu", devis: "recu", approuve: "picked", en_cours: "labo" };
-const colOf = t => COL_OF[t.status] || t.status;
-const T_STATUS = Object.assign(Object.fromEntries(WORK_COLS.map(([k, l, c]) => [k, [l, { blue: "info", grey: "", yellow: "warn", green: "good", orange: "orange", red: "bad" }[c]]])),
-  { en_cours: ["En étalonnage", "orange"], dropped: ["Dropped · rendu au client", "bad"], done: ["Done", ""], client: ["Chez le client", ""] });
-const IN_SHOP = ["recu", "picked", "labo", "en_cours", "a_livrer", "evaluation", "devis", "approuve"];
-const atClient = t => !t.status || ["client", "dropped", "done"].includes(t.status);
+/* ======================= OUTILLAGE DE LA STATION =======================
+   Registre des outils de la station (n° d'outil = étiquette scannée), sortie et retour par personne et par avion,
+   étalonnage : échéances, envoi au laboratoire (souvent WAYS), retour avec certificat.
+   tools/<id> = { toolNo, name, pn, serial, brand, model, category, location, owner, calRequired, intervalMonths, lastCalDate, nextDue,
+                  status: service|lab|us|lost|retired, out: {staffId, reg, at, by} | absent, job: {labId, sentDate, ref, expected},
+                  certs[], history[{at, type, text, by}], shipments[], photos[], notes }
+   Un outil hors service, au labo ou dont l'étalonnage est dépassé ne peut pas sortir (contrôlé aussi sur le serveur). */
+const T_STATUS = { service: ["En service", "good"], lab: ["Au labo", "orange"], us: ["Hors service", "bad"], lost: ["Perdu", "bad"], retired: ["Retiré", ""] };
 const T_RESULT = { conforme: ["Conforme", "good"], ajuste: ["Conforme après ajustage", "good"], non_conforme: ["Non conforme", "bad"] };
-const T_COL = Object.fromEntries(WORK_COLS.map(([k, , c]) => [k, "c-" + c]));
-const tChip = st => { const [l, c] = T_STATUS[st] || [st, ""]; return `<span class="chip ${c}">${l}</span>`; };
-const toolBySerial = s => S.tools.find(t => t.serial === s);
+const T_HIST = { out: "Sorti", in: "Rentré", send: "Envoyé au labo", cal: "Étalonné", us: "Hors service", service: "Remis en service", lost: "Perdu", retired: "Retiré", note: "Note" };
+const tStatus = t => T_STATUS[t.status] ? t.status : "service";
+const tOverdue = t => tStatus(t) === "service" && t.calRequired !== false && !!t.nextDue && t.nextDue < today();
+const tUsable = t => tStatus(t) === "service" && !tOverdue(t);
+const tChip = t => tOverdue(t) ? `<span class="chip bad">Étalonnage dépassé</span>` : (([l, c]) => `<span class="chip ${c}">${l}</span>`)(T_STATUS[tStatus(t)]);
+const tLabel = t => t.toolNo || t.serial || "?";
+const toolByCode = c => { const n = normSerial(c); return S.tools.find(t => normSerial(t.toolNo) === n) || S.tools.find(t => normSerial(t.serial) === n); };
 const activeCert = t => (t.certs || []).filter(c => c.validUntil >= today()).sort((a, b) => b.date.localeCompare(a.date))[0];
-const toolsDue = (days = 60) => S.tools.filter(t => atClient(t) && t.nextDue && t.nextDue <= addDays(today(), days));
+const toolsOut = () => S.tools.filter(t => t.out && t.out.at);
+/* outils à étalonner bientôt (hors labo, hors retirés) */
+const toolsDue = (days = 60) => S.tools.filter(t => ["service", "us"].includes(tStatus(t)) && t.calRequired !== false && t.nextDue && t.nextDue <= addDays(today(), days));
+const outHours = t => t.out?.at ? (Date.now() - new Date(t.out.at).getTime()) / 3600000 : 0;
+const tHist = (t, type, text) => [...(t.history || []), { at: new Date().toISOString(), type, text: text || "", by: (ME && ME.name) || "" }].slice(-300);
+const labName = id => (S.labs || []).find(l => l.id === id)?.name || "";
+const outWho = t => t.out ? (staff(t.out.staffId)?.name || t.out.name || "?") : "";
+/* fiche personnel de l'utilisateur connecté (même adresse e-mail) */
+const meStaff = () => ME && ME.email ? S.staff.find(p => (p.email || "").toLowerCase() === String(ME.email).toLowerCase()) : null;
 
 VIEWS.etalonnage = {
   render() {
-    const tab = curTab("etalonnage", "atelier");
-    const n = st => S.tools.filter(t => t.status === st).length;
-    return head("Étalonnage", plural(S.tools.length, "outil") + " suivi" + (S.tools.length > 1 ? "s" : ""),
-      `<button class="btn" data-a="tool-form" ${dis()}>Ajouter un outil</button><button class="btn primary" data-a="tool-reception" ${dis()}>Réceptionner des outils</button>`) +
-      `<div class="pipeline">${[["NewTool", ["recu", "evaluation", "devis"], "c-blue"], ["Picked", ["picked", "approuve"], "c-yellow"], ["Lab", ["labo", "en_cours"], "c-orange"], ["Calibrated", ["a_livrer"], "c-green"]].map(([l, sts, c]) => `<div class="panel tile ${c}"><div class="lbl">${l}</div><div class="val">${sts.reduce((a, st) => a + n(st), 0)}</div></div>`).join("")}
-        <div class="panel tile c-red ${toolsDue(0).length ? "alert" : ""}"><div class="lbl">Échéance dépassée chez les clients</div><div class="val">${toolsDue(0).length}</div><div class="note">${toolsDue(30).length} dans les 30 jours</div></div></div>` +
-      tabs("etalonnage", [["atelier", "En atelier", IN_SHOP.reduce((a, st) => a + n(st), 0), n("a_livrer") > 0], ["outils", "Tous les outils", S.tools.length], ["labos", "Laboratoires", (S.labs || []).length || ""], ["echeances", "Rappels d'échéance", toolsDue(60).length]]) +
-      ({ atelier: calibWorkshop, outils: calibAll, labos: calibLabs, echeances: calibDue })[tab]();
+    const tab = curTab("etalonnage", "outils"), out = toolsOut(), due = toolsDue(60), over = S.tools.filter(tOverdue), lab = S.tools.filter(t => tStatus(t) === "lab");
+    return head("Outillage", plural(S.tools.length, "outil") + " de la station",
+      `<button class="btn" data-a="tool-form" ${dis()}>Ajouter un outil</button><button class="btn primary" data-a="tool-scan" ${dis()}>Sortie / retour d'outils</button>`) +
+      `<div class="pipeline"><div class="panel tile c-blue"><div class="lbl">Sortis</div><div class="val">${out.length}</div><div class="note">${out.filter(t => outHours(t) > 12).length} depuis plus de 12 h</div></div>
+        <div class="panel tile c-orange"><div class="lbl">Au labo</div><div class="val">${lab.length}</div></div>
+        <div class="panel tile c-red ${over.length ? "alert" : ""}"><div class="lbl">Étalonnage dépassé</div><div class="val">${over.length}</div><div class="note">${toolsDue(30).length - over.length} dans les 30 jours</div></div>
+        <div class="panel tile c-grey"><div class="lbl">Hors service</div><div class="val">${S.tools.filter(t => tStatus(t) === "us").length}</div></div></div>` +
+      tabs("etalonnage", [["outils", "Registre", S.tools.length], ["sortis", "Sortis", out.length, out.some(t => outHours(t) > 12)], ["etal", "Étalonnage", due.length + lab.length, over.length > 0], ["labos", "Laboratoires", (S.labs || []).length || ""]]) +
+      ({ outils: toolsRegister, sortis: toolsOutList, etal: toolsCal, labos: calibLabs })[tab]();
   }
 };
+const toolHead = `<thead><tr><th>N° outil</th><th>Outil</th><th>Emplacement</th><th>Statut</th><th>Prochain étalonnage</th></tr></thead>`;
 function toolRow(t) {
-  const ac = activeCert(t);
-  return `<tr class="click" data-a="tool-open" data-id="${t.id}"><td class="mono"><b>${esc(t.serial)}</b>${demoTag(t)}</td><td>${esc(t.name)}<div class="muted small">${esc([t.brand, t.model].filter(Boolean).join(" "))}</div></td>
-    <td>${esc(clientName(t.clientId))}</td><td>${tChip(t.status)}${t.status === "labo" && t.job?.labId ? `<div class="muted small">${esc(labName(t.job.labId))}</div>` : ""}</td><td>${ac ? `<span class="chip good">${esc(ac.number || "Actif")}</span>` : `<span class="muted">Aucun actif</span>`}</td><td>${atClient(t) ? dueChip(t.nextDue) : `<span class="num muted">${fmtDate(t.nextDue)}</span>`}</td></tr>`;
+  return `<tr class="click" data-a="tool-open" data-id="${t.id}"><td class="mono"><b>${esc(tLabel(t))}</b>${demoTag(t)}</td><td>${esc(t.name)}<div class="muted small mono">${esc([t.pn && "P/N " + t.pn, t.serial && "S/N " + t.serial].filter(Boolean).join(" · "))}</div></td>
+    <td class="small">${esc(t.location || "—")}</td><td>${tChip(t)}${t.out ? `<div class="small">${esc(tr("Sorti"))} · ${esc(outWho(t))}${t.out.reg ? " · " + esc(t.out.reg) : ""}</div>` : ""}${tStatus(t) === "lab" && t.job?.labId ? `<div class="muted small">${esc(labName(t.job.labId))}</div>` : ""}</td>
+    <td>${t.calRequired === false ? `<span class="muted small">Sans étalonnage</span>` : dueChip(t.nextDue)}</td></tr>`;
 }
-const toolHead = `<thead><tr><th>N° de série</th><th>Outil</th><th>Client</th><th>Statut</th><th>Certificat</th><th>Prochain étalonnage</th></tr></thead>`;
-const doneOpen = () => { try { return localStorage.getItem("st-done-open") === "1"; } catch (e) { return false; } };
-const labName = id => (S.labs || []).find(l => l.id === id)?.name || "";
-function kcard(t) {
-  const since = t.job?.movedAt || t.job?.receivedDate, days = since ? daysBetween(since, today()) : 0;
-  const shp = (t.shipments || []).filter(x => !x.delivered).slice(-1)[0];
-  return `<div class="kcard" draggable="${readOnly ? "false" : "true"}" data-drag="${t.id}" data-a="tool-open" data-id="${t.id}" role="button" tabindex="0">
-    <div class="row-sb"><span class="mono small">${t.status === "a_livrer" ? ADOT : ""}<b>${esc(t.serial)}</b></span><span class="small ${days > 10 && t.status !== "done" ? "txt-warn" : "muted"}" title="Depuis le ${fmtDate(since)}">${days} j</span></div>
-    <div class="kname">${t.job?.so ? `<b>${esc(t.job.so)}</b> - ` : ""}${esc(t.name)}${demoTag(t)}</div><div class="muted small">${esc(clientName(t.clientId))}</div>
-    ${t.job?.ro || (t.status === "labo" && t.job?.labId) || shp ? `<div class="ktags">${t.job?.ro ? `<span class="ktag">${esc(t.job.ro)}</span>` : ""}${t.status === "labo" && t.job?.labId ? `<span class="ktag lab">${esc(labName(t.job.labId))}</span>` : ""}${shp ? `<span class="ktag ship" title="${esc(CARRIERS[shp.carrier]?.[0] || shp.carrier)} ${esc(shp.number)}">📦 ${esc(CARRIERS[shp.carrier]?.[0] || shp.carrier)}</span>` : ""}</div>` : ""}</div>`;
+function toolsRegister() {
+  const q = UI.q.toLowerCase(), f = UI.filter;
+  const rows = S.tools.filter(t => (f === "tous" ? tStatus(t) !== "retired" : f === "ok" ? tUsable(t) : f === "out" ? !!t.out : f === "lab" ? tStatus(t) === "lab" : f === "ko" ? !tUsable(t) && tStatus(t) !== "lab" : f === "retired" ? tStatus(t) === "retired" : true)
+    && (!q || [t.toolNo, t.serial, t.pn, t.name, t.brand, t.model, t.category, t.location].join(" ").toLowerCase().includes(q)))
+    .sort((a, b) => String(tLabel(a)).localeCompare(String(tLabel(b)), undefined, { numeric: true }));
+  return `<div class="panel">${searchBar("N° d'outil, désignation, P/N, S/N, emplacement…", [["tous", "Tous"], ["ok", "Utilisables"], ["out", "Sortis"], ["lab", "Au labo"], ["ko", "Inutilisables", S.tools.some(t => !tUsable(t) && ["service", "us"].includes(tStatus(t)))], ["retired", "Retirés"]])}
+    <div class="tablewrap"><table>${toolHead}<tbody>${rows.map(toolRow).join("")}</tbody></table>${rows.length ? "" : `<div class="empty">${S.tools.length ? "Aucun outil ne correspond." : "Aucun outil. Ajoutez les outils de la station avec leur n° d'étiquette."}</div>`}</div></div>`;
 }
-function calibWorkshop() {
-  const open = doneOpen(), lim = addDays(today(), -30);
-  const tot = S.tools.filter(t => WORK_COLS.some(c => c[0] === colOf(t)) && (t.status !== "done" || (t.job?.closedDate || t.job?.movedAt || "") >= lim)).length;
-  return `<div class="hint mb">${readOnly ? "" : "Glissez-déposez les cartes d'une colonne à l'autre. "}Dropped : rendu au client · Done : dossier clôturé (30 derniers jours affichés).</div><div class="kanban kboard">${WORK_COLS.map(([st, label, c]) => {
-    let ts = S.tools.filter(t => colOf(t) === st);
-    if (st === "done") ts = ts.filter(t => (t.job?.closedDate || t.job?.movedAt || "") >= lim).sort((a, b) => (b.job?.closedDate || "").localeCompare(a.job?.closedDate || ""));
-    else ts.sort((a, b) => (a.job?.movedAt || a.job?.receivedDate || "").localeCompare(b.job?.movedAt || b.job?.receivedDate || ""));
-    if (st === "done" && !open) return `<div class="panel kcol c-${c} collapsed" data-drop="done"><button class="kcollapse" data-a="done-toggle" aria-expanded="false" title="Afficher la colonne Done"><span class="vlab">${label}</span><span class="chip">${ts.length}</span><span aria-hidden="true">▸</span></button></div>`;
-    return `<div class="panel kcol c-${c}" data-drop="${st}"><h3><span>${st === "a_livrer" && ts.length ? ADOT : ""}${label}</span><span class="row-g">${st === "recu" && !readOnly ? `<button class="x" data-a="tool-reception" title="Réceptionner des outils" aria-label="Réceptionner des outils">+</button>` : ""}${st === "done" ? `<button class="x" data-a="done-toggle" aria-expanded="true" aria-label="Replier la colonne Done" title="Replier">◂</button>` : ""}</span></h3>
-      <div class="kbar"><span style="width:${tot ? Math.round(ts.length / tot * 100) : 0}%"></span></div><div class="kcount">${ts.length}</div>
-      <div class="kbody">${ts.map(kcard).join("") || `<div class="muted small kempty">Rien ici.</div>`}</div></div>`;
-  }).join("")}</div>`;
+function toolsOutList() {
+  const rows = toolsOut().sort((a, b) => a.out.at.localeCompare(b.out.at));
+  return `<div class="panel"><div class="pad muted small">Outils sortis de l'outillage et pas encore rentrés. À vérifier au Tool Check de fin de shift (MOE 2.6.5).</div>
+    ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>N° outil</th><th>Outil</th><th>Sorti par</th><th>Avion</th><th>Depuis</th><th></th></tr></thead><tbody>${rows.map(t => `<tr class="click" data-a="tool-open" data-id="${t.id}">
+      <td class="mono"><b>${esc(tLabel(t))}</b></td><td>${esc(t.name)}</td><td>${esc(outWho(t))}</td><td class="mono">${esc(t.out.reg || "—")}</td>
+      <td class="num ${outHours(t) > 12 ? "txt-warn" : ""}">${fmtDT(t.out.at)}</td><td class="r">${readOnly ? "" : `<button class="btn sm" data-a="tool-in" data-id="${t.id}">Rentrer</button>`}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty">Tous les outils sont rentrés.</div>`}</div>`;
 }
-ACTIONS["done-toggle"] = () => { try { localStorage.setItem("st-done-open", doneOpen() ? "0" : "1"); } catch (e) {} render(true); };
-/* glisser-déposer (délégué : survit aux re-rendus) */
-let dragId = null;
-document.addEventListener("dragstart", e => { const c = e.target.closest && e.target.closest("[data-drag]"); if (!c || readOnly) return; dragId = c.dataset.drag; e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", dragId); } catch (x) {} c.classList.add("dragging"); });
-document.addEventListener("dragend", e => { dragId = null; document.querySelectorAll(".dragging,.dropover").forEach(x => x.classList.remove("dragging", "dropover")); });
-document.addEventListener("dragover", e => { const col = dragId && e.target.closest && e.target.closest("[data-drop]"); if (!col) return; e.preventDefault(); document.querySelectorAll(".dropover").forEach(x => x !== col && x.classList.remove("dropover")); col.classList.add("dropover"); });
-document.addEventListener("drop", e => { const col = dragId && e.target.closest && e.target.closest("[data-drop]"); if (!col) return; e.preventDefault(); const id = dragId; dragId = null; col.classList.remove("dropover"); moveTool(id, col.dataset.drop); });
-/* déplacement d'un outil vers une colonne (glisser-déposer ou menu « Déplacer vers ») */
-async function moveTool(id, st, after) {
-  const t = S.tools.find(x => x.id === id); if (!t || t.status === st) return;
-  if (st === "labo") return labSendForm(t, after);
-  const job = Object.assign({}, t.job || {}, { movedAt: today() });
-  if (colOf(t) === st) return;
-  if (st === "recu" && ["client", "done"].includes(t.status || "client")) { await patch("tools", t.id, { status: "recu", job: { receivedDate: today(), movedAt: today() } }); toast("Outil réceptionné"); after && after(); return; }
-  if (st === "picked") job.pickedDate = today();
-  if (st === "done") {
-    job.closedDate = today();
-    await patch("tools", t.id, { status: "done", job, history: [...(t.history || []), Object.assign({}, job, { done: job.doneDate || t.lastCalDate || today(), delivered: job.delivered || today() })] });
-    toast("Rendu au client · Done"); after && after(); return;
-  }
-  if (st === "dropped") job.delivered = job.delivered || today();
-  await patch("tools", t.id, { status: st, job });
-  toast("Déplacé vers « " + T_STATUS[st][0] + " »"); after && after();
+function toolsCal() {
+  const sel = UI.calSel || (UI.calSel = new Set());
+  const due = toolsDue(60).sort((a, b) => a.nextDue.localeCompare(b.nextDue)), lab = S.tools.filter(t => tStatus(t) === "lab").sort((a, b) => (a.job?.sentDate || "").localeCompare(b.job?.sentDate || ""));
+  const ck = t => readOnly ? "" : `<td style="width:36px" data-stop><input type="checkbox" data-calsel="${t.id}" ${sel.has(t.id) ? "checked" : ""} ${t.out ? "disabled title=\"" + esc(tr("Outil sorti : à rentrer d'abord")) + "\"" : ""} aria-label="Choisir"></td>`;
+  return `<div class="stack"><div class="panel"><div class="row-sb pad"><div><h3 class="np">À étalonner (60 prochains jours) <span class="muted">${due.length}</span></h3><div class="muted small">Cochez les outils à envoyer ensemble au laboratoire.</div></div>
+      ${readOnly ? "" : `<button class="btn primary sm" data-a="tool-send" ${sel.size ? "" : "disabled"}>Envoyer au labo (${sel.size})</button>`}</div>
+    ${due.length ? `<div class="tablewrap"><table><thead><tr>${readOnly ? "" : "<th></th>"}<th>N° outil</th><th>Outil</th><th>Statut</th><th>Échéance</th><th>Labo habituel</th></tr></thead><tbody>${due.map(t => `<tr class="click" data-a="tool-open" data-id="${t.id}">${ck(t)}
+      <td class="mono"><b>${esc(tLabel(t))}</b></td><td>${esc(t.name)}</td><td>${tChip(t)}${t.out ? `<div class="small txt-warn">${esc(tr("Sorti"))} · ${esc(outWho(t))}</div>` : ""}</td><td>${dueChip(t.nextDue)}</td><td class="small">${esc(labName(t.defaultLabId) || "—")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="empty">Aucun outil n'arrive à échéance dans les 60 prochains jours.</div>`}</div>
+    <div class="panel"><div class="pad"><h3 class="np">Au laboratoire <span class="muted">${lab.length}</span></h3></div>
+    ${lab.length ? `<div class="tablewrap"><table><thead><tr><th>N° outil</th><th>Outil</th><th>Laboratoire</th><th>Référence</th><th>Envoyé le</th><th>Retour prévu</th><th></th></tr></thead><tbody>${lab.map(t => { const d = t.job?.sentDate ? daysBetween(t.job.sentDate, today()) : null;
+      return `<tr class="click" data-a="tool-open" data-id="${t.id}"><td class="mono"><b>${esc(tLabel(t))}</b></td><td>${esc(t.name)}</td><td>${esc(labName(t.job?.labId) || "—")}</td><td class="mono small">${esc(t.job?.ref || "—")}</td>
+        <td class="num">${fmtDate(t.job?.sentDate)}${d != null ? ` <span class="muted small">· ${d} j</span>` : ""}</td><td class="num ${t.job?.expected && t.job.expected < today() ? "txt-warn" : ""}">${fmtDate(t.job?.expected)}</td>
+        <td class="r">${readOnly ? "" : `<button class="btn sm" data-a="tool-back" data-id="${t.id}">Retour du labo</button>`}</td></tr>`; }).join("")}</tbody></table></div>`
+      : `<div class="empty">Aucun outil au laboratoire.</div>`}</div></div>`;
 }
-/* envoi au labo : labo présélectionné = dernier labo utilisé pour cet outil */
-function labSendForm(t, after) {
-  const labs = (S.labs || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-  const def = t.job?.labId || t.defaultLabId || "";
-  const m = modal(`${mHead("Envoyer au laboratoire · <span class=\"mono\">" + esc(t.serial) + "</span>")}<form><div class="body">
-    ${labs.length ? "" : `<div class="banner warn">Aucun laboratoire enregistré. Ajoutez-en un dans l'onglet Laboratoires (vous pourrez le choisir ensuite).</div>`}
-    <div class="fields">${field("ls-lab", "Laboratoire", def, { type: "select", options: [["", "Choisir…"], ...labs.map(l => [l.id, l.name])] })}${field("ls-date", "Date d'envoi", today(), { type: "date" })}
-    ${field("ls-carrier", "Transporteur", "dhl", { type: "select", options: [["", "Pas d'envoi (déposé / enlevé)"], ...Object.entries(CARRIERS).map(([k, v]) => [k, v[0]])] })}${field("ls-no", "N° de suivi", "", { cls: "mono", ph: "Ex. 1234567890" })}</div>
-    ${def ? `<div class="hint">Labo présélectionné : ${esc(labName(def))} (dernier labo utilisé pour cet outil).</div>` : ""}<div class="err" id="ls-err"></div></div>
-    <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer au labo</button></footer></form>`);
-  m.querySelector("form").onsubmit = async e => {
-    e.preventDefault();
-    const lab = val("ls-lab"); if (!lab) { m.querySelector("#ls-err").textContent = "Choisissez le laboratoire."; return; }
-    const job = Object.assign({}, t.job || {}, { labId: lab, sentDate: val("ls-date") || today(), movedAt: val("ls-date") || today() });
-    const shipments = [...(t.shipments || [])];
-    if (val("ls-no")) shipments.push({ id: "s" + Date.now().toString(36), carrier: val("ls-carrier") || "autre", number: val("ls-no").trim(), dir: "vers_labo", date: val("ls-date") || today(), labId: lab });
-    await patch("tools", t.id, { status: "labo", job, defaultLabId: lab, shipments });
-    closeModal(); toast("Envoyé chez " + labName(lab)); after ? after() : render(true);
-  };
-}
-function calibAll() {
-  const q = UI.q.toLowerCase();
-  const rows = S.tools.filter(t => (UI.filter === "tous" || (UI.filter === "atelier" ? IN_SHOP.includes(t.status) : UI.filter === "client" ? atClient(t) : t.status === UI.filter)) && (!q || [t.serial, t.pn, t.job?.so, t.job?.ro, t.name, t.brand, t.model, clientName(t.clientId), t.category].join(" ").toLowerCase().includes(q))).sort((a, b) => a.serial.localeCompare(b.serial));
-  return `<div class="panel">${searchBar("Numéro de série, outil, marque, client…", [["tous", "Tous"], ["atelier", "En atelier"], ["labo", "Lab"], ["a_livrer", "Calibrated"], ["client", "Chez le client"]])}
-    <div class="tablewrap"><table>${toolHead}<tbody>${rows.map(toolRow).join("")}</tbody></table>${rows.length ? "" : `<div class="empty">Aucun outil ne correspond.</div>`}</div></div>`;
-}
-function calibDue() {
-  const due = toolsDue(60), groups = {};
-  due.forEach(t => (groups[t.clientId] = groups[t.clientId] || []).push(t));
-  const list = Object.entries(groups);
-  if (!list.length) return `<div class="panel empty">Aucun outil n'arrive à échéance dans les 60 prochains jours.</div>`;
-  return `<div class="stack">${list.map(([cid, ts]) => `<div class="panel"><div class="row-sb pad"><div><b>${esc(clientName(cid))}</b> <span class="muted">· ${plural(ts.length, "outil")}</span>${client(cid)?.email ? `<div class="muted small">${esc(client(cid).email)}</div>` : ""}</div>
-    <div class="row-g"><button class="btn sm" data-a="tool-remind" data-client="${cid}">Préparer l'e-mail de rappel</button>${readOnly ? "" : `<button class="btn sm" data-a="tool-reminded" data-client="${cid}">Marquer comme relancé</button>`}</div></div>
-    <div class="tablewrap"><table>${toolHead}<tbody>${ts.sort((a, b) => a.nextDue.localeCompare(b.nextDue)).map(toolRow).join("")}</tbody></table></div>
-    ${ts.some(t => t.remindedAt) ? `<div class="pad small muted">Dernière relance : ${fmtDate(ts.map(t => t.remindedAt || "").sort().pop())}</div>` : ""}</div>`).join("")}</div>`;
-}
-ACTIONS["tool-remind"] = el => {
-  const ts = toolsDue(60).filter(t => t.clientId === el.dataset.client);
-  mailBox(el.dataset.client, (cl, s) => MAIL.rappel[LANG](cl, ts, s));
-};
-ACTIONS["tool-reminded"] = async el => { for (const t of toolsDue(60).filter(t => t.clientId === el.dataset.client)) await patch("tools", t.id, { remindedAt: today() }); toast("Relance notée"); };
+document.addEventListener("change", e => { const id = e.target.dataset && e.target.dataset.calsel; if (!id) return; const s = UI.calSel || (UI.calSel = new Set()); e.target.checked ? s.add(id) : s.delete(id); render(true); });
 
-/* ---------- réception par scan ---------- */
-ACTIONS["tool-reception"] = () => {
-  let items = [];
-  const m = modal(`${mHead("Réception d'outils à étalonner")}<form><div class="body"><div class="fields">
-    ${field("r-client", "Client (pour les nouveaux outils)", "", { type: "select", options: clientOptions() })}${field("r-date", "Date de collecte", today(), { type: "date" })}</div>
-    ${scanBox("tscan", "Scanner ou saisir le numéro de série de l'outil")}<div id="t-list"></div><div class="err" id="r-err"></div></div>
-    <footer><div class="left muted" id="t-count"></div><button type="button" class="btn" data-close>Annuler</button><button class="btn primary" id="r-go">Réceptionner</button></footer></form>`, "lg");
-  const check = s => {
-    const t = toolBySerial(s);
-    if (!t) return { lvl: "new", msg: "Nouvel outil : complétez sa désignation" };
-    if (!atClient(t)) return { lvl: "warn", msg: `${t.name} · déjà en atelier (${T_STATUS[t.status][0].toLowerCase()})` };
-    return { lvl: "ok", msg: `${t.name} · ${clientName(t.clientId)} · échéance ${fmtDate(t.nextDue)}` };
-  };
-  const draw = () => {
-    items.forEach(i => Object.assign(i, check(i.serial)));
-    m.querySelector("#t-list").innerHTML = items.length ? `<div class="scanlist">${items.map((i, k) => `<div class="scanitem ${i.lvl}"><span class="mono"><b>${esc(i.serial)}</b></span>
-      ${i.lvl === "new" ? `<span class="grow row-g wrap"><input placeholder="Désignation *" data-k="name" data-i="${k}" value="${esc(i.name || "")}"><input placeholder="Marque" data-k="brand" data-i="${k}" value="${esc(i.brand || "")}"><input placeholder="Modèle" data-k="model" data-i="${k}" value="${esc(i.model || "")}"></span>` : `<span class="grow">${esc(i.msg)}</span>`}
-      <button type="button" class="x" data-rmscan="${k}" aria-label="Retirer">×</button></div>`).join("")}</div>` : `<div class="empty small">Aucun outil scanné.</div>`;
-    m.querySelector("#t-count").textContent = plural(items.length, "outil");
-  };
-  wireScan("tscan", s => { if (items.some(i => i.serial === s)) { toast(s + " est déjà dans la liste"); return; } items.unshift({ serial: s }); draw(); });
-  m.addEventListener("input", e => { if (e.target.dataset.i != null) items[+e.target.dataset.i][e.target.dataset.k] = e.target.value; });
-  m.addEventListener("click", e => { const b = e.target.closest("[data-rmscan]"); if (b) { items.splice(+b.dataset.rmscan, 1); draw(); } });
-  draw();
-  m.querySelector("form").onsubmit = async e => {
-    e.preventDefault();
-    const err = m.querySelector("#r-err"), date = val("r-date") || today(), cl = val("r-client");
-    if (!items.length) { err.textContent = "Scannez au moins un outil."; return; }
-    const news = items.filter(i => i.lvl === "new");
-    if (news.length && !cl) { err.textContent = "Choisissez le client pour les nouveaux outils."; return; }
-    if (news.some(i => !(i.name || "").trim())) { err.textContent = "Indiquez la désignation de chaque nouvel outil."; return; }
-    m.querySelector("#r-go").disabled = true;
-    for (const i of items) {
-      const t = toolBySerial(i.serial);
-      if (t) await patch("tools", t.id, { status: "recu", job: { receivedDate: date, movedAt: date } });
-      else await save("tools", "t-" + safeId(i.serial), { serial: i.serial, name: i.name.trim(), brand: i.brand || "", model: i.model || "", category: "", clientId: cl, intervalMonths: 12, calPrice: 0, status: "recu", job: { receivedDate: date, movedAt: date }, nextDue: "", photos: [], certs: [], history: [], shipments: [], createdAt: date });
-    }
-    closeModal(); toast(`${plural(items.length, "outil")} réceptionné${items.length > 1 ? "s" : ""}`);
-    UI.tab.etalonnage = "atelier"; render(true);
-  };
-};
-
-/* ---------- dossier outil ---------- */
-ACTIONS["tool-open"] = el => openTool(el.dataset.id);
-async function openTool(id) {
-  const t = await waitFind("tools", id); if (!t) return;
-  const ready = S.tools.filter(x => x.clientId === t.clientId && x.status === "a_livrer").length;
-  const inShop = IN_SHOP.includes(t.status);
-  const act = readOnly ? "" : atClient(t) ? `<button class="btn primary" data-a="tool-st" data-st="recu">Réceptionner pour étalonnage</button>`
-    : t.status === "a_livrer" ? `<button class="btn primary" data-a="tool-deliver">Livrer au client${ready > 1 ? ` (${ready} outils prêts)` : ""}</button>`
-    : t.status === "dropped" ? `<button class="btn primary" data-a="tool-st" data-st="done">Clôturer (Done)</button>`
-    : ["labo", "en_cours"].includes(t.status) ? `<button class="btn primary" data-a="tool-done">Enregistrer le certificat (Calibrated)</button>`
-    : t.status === "recu" ? `<button class="btn" data-a="tool-st" data-st="picked">Picked</button><button class="btn primary" data-a="tool-st" data-st="labo">Envoyer au labo</button>`
-    : `<button class="btn" data-a="tool-done">Étalonné en interne</button><button class="btn primary" data-a="tool-st" data-st="labo">Envoyer au labo</button>`;
-  const inShopD = inShop || t.status === "dropped";
-  const labs = (S.labs || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-  const m = modal(`${mHead(`<span class="mono">${esc(t.serial)}</span> ${esc(t.name)} ${tChip(t.status)}`)}<div class="body">
-    ${inShopD ? `<div class="panel pad jobbox"><div class="row-sb wrap"><b>Dossier en cours</b>${readOnly ? "" : `<label class="row-g small">Déplacer vers <select id="tm-move" class="fsel">${WORK_COLS.map(([k, l]) => `<option value="${k}" ${k === colOf(t) ? "selected" : ""}>${l}</option>`).join("")}</select></label>`}</div>
-      <dl class="kv sm"><dt>Bon de commande</dt><dd>${t.job?.so ? `<span class="mono">${esc(t.job.so)}</span>` : `<span class="muted">—</span>`}</dd>
-      <dt>Repair Order (RO)</dt><dd class="mono">${esc(t.job?.ro || "—")}</dd>
-      <dt>Laboratoire</dt><dd>${readOnly ? esc(labName(t.job?.labId) || "—") : `<select id="tm-lab" class="fsel"><option value="">Atelier interne / pas encore choisi</option>${labs.map(l => `<option value="${l.id}" ${l.id === (t.job?.labId || t.defaultLabId) ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>${!t.job?.labId && t.defaultLabId ? `<div class="hint">Présélectionné : dernier labo utilisé pour cet outil.</div>` : ""}`}</dd>
-      ${t.job?.receivedDate ? `<dt>En atelier depuis</dt><dd>${fmtDate(t.job.receivedDate)}</dd>` : ""}</dl></div>` : ""}
-    <dl class="kv"><dt>Client</dt><dd><b>${esc(clientName(t.clientId))}</b></dd>${t.pn ? `<dt>Part number (P/N)</dt><dd class="mono">${esc(t.pn)}</dd>` : ""}<dt>Marque / modèle</dt><dd>${esc([t.brand, t.model].filter(Boolean).join(" ") || "—")}</dd>
-    <dt>Catégorie</dt><dd>${esc(t.category || "—")}</dd><dt>Périodicité</dt><dd>${t.intervalMonths ? t.intervalMonths + " mois" : "—"}</dd>
-    <dt>Dernier étalonnage</dt><dd>${fmtDate(t.lastCalDate)}</dd><dt>Prochain étalonnage</dt><dd>${dueChip(t.nextDue)}</dd><dt>Prix de l'étalonnage</dt><dd>${t.calPrice ? eur(t.calPrice) + " HT" : "—"}</dd>
-    ${t.defaultLabId ? `<dt>Labo habituel</dt><dd>${esc(labName(t.defaultLabId))}</dd>` : ""}</dl>
-    <h3>Suivi des envois</h3>${shipmentsHtml(t)}
-    <h3>Photos</h3><div class="photos">${(t.photos || []).map(p => `<a href="${esc(blobUrl(p))}" target="_blank" rel="noopener"><img src="${esc(blobUrl(p))}" alt="Photo de l'outil ${esc(t.serial)}"></a>`).join("")}
-      ${assets && !readOnly ? `<label class="addphoto">+ Photo<input type="file" accept="image/*" capture="environment" id="tp-file" hidden></label>` : ""}</div>${!(t.photos || []).length && !assets ? `<div class="muted small">Aucune photo.</div>` : ""}
-    <h3>Certificats</h3>${(t.certs || []).length ? `<div class="tablewrap"><table><thead><tr><th>N°</th><th>Date</th><th>Résultat</th><th>Valide jusqu'au</th><th></th></tr></thead><tbody>${(t.certs || []).slice().sort((a, b) => b.date.localeCompare(a.date)).map(c => `<tr><td class="mono">${esc(c.number || "—")}</td><td class="num">${fmtDate(c.date)}</td>
-      <td><span class="chip ${T_RESULT[c.result]?.[1] || ""}">${T_RESULT[c.result]?.[0] || "—"}</span></td><td>${c.validUntil >= today() ? `<span class="chip good">Actif · ${fmtDate(c.validUntil)}</span>` : `<span class="chip">Expiré · ${fmtDate(c.validUntil)}</span>`}</td>
-      <td class="r">${c.file ? `<a class="btn sm" href="${esc(blobUrl(c.file))}" target="_blank" rel="noopener">Ouvrir</a>` : `<span class="muted small">pas de fichier</span>`}</td></tr>`).join("")}</tbody></table></div>` : `<div class="muted">Aucun certificat.</div>`}
-    ${assets && !readOnly ? `<label class="btn sm">Joindre un certificat existant (PDF)<input type="file" accept="application/pdf,image/*" id="tc-file" hidden></label>` : ""}
-    <h3>Historique</h3><div class="timeline">${(t.history || []).slice().reverse().map(h => `<div><span class="num muted">${fmtDate(h.done)}</span> <b>Étalonnage</b>${h.result ? " · " + (T_RESULT[h.result]?.[0] || "") : ""}${h.so ? ` · SO <span class="mono">${esc(h.so)}</span>` : ""}${h.ro ? ` · <span class="mono">${esc(h.ro)}</span>` : ""}${h.certNo ? ` · <span class="mono">${esc(h.certNo)}</span>` : ""}${h.labId ? " · " + esc(labName(h.labId)) : h.lab ? " · " + esc(h.lab) : ""}${h.delivered ? ` · livré le ${fmtDate(h.delivered)}` : ""}</div>`).join("") || `<div class="muted">Aucun étalonnage enregistré.</div>`}</div>
-    ${t.notes ? `<div class="quote">${esc(t.notes)}</div>` : ""}</div>
-    <footer><div class="left">${readOnly ? "" : `<button class="btn" data-a="tool-form" data-id="${t.id}">Modifier la fiche</button>`}</div>${act || ""}</footer>`, "lg");
-  m.dataset.tool = t.id;
-  const up = async (inp, kind) => {
-    const f = inp.files[0]; inp.value = ""; if (!f) return;
-    toast("Envoi du fichier…");
+/* ---------- sortie / retour par scan ---------- */
+ACTIONS["tool-scan"] = () => {
+  const me = meStaff(), crew = staffActive().slice().sort(staffSort);
+  const m = modal(`${mHead("Sortie / retour d'outils")}<div class="body"><div class="fields">
+    ${field("ts-who", "Sortis par", me ? me.id : "", { type: "select", options: [["", "Choisir…"], ...crew.map(p => [p.id, p.name])] })}${field("ts-reg", "Avion (facultatif)", "", { cls: "mono", ph: "9H-ABC" })}</div>
+    ${scanBox("ts-scan", "Scanner ou saisir le n° de l'outil : il sort s'il est rentré, il rentre s'il est sorti")}<div id="ts-log" class="scanlist"></div></div>
+    <footer><button type="button" class="btn primary" data-close>Terminer</button></footer>`, "lg");
+  const log = (lvl, msg) => m.querySelector("#ts-log").insertAdjacentHTML("afterbegin", `<div class="scanitem ${lvl}">${msg}</div>`);
+  wireScan("ts-scan", async code => {
+    const t = toolByCode(code);
+    if (!t) { log("warn", `<span class="mono"><b>${esc(code)}</b></span> ${esc(tr("Outil inconnu : ajoutez-le au registre"))}`); return; }
+    const name = `<span class="mono"><b>${esc(tLabel(t))}</b></span> ${esc(t.name)}`;
     try {
-      const r = await assets.upload(f, f.type ? undefined : { type: kind === "photo" ? "image/jpeg" : "application/pdf" });
-      if (kind === "photo") await patch("tools", t.id, { photos: [...(t.photos || []), r.id] });
-      else await patch("tools", t.id, { certs: [...(t.certs || []), { number: f.name.replace(/\.[^.]+$/, ""), date: today(), validUntil: t.nextDue || addMonths(today(), +t.intervalMonths || 12), result: "conforme", file: r.id }] });
-      toast("Fichier ajouté"); openTool(t.id);
-    } catch (e) { toast(e.code === "too_large" ? "Fichier trop lourd (20 Mo maximum)." : e.code === "unsupported_type" ? "Format non accepté : utilisez une photo ou un PDF." : "Envoi impossible pour l'instant."); }
-  };
-  m.querySelector("#tp-file")?.addEventListener("change", e => up(e.target, "photo"));
-  m.querySelector("#tm-move")?.addEventListener("change", e => moveTool(t.id, e.target.value, () => openTool(t.id)));
-  m.querySelector("#tm-lab")?.addEventListener("change", async e => { const lab = e.target.value; await patch("tools", t.id, Object.assign({ job: Object.assign({}, t.job || {}, { labId: lab }) }, lab ? { defaultLabId: lab } : {})); toast(lab ? "Labo : " + labName(lab) : "Atelier interne"); openTool(t.id); });
-  wireShipments(m, t);
-  m.querySelector("#tc-file")?.addEventListener("change", e => up(e.target, "cert"));
-}
-const curTool = () => S.tools.find(x => x.id === document.querySelector(".modal")?.dataset.tool);
-ACTIONS["tool-st"] = async el => {
-  const t = curTool(), st = el.dataset.st;
-  if (st !== "recu" || !atClient(t)) return moveTool(t.id, st, () => openTool(t.id));
-  const job = Object.assign({}, t.job || {}, st === "recu" ? { receivedDate: today() } : { startedDate: today() });
-  await patch("tools", t.id, { status: st, job: st === "recu" ? { receivedDate: today(), movedAt: today() } : job });
-  toast(T_STATUS[st][0]); openTool(t.id);
+      if (t.out) { await patch("tools", t.id, { out: null, history: tHist(t, "in", outWho(t)) }); log("ok", `${name} · ${esc(tr("Rentré"))}`); return; }
+      if (!tUsable(t)) { log("warn", `${name} · ${esc(tr(tOverdue(t) ? "Étalonnage dépassé : ne pas utiliser" : T_STATUS[tStatus(t)][0] + " : ne peut pas sortir"))}`); return; }
+      const who = val("ts-who"); if (!who) { log("warn", `${name} · ${esc(tr("Choisissez qui sort l'outil"))}`); return; }
+      const reg = val("ts-reg").toUpperCase();
+      await patch("tools", t.id, { out: { staffId: who, reg, at: new Date().toISOString(), by: (ME && ME.name) || "" }, history: tHist(t, "out", staff(who)?.name + (reg ? " · " + reg : "")) });
+      log("ok", `${name} · ${esc(tr("Sorti"))} · ${esc(staff(who)?.name || "")}${reg ? " · " + esc(reg) : ""}`);
+    } catch (e) { log("warn", `${name} · ${esc(tr(e.message || "Erreur"))}`); }
+  });
 };
-ACTIONS["tool-done"] = () => {
-  const t = curTool();
-  const m = modal(`${mHead("Terminer l'étalonnage · " + esc(t.serial))}<form><div class="body"><div class="fields">
+ACTIONS["tool-out"] = el => {
+  const t = S.tools.find(x => x.id === el.dataset.id); if (!t) return;
+  if (!tUsable(t)) { toast(tOverdue(t) ? "Étalonnage dépassé : ne pas utiliser" : "Cet outil ne peut pas sortir"); return; }
+  const me = meStaff(), crew = staffActive().slice().sort(staffSort);
+  const m = modal(`${mHead("Sortir · " + esc(tLabel(t)))}<form><div class="body"><div class="fields">
+    ${field("to-who", "Sorti par", me ? me.id : "", { type: "select", required: true, options: [["", "Choisir…"], ...crew.map(p => [p.id, p.name])] })}${field("to-reg", "Avion (facultatif)", "", { cls: "mono", ph: "9H-ABC" })}</div></div>
+    <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Sortir l'outil</button></footer></form>`);
+  m.querySelector("form").onsubmit = async e => { e.preventDefault(); const who = val("to-who"), reg = val("to-reg").toUpperCase();
+    await patch("tools", t.id, { out: { staffId: who, reg, at: new Date().toISOString(), by: (ME && ME.name) || "" }, history: tHist(t, "out", staff(who)?.name + (reg ? " · " + reg : "")) }); closeModal(); toast("Outil sorti"); };
+};
+ACTIONS["tool-in"] = async el => { const t = S.tools.find(x => x.id === el.dataset.id); if (!t || !t.out) return; await patch("tools", t.id, { out: null, history: tHist(t, "in", outWho(t)) }); toast("Outil rentré"); if (document.querySelector(".modal")?.dataset.tool === t.id) openTool(t.id); };
+
+/* ---------- envoi au labo (plusieurs outils) et retour ---------- */
+ACTIONS["tool-send"] = el => {
+  const ids = el.dataset.id ? [el.dataset.id] : [...(UI.calSel || [])];
+  const ts = ids.map(id => S.tools.find(t => t.id === id)).filter(t => t && !t.out && tStatus(t) !== "lab"); if (!ts.length) return;
+  const labs = (S.labs || []).slice().sort((a, b) => a.name.localeCompare(b.name)), def = ts[0].defaultLabId || (labs.find(l => /ways/i.test(l.name)) || (labs.length === 1 ? labs[0] : {})).id || "";
+  const m = modal(`${mHead("Envoyer au laboratoire")}<form><div class="body">
+    ${labs.length ? "" : `<div class="banner warn">Aucun laboratoire enregistré : ajoutez-en un dans l'onglet Laboratoires.</div>`}
+    <div class="muted small">${ts.map(t => `<span class="chip sm mono">${esc(tLabel(t))}</span>`).join(" ")}</div>
+    <div class="fields">${field("ls-lab", "Laboratoire", def, { type: "select", options: [["", "Choisir…"], ...labs.map(l => [l.id, l.name])] })}${field("ls-date", "Date d'envoi", today(), { type: "date" })}
+    ${field("ls-ref", "Référence (bon d'envoi, commande…)", "", { cls: "mono" })}${field("ls-exp", "Retour prévu", addDays(today(), +((S.labs || []).find(l => l.id === def)?.leadDays) || 14), { type: "date" })}
+    ${field("ls-carrier", "Transporteur", "", { type: "select", options: [["", "Pas d'envoi (déposé / enlevé)"], ...Object.entries(CARRIERS).map(([k, v]) => [k, v[0]])] })}${field("ls-no", "N° de suivi", "", { cls: "mono" })}</div><div class="err" id="ls-err"></div></div>
+    <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Envoyer ${plural(ts.length, "outil")}</button></footer></form>`);
+  m.querySelector("form").onsubmit = async e => {
+    e.preventDefault();
+    const lab = val("ls-lab"); if (!lab) { m.querySelector("#ls-err").textContent = tr("Choisissez le laboratoire."); return; }
+    m.querySelector("button.primary").disabled = true;
+    const date = val("ls-date") || today(), no = val("ls-no").trim();
+    for (const t of ts) {
+      const shipments = [...(t.shipments || [])]; if (no) shipments.push({ id: "s" + Date.now().toString(36) + t.id.slice(-3), carrier: val("ls-carrier") || "autre", number: no, dir: "vers_labo", date, labId: lab });
+      await patch("tools", t.id, { status: "lab", job: { labId: lab, sentDate: date, ref: val("ls-ref").trim(), expected: val("ls-exp") }, defaultLabId: lab, shipments, history: tHist(t, "send", labName(lab) + (val("ls-ref") ? " · " + val("ls-ref").trim() : "")) });
+    }
+    UI.calSel = new Set(); closeModal(); toast(`${plural(ts.length, "outil")} envoyé${ts.length > 1 ? "s" : ""} chez ${labName(lab)}`); render(true);
+  };
+};
+/* retour du labo, ou étalonnage enregistré pour un outil en service : certificat, résultat, prochaine échéance */
+ACTIONS["tool-back"] = el => {
+  const t = S.tools.find(x => x.id === (el.dataset.id || document.querySelector(".modal")?.dataset.tool)); if (!t) return;
+  const m = modal(`${mHead((tStatus(t) === "lab" ? "Retour du labo · " : "Enregistrer un étalonnage · ") + esc(tLabel(t)))}<form><div class="body"><div class="fields">
     ${field("c-date", "Date d'étalonnage", today(), { type: "date", required: true })}${field("c-res", "Résultat", "conforme", { type: "select", options: Object.entries(T_RESULT).map(([k, v]) => [k, v[0]]) })}
-    ${field("c-no", "N° de certificat", "", { cls: "mono", required: true })}${field("c-lab", "Réalisé par", labName(t.job?.labId) || "Atelier interne", { ph: "Atelier interne ou laboratoire externe" })}
+    ${field("c-no", "N° de certificat", "", { cls: "mono", required: true })}${field("c-lab", "Réalisé par", labName(t.job?.labId) || labName(t.defaultLabId), { ph: "Laboratoire" })}
     ${field("c-int", "Périodicité (mois)", t.intervalMonths || 12, { type: "number", min: 1 })}${field("c-next", "Prochain étalonnage", addMonths(today(), +t.intervalMonths || 12), { type: "date" })}</div>
-    ${assets ? `<label class="f">Certificat (PDF ou photo)<input type="file" id="c-file" accept="application/pdf,image/*"></label>` : `<div class="hint">L'ajout de fichiers est réservé aux éditeurs : le certificat pourra être joint plus tard.</div>`}
-    ${field("c-note", "Remarques (valeurs relevées, ajustages…)", "", { type: "textarea", wide: true })}<div class="err" id="c-err"></div></div>
+    ${assets ? `<label class="f">Certificat (PDF ou photo)<input type="file" id="c-file" accept="application/pdf,image/*"></label>` : `<div class="hint">Le certificat pourra être joint plus tard.</div>`}
+    ${field("c-note", "Remarques (valeurs relevées, ajustages…)", "", { type: "textarea", wide: true })}<div class="banner warn small" id="c-nc" hidden>Non conforme : l'outil passe hors service.</div><div class="err" id="c-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></footer></form>`, "lg");
-  const sync = () => { m.querySelector("#c-next").value = addMonths(val("c-date") || today(), +val("c-int") || 12); };
-  m.querySelector("#c-date").onchange = sync; m.querySelector("#c-int").oninput = sync;
+  const sync = () => { m.querySelector("#c-next").value = addMonths(val("c-date") || today(), +val("c-int") || 12); m.querySelector("#c-nc").hidden = val("c-res") !== "non_conforme"; };
+  m.querySelector("#c-date").onchange = sync; m.querySelector("#c-int").oninput = sync; m.querySelector("#c-res").onchange = sync;
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const btn = m.querySelector("button.primary"); btn.disabled = true;
-    let file = "";
-    const f = m.querySelector("#c-file")?.files[0];
-    if (f) { try { file = (await assets.upload(f, f.type ? undefined : { type: "application/pdf" })).id; } catch { m.querySelector("#c-err").textContent = "Le fichier n'a pas pu être envoyé. Réessayez ou enregistrez sans fichier."; btn.disabled = false; return; } }
-    const date = val("c-date"), res = val("c-res"), no = val("c-no"), next = val("c-next");
-    const cert = { number: no, date, validUntil: res === "non_conforme" ? date : next, result: res, file, lab: val("c-lab") };
-    await patch("tools", t.id, {
-      status: "a_livrer", lastCalDate: date,
-      ...(t.status === "labo" ? {} : {}), nextDue: res === "non_conforme" ? date : next, intervalMonths: +val("c-int") || 12,
-      certs: [...(t.certs || []), cert], job: Object.assign({}, t.job || {}, { movedAt: today(), doneDate: date, result: res, certNo: no, lab: val("c-lab"), note: val("c-note") })
-    });
-    toast("Étalonnage enregistré : outil prêt à livrer"); openTool(t.id);
+    let file = ""; const f = m.querySelector("#c-file")?.files[0];
+    if (f) { try { file = (await assets.upload(f, f.type ? undefined : { type: "application/pdf" })).id; } catch { m.querySelector("#c-err").textContent = tr("Le fichier n'a pas pu être envoyé. Réessayez ou enregistrez sans fichier."); btn.disabled = false; return; } }
+    const date = val("c-date"), res = val("c-res"), no = val("c-no"), next = val("c-next"), nc = res === "non_conforme";
+    const shipments = (t.shipments || []).map(x => x.dir === "vers_labo" && !x.delivered ? Object.assign({}, x, { delivered: x.date || date }) : x);
+    await patch("tools", t.id, { status: nc ? "us" : "service", lastCalDate: date, nextDue: nc ? date : next, intervalMonths: +val("c-int") || 12, job: null, shipments,
+      certs: [...(t.certs || []), { number: no, date, validUntil: nc ? date : next, result: res, file, lab: val("c-lab"), note: val("c-note") }],
+      history: tHist(t, "cal", `${T_RESULT[res][0]} · ${no}${val("c-lab") ? " · " + val("c-lab") : ""}`) });
+    toast(nc ? "Étalonnage enregistré : outil hors service" : "Étalonnage enregistré : outil en service"); openTool(t.id);
   };
 };
-ACTIONS["tool-deliver"] = () => {
-  const t = curTool(), ready = S.tools.filter(x => x.clientId === t.clientId && x.status === "a_livrer");
-  const m = modal(`${mHead("Livraison au client · " + esc(clientName(t.clientId)))}<form><div class="body">
-    <div class="checklist">${ready.map(x => `<label class="chk"><input type="checkbox" value="${x.id}" checked> <span class="mono"><b>${esc(x.serial)}</b></span> ${esc(x.name)} <span class="muted">· ${x.calPrice ? eur(x.calPrice) : "prix non défini"}</span></label>`).join("")}</div>
-    <div class="fields">${field("dl-date", "Date de livraison", today(), { type: "date" })}</div>
-    <div class="err" id="dl-err"></div></div>
-    <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Valider la livraison</button></footer></form>`);
-  m.querySelector("form").onsubmit = async e => {
-    e.preventDefault();
-    const ids = [...m.querySelectorAll(".checklist input:checked")].map(i => i.value), date = val("dl-date");
-    if (!ids.length) { m.querySelector("#dl-err").textContent = "Cochez au moins un outil."; return; }
-    m.querySelector("button.primary").disabled = true;
-    const sel = ids.map(id => S.tools.find(x => x.id === id));
-    for (const x of sel) await patch("tools", x.id, { status: "dropped", job: Object.assign({}, x.job || {}, { delivered: date, movedAt: date }) });
-    closeModal(); toast(`${plural(sel.length, "outil")} livré${sel.length > 1 ? "s" : ""}`);
-  };
+/* changement de statut : hors service, perdu, retiré, remis en service */
+ACTIONS["tool-status"] = el => {
+  const t = S.tools.find(x => x.id === document.querySelector(".modal")?.dataset.tool), st = el.dataset.st; if (!t) return;
+  const m = modal(`${mHead(esc(tr(T_STATUS[st][0])) + " · " + esc(tLabel(t)))}<form><div class="body">${field("tst-why", st === "service" ? "Remarque" : "Raison", "", { type: "textarea", wide: true, required: st !== "service" })}
+    ${st === "us" ? `<div class="hint">Mettez une étiquette « Unserviceable » sur l'outil et rangez-le en quarantaine.</div>` : ""}</div>
+    <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Confirmer</button></footer></form>`);
+  m.querySelector("form").onsubmit = async e => { e.preventDefault(); await patch("tools", t.id, Object.assign({ status: st, history: tHist(t, st, val("tst-why")) }, st === "service" ? {} : { out: null })); openTool(t.id); };
 };
+
+/* ---------- fiche outil ---------- */
+ACTIONS["tool-open"] = el => openTool(el.dataset.id);
+async function openTool(id) {
+  const t = await waitFind("tools", id); if (!t) return;
+  const st = tStatus(t), ok = tUsable(t);
+  const act = readOnly ? "" : [
+    t.out ? `<button class="btn primary" data-a="tool-in" data-id="${t.id}">Rentrer</button>` : ok ? `<button class="btn primary" data-a="tool-out" data-id="${t.id}">Sortir</button>` : "",
+    st === "lab" ? `<button class="btn primary" data-a="tool-back" data-id="${t.id}">Retour du labo</button>` : "",
+    ["service", "us"].includes(st) && t.calRequired !== false && !t.out ? `<button class="btn" data-a="tool-send" data-id="${t.id}">Envoyer au labo</button>` : "",
+    isOffice() && st !== "lab" ? `<button class="btn" data-a="tool-back" data-id="${t.id}">Enregistrer un étalonnage</button>` : ""].join("");
+  const stBtns = readOnly || !isOffice() ? "" : (st === "service" ? [["us", "Mettre hors service"], ["lost", "Déclarer perdu"], ["retired", "Ne plus utiliser"]] : st === "lab" ? [] : [["service", "Remettre en service"]])
+    .map(([k, l]) => `<button class="linkbtn small" data-a="tool-status" data-st="${k}">${l}</button>`).join(" · ");
+  const m = modal(`${mHead(`<span class="mono">${esc(tLabel(t))}</span> ${esc(t.name)} ${tChip(t)}`)}<div class="body">
+    ${tOverdue(t) ? `<div class="banner bad">Étalonnage dépassé depuis le ${fmtDate(t.nextDue)} : ne pas utiliser cet outil.</div>` : ""}
+    ${t.out ? `<div class="banner info">Sorti par <b>${esc(outWho(t))}</b>${t.out.reg ? " pour " + `<b class="mono">${esc(t.out.reg)}</b>` : ""} · ${fmtDT(t.out.at)}</div>` : ""}
+    ${st === "lab" ? `<div class="banner warn">Au laboratoire ${esc(labName(t.job?.labId))} depuis le ${fmtDate(t.job?.sentDate)}${t.job?.ref ? " · " + esc(t.job.ref) : ""}${t.job?.expected ? " · " + tr("retour prévu") + " " + fmtDate(t.job.expected) : ""}.</div>` : ""}
+    <dl class="kv"><dt>Désignation</dt><dd>${esc(t.name)}</dd>${t.pn ? `<dt>Part number (P/N)</dt><dd class="mono">${esc(t.pn)}</dd>` : ""}${t.serial ? `<dt>N° de série (S/N)</dt><dd class="mono">${esc(t.serial)}</dd>` : ""}
+    <dt>Marque / modèle</dt><dd>${esc([t.brand, t.model].filter(Boolean).join(" ") || "—")}</dd><dt>Catégorie</dt><dd>${esc(t.category || "—")}</dd><dt>Emplacement</dt><dd>${esc(t.location || "—")}</dd>
+    ${t.owner ? `<dt>Propriétaire</dt><dd>${esc(t.owner)}</dd>` : ""}
+    ${t.calRequired === false ? `<dt>Étalonnage</dt><dd class="muted">Pas d'étalonnage pour cet outil</dd>` : `<dt>Périodicité</dt><dd>${t.intervalMonths ? t.intervalMonths + " mois" : "—"}</dd><dt>Dernier étalonnage</dt><dd>${fmtDate(t.lastCalDate)}</dd><dt>Prochain étalonnage</dt><dd>${dueChip(t.nextDue)}</dd>`}
+    ${t.defaultLabId ? `<dt>Labo habituel</dt><dd>${esc(labName(t.defaultLabId))}</dd>` : ""}</dl>
+    ${stBtns ? `<div class="row-g wrap">${stBtns}</div>` : ""}
+    ${t.calRequired === false ? "" : `<h3>Certificats</h3>${(t.certs || []).length ? `<div class="tablewrap"><table><thead><tr><th>N°</th><th>Date</th><th>Résultat</th><th>Valide jusqu'au</th><th>Labo</th><th></th></tr></thead><tbody>${(t.certs || []).slice().sort((a, b) => b.date.localeCompare(a.date)).map(c => `<tr>
+      <td class="mono">${esc(c.number || "—")}</td><td class="num">${fmtDate(c.date)}</td><td><span class="chip ${T_RESULT[c.result]?.[1] || ""}">${T_RESULT[c.result]?.[0] || "—"}</span></td>
+      <td>${c.validUntil >= today() && c.result !== "non_conforme" ? `<span class="chip good">Actif · ${fmtDate(c.validUntil)}</span>` : `<span class="chip">Expiré · ${fmtDate(c.validUntil)}</span>`}</td><td class="small">${esc(c.lab || "")}</td>
+      <td class="r">${c.file ? `<a class="btn sm" href="${esc(blobUrl(c.file))}" target="_blank" rel="noopener">Ouvrir</a>` : `<span class="muted small">pas de fichier</span>`}</td></tr>`).join("")}</tbody></table></div>` : `<div class="muted">Aucun certificat enregistré.</div>`}
+    <h3>Suivi des envois</h3>${shipmentsHtml(t)}`}
+    <h3>Photos</h3><div class="photos">${(t.photos || []).map(p => `<a href="${esc(blobUrl(p))}" target="_blank" rel="noopener"><img src="${esc(blobUrl(p))}" alt="Photo de l'outil ${esc(tLabel(t))}"></a>`).join("")}
+      ${assets && !readOnly && isOffice() ? `<label class="addphoto">+ Photo<input type="file" accept="image/*" capture="environment" id="tp-file" hidden></label>` : ""}</div>${!(t.photos || []).length && !assets ? `<div class="muted small">Aucune photo.</div>` : ""}
+    <h3>Historique</h3><div class="timeline">${(t.history || []).slice(-40).reverse().map(h => `<div><span class="num muted">${fmtDT(h.at)}</span> <b>${esc(tr(T_HIST[h.type] || h.type))}</b>${h.text ? " · " + esc(h.text) : ""}${h.by ? ` <span class="muted small">(${esc(h.by)})</span>` : ""}</div>`).join("") || `<div class="muted">Rien pour l'instant.</div>`}</div>
+    ${t.notes ? `<div class="quote">${esc(t.notes)}</div>` : ""}</div>
+    <footer><div class="left">${readOnly || !isOffice() ? "" : `<button class="btn" data-a="tool-form" data-id="${t.id}">Modifier la fiche</button>`}</div>${act}</footer>`, "lg");
+  m.dataset.tool = t.id;
+  m.querySelector("#tp-file")?.addEventListener("change", async e => {
+    const f = e.target.files[0]; e.target.value = ""; if (!f) return; toast("Envoi du fichier…");
+    try { const r = await assets.upload(f, f.type ? undefined : { type: "image/jpeg" }); await patch("tools", t.id, { photos: [...(t.photos || []), r.id] }); toast("Fichier ajouté"); openTool(t.id); }
+    catch (x) { toast(x.code === "too_large" ? "Fichier trop lourd (20 Mo maximum)." : "Envoi impossible pour l'instant."); }
+  });
+  if (t.calRequired !== false) wireShipments(m, t);
+}
 ACTIONS["tool-form"] = el => {
-  const t = S.tools.find(x => x.id === el.dataset.id) || { intervalMonths: 12, status: "client", calPrice: 0 };
-  const isNew = !t.id;
-  const cats = [...new Set(S.tools.map(x => x.category).filter(Boolean))];
-  const m = modal(`${mHead(isNew ? "Nouvel outil" : "Modifier " + esc(t.serial))}<form><div class="body"><div class="fields">
-    ${field("tf-serial", "N° de série", t.serial, { required: true, cls: "mono" })}${field("tf-name", "Désignation", t.name, { required: true, ph: "Clé dynamométrique 20-100 Nm" })}
-    ${field("tf-pn", "Part number (P/N)", t.pn, { cls: "mono" })}${field("tf-brand", "Marque", t.brand)}${field("tf-model", "Modèle", t.model)}${field("tf-cat", "Catégorie", t.category, { ph: cats.slice(0, 3).join(", ") || "Couple, pression, électrique…" })}
-    ${field("tf-client", "Client propriétaire", t.clientId, { type: "select", options: clientOptions(), required: true })}
-    ${field("tf-int", "Périodicité (mois)", t.intervalMonths, { type: "number", min: 1 })}${field("tf-next", "Prochain étalonnage", t.nextDue, { type: "date" })}
-    ${field("tf-price", "Prix de l'étalonnage HT", t.calPrice, { type: "number", step: "0.01" })}
-    ${isNew ? field("tf-st", "Où est l'outil ?", "client", { type: "select", options: [["client", "Chez le client"], ["recu", "Réceptionné à l'atelier"]] }) : ""}</div>
+  const t = S.tools.find(x => x.id === el.dataset.id) || { intervalMonths: 12, status: "service", calRequired: true, owner: settings().name || "" };
+  const isNew = !t.id, cats = [...new Set(S.tools.map(x => x.category).filter(Boolean))], locs = [...new Set(S.tools.map(x => x.location).filter(Boolean))];
+  const m = modal(`${mHead(isNew ? "Nouvel outil" : "Modifier " + esc(tLabel(t)))}<form><div class="body"><div class="fields">
+    ${field("tf-no", "N° d'outil (étiquette)", t.toolNo, { required: true, cls: "mono", ph: "TLV-T-001" })}${field("tf-name", "Désignation", t.name, { required: true, ph: "Clé dynamométrique 20-100 Nm" })}
+    ${field("tf-pn", "Part number (P/N)", t.pn, { cls: "mono" })}${field("tf-serial", "N° de série (S/N)", t.serial, { cls: "mono" })}${field("tf-brand", "Marque", t.brand)}${field("tf-model", "Modèle", t.model)}
+    <label class="f">Catégorie<input id="tf-cat" list="tf-cats" value="${esc(t.category || "")}"></label><datalist id="tf-cats">${cats.map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+    <label class="f">Emplacement<input id="tf-loc" list="tf-locs" value="${esc(t.location || "")}" placeholder="${esc(tr("Caisse 1, étagère B…"))}"></label><datalist id="tf-locs">${locs.map(c => `<option value="${esc(c)}">`).join("")}</datalist>
+    ${field("tf-owner", "Propriétaire", t.owner)}</div>
+    <label class="chk"><input type="checkbox" id="tf-cal" ${t.calRequired !== false ? "checked" : ""}> Outil à étalonner</label>
+    <div class="fields" id="tf-calf">${field("tf-int", "Périodicité (mois)", t.intervalMonths, { type: "number", min: 1 })}${field("tf-last", "Dernier étalonnage", t.lastCalDate, { type: "date" })}${field("tf-next", "Prochain étalonnage", t.nextDue, { type: "date" })}</div>
     ${field("tf-notes", "Notes", t.notes, { type: "textarea", wide: true })}<div class="err" id="tf-err"></div></div>
     <footer>${isNew ? "" : `<div class="left"><button type="button" class="btn danger" data-a="tool-del" data-id="${t.id}" ${dis()}>Supprimer</button></div>`}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
+  const calf = () => { m.querySelector("#tf-calf").hidden = !m.querySelector("#tf-cal").checked; };
+  m.querySelector("#tf-cal").onchange = calf; calf();
+  m.querySelector("#tf-last").onchange = () => { if (val("tf-last")) m.querySelector("#tf-next").value = addMonths(val("tf-last"), +val("tf-int") || 12); };
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    const serial = normSerial(val("tf-serial")), other = toolBySerial(serial);
-    if (other && other.id !== t.id) { m.querySelector("#tf-err").textContent = `Le n° de série ${serial} existe déjà (${other.name}).`; return; }
-    const st = isNew ? val("tf-st") : t.status;
-    const data = Object.assign({ photos: [], certs: [], history: [], job: {} }, strip(t), { serial, pn: val("tf-pn").trim().toUpperCase(), name: val("tf-name"), brand: val("tf-brand"), model: val("tf-model"), category: val("tf-cat"), clientId: val("tf-client"), intervalMonths: +val("tf-int") || 12, nextDue: val("tf-next"), calPrice: +val("tf-price") || 0, notes: val("tf-notes"), status: st });
-    if (isNew && st === "recu") data.job = { receivedDate: today(), movedAt: today() };
-    const id = await save("tools", t.id || "t-" + safeId(serial), data);
+    const no = normSerial(val("tf-no")), other = S.tools.find(x => normSerial(x.toolNo) === no);
+    if (other && other.id !== t.id) { m.querySelector("#tf-err").textContent = `${tr("Le n° d'outil")} ${no} ${tr("existe déjà")} (${other.name}).`; return; }
+    const data = Object.assign({ photos: [], certs: [], history: [], shipments: [] }, strip(t), { toolNo: no, name: val("tf-name"), pn: val("tf-pn").trim().toUpperCase(), serial: normSerial(val("tf-serial")),
+      brand: val("tf-brand"), model: val("tf-model"), category: val("tf-cat"), location: val("tf-loc"), owner: val("tf-owner"), calRequired: m.querySelector("#tf-cal").checked,
+      intervalMonths: +val("tf-int") || 12, lastCalDate: val("tf-last"), nextDue: val("tf-next"), notes: val("tf-notes"), status: t.status || "service" });
+    const id = await save("tools", t.id || "t-" + safeId(no), data);
     toast("Outil enregistré"); openTool(id);
   };
 };
-ACTIONS["tool-del"] = el => confirmBox("Supprimer ce dossier outil ? Ses photos et certificats ne seront plus accessibles depuis l'application.", () => remove("tools", el.dataset.id));
+ACTIONS["tool-del"] = el => confirmBox("Supprimer cet outil du registre ? Pour un outil qui n'est plus utilisé, préférez « Retirer » : son historique reste consultable.", () => remove("tools", el.dataset.id));
 
 /* ======================= SUIVI DES ENVOIS (DHL, FedEx…) ======================= */
 const CARRIERS = {
@@ -305,7 +249,7 @@ const CARRIERS = {
   bpost: ["bpost", n => `https://track.bpost.cloud/btr/web/#/search?itemCode=${n}`],
   autre: ["Autre", null]
 };
-const SHIP_DIR = { vers_labo: "Vers le labo", retour_labo: "Retour du labo", vers_client: "Vers le client", depuis_client: "Depuis le client" };
+const SHIP_DIR = { vers_labo: "Vers le labo", retour_labo: "Retour du labo" };
 const trackUrl = x => { const c = CARRIERS[x.carrier]; return c && c[1] ? c[1](encodeURIComponent(x.number)) : ""; };
 function shipmentsHtml(t) {
   const list = (t.shipments || []).slice().sort((a, b) => (b.date || "").localeCompare(a.date || ""));
@@ -314,7 +258,7 @@ function shipmentsHtml(t) {
     <td class="mono">${trackUrl(x) ? `<a href="${esc(trackUrl(x))}" target="_blank" rel="noopener" data-stop>${esc(x.number)} ↗</a>` : esc(x.number)}</td>
     <td>${x.delivered ? `<span class="chip good">Livré · ${fmtDate(x.delivered)}</span>` : readOnly ? `<span class="chip info">En transit</span>` : `<button type="button" class="btn sm" data-shipdone="${x.id}">Marquer livré</button>`}</td>
     <td class="r">${readOnly ? "" : `<button type="button" class="x" data-shiprm="${x.id}" aria-label="Supprimer cet envoi">×</button>`}</td></tr>`).join("")}</tbody></table></div>` : `<div class="muted small">Aucun envoi enregistré.</div>`}
-    ${readOnly ? "" : `<div class="shipadd row-g wrap"><select id="sh-dir" class="fsel" aria-label="Sens">${Object.entries(SHIP_DIR).map(([k, l]) => `<option value="${k}" ${k === (t.status === "labo" ? "retour_labo" : IN_SHOP.includes(t.status) ? "vers_labo" : "depuis_client") ? "selected" : ""}>${l}</option>`).join("")}</select>
+    ${readOnly ? "" : `<div class="shipadd row-g wrap"><select id="sh-dir" class="fsel" aria-label="Sens">${Object.entries(SHIP_DIR).map(([k, l]) => `<option value="${k}" ${k === (t.status === "lab" ? "retour_labo" : "vers_labo") ? "selected" : ""}>${l}</option>`).join("")}</select>
       <select id="sh-car" class="fsel" aria-label="Transporteur">${Object.entries(CARRIERS).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join("")}</select>
       <input id="sh-no" class="mono" placeholder="N° de suivi" aria-label="Numéro de suivi"><input id="sh-date" type="date" value="${today()}" aria-label="Date d'envoi"><button type="button" class="btn sm" id="sh-add">+ Ajouter l'envoi</button></div>`}</div>`;
 }
@@ -333,7 +277,7 @@ function wireShipments(m, t) {
 }
 
 /* ======================= LABORATOIRES ======================= */
-const labTools = id => S.tools.filter(t => t.status === "labo" && t.job?.labId === id);
+const labTools = id => S.tools.filter(t => t.status === "lab" && t.job?.labId === id);
 function calibLabs() {
   const labs = (S.labs || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   const sel = labs.find(l => l.id === UI.labSel) || null;
@@ -341,7 +285,7 @@ function calibLabs() {
     ${labs.length ? `<div class="tablewrap"><table><thead><tr><th>Laboratoire</th><th>Accréditation</th><th>Contact</th><th class="r">Outils chez eux</th></tr></thead><tbody>${labs.map(l => { const n = labTools(l.id).length; return `<tr class="click ${sel && sel.id === l.id ? "sel" : ""}" data-a="lab-sel" data-id="${l.id}">
       <td><b>${esc(l.name)}</b><div class="muted small">${esc(l.city || "")}</div></td><td class="small">${esc(l.accreditation || "—")}</td><td class="small">${esc(l.contact || "")}${l.email ? `<div class="muted">${esc(l.email)}</div>` : ""}</td>
       <td class="r">${n ? `<span class="chip bad">${n}</span>` : `<span class="muted">0</span>`}</td></tr>`; }).join("")}</tbody></table></div>`
-      : `<div class="empty">Aucun laboratoire. Ajoutez les labos avec qui vous travaillez : ils pourront être choisis dans la fiche de chaque outil.</div>`}</div>`;
+      : `<div class="empty">Aucun laboratoire. Ajoutez les labos où la station envoie ses outils (par exemple WAYS) : ils pourront être choisis à chaque envoi.</div>`}</div>`;
   if (!sel) return `<div class="labs-grid">${list}<div class="panel empty">Sélectionnez un laboratoire pour voir ses coordonnées et les outils qui s'y trouvent actuellement.</div></div>`;
   const ts = labTools(sel.id).sort((a, b) => (a.job?.sentDate || "").localeCompare(b.job?.sentDate || ""));
   const usual = S.tools.filter(t => t.defaultLabId === sel.id).length;
@@ -349,8 +293,8 @@ function calibLabs() {
     <dl class="kv sm pad">${[["Accréditation", sel.accreditation], ["Adresse", [sel.address, sel.city].filter(Boolean).join(", ")], ["Contact", sel.contact], ["E-mail", sel.email], ["Téléphone", sel.phone], ["Délai habituel", sel.leadDays ? sel.leadDays + " jours" : ""]].filter(r => r[1]).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
     ${sel.notes ? `<div class="pad quote">${esc(sel.notes)}</div>` : ""}
     <div class="pad"><h3 class="np">Outils actuellement chez ${esc(sel.name)} <span class="muted">${ts.length}</span></h3></div>
-    ${ts.length ? `<div class="tablewrap"><table><thead><tr><th>N° de série</th><th>Outil</th><th>Client</th><th>SO · RO</th><th>Envoyé le</th><th>Suivi</th></tr></thead><tbody>${ts.map(t => { const d = t.job?.sentDate ? daysBetween(t.job.sentDate, today()) : null, shp = (t.shipments || []).filter(x => x.dir === "vers_labo").slice(-1)[0];
-      return `<tr class="click" data-a="tool-open" data-id="${t.id}"><td class="mono"><b>${esc(t.serial)}</b>${demoTag(t)}</td><td>${esc(t.name)}</td><td class="small">${esc(clientName(t.clientId))}</td><td class="small mono">${esc([t.job?.so, t.job?.ro].filter(Boolean).join(" · ") || "—")}</td>
+    ${ts.length ? `<div class="tablewrap"><table><thead><tr><th>N° outil</th><th>Outil</th><th>S/N</th><th>Référence</th><th>Envoyé le</th><th>Suivi</th></tr></thead><tbody>${ts.map(t => { const d = t.job?.sentDate ? daysBetween(t.job.sentDate, today()) : null, shp = (t.shipments || []).filter(x => x.dir === "vers_labo").slice(-1)[0];
+      return `<tr class="click" data-a="tool-open" data-id="${t.id}"><td class="mono"><b>${esc(t.toolNo || t.serial)}</b>${demoTag(t)}</td><td>${esc(t.name)}</td><td class="small mono">${esc(t.serial || "")}</td><td class="small mono">${esc(t.job?.ref || "—")}</td>
         <td class="num">${fmtDate(t.job?.sentDate)}${d != null ? ` <span class="small ${sel.leadDays && d > +sel.leadDays ? "txt-warn" : "muted"}">· ${d} j</span>` : ""}</td>
         <td>${shp ? (trackUrl(shp) ? `<a href="${esc(trackUrl(shp))}" target="_blank" rel="noopener" data-stop class="mono small nowrap">${esc(CARRIERS[shp.carrier]?.[0])} ${esc(shp.number)} ↗</a>` : `<span class="mono small">${esc(shp.number)}</span>`) : `<span class="muted small">—</span>`}</td></tr>`; }).join("")}</tbody></table></div>`
       : `<div class="empty">Aucun outil chez ce laboratoire en ce moment.</div>`}</div></div>`;

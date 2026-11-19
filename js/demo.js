@@ -6,7 +6,7 @@ const DEMO_SETS = [
   ["personnel", "Personnel et roster", "5 personnes, licences, qualifications, documents, roster du mois"],
   ["clients", "Clients & tarifs", "3 compagnies aériennes, 6 tarifs"],
   ["flotte", "Véhicules", "4 véhicules, entretiens, panne, pneus"],
-  ["etalonnage", "Outillage", "1 laboratoire, 5 outils à différents stades"]
+  ["etalonnage", "Outillage", "1 laboratoire, 6 outils (au labo, échéance proche ou dépassée…)"]
 ];
 function demoGenHtml() {
   return `<div class="demo-gen"><div class="small">Créer des données d'exemple pour tester une partie de l'application. Elles portent le repère ${demoTag({ demo: true })} et se suppriment toutes ensemble.</div>
@@ -56,14 +56,15 @@ async function demoStaff() {
     notes: "", demo: true }); }
 }
 async function demoCalib() {
-  const cs = S.clients.map(c => c.id);
   const lab = dId("lab");
-  await save("labs", lab, { name: "Laboratoire Exemple", contact: "", email: "", phone: "", address: "", accreditation: "ISO 17025 (exemple)", notes: "", demo: true });
-  const tools = [["recu", "Clé dynamométrique 20-100 Nm"], ["picked", "Multimètre Fluke 87V"], ["labo", "Manomètre 0-250 bar"], ["a_livrer", "Pied à coulisse 150 mm"], ["dropped", "Thermomètre de contact"]];
-  for (const [status, name] of tools) {
-    const recv = dAgo(10 + Math.floor(Math.random() * 10));
-    await save("tools", dId("o"), { serial: "EX-" + String(1000 + Math.floor(Math.random() * 8999)), name: name + " (exemple)", brand: "", model: "", category: "", clientId: cs.length ? pick(cs) : "", intervalMonths: 12, calPrice: 65, status,
-      job: { receivedDate: recv, movedAt: dAgo(2), labId: status === "labo" ? lab : "" }, lastCalDate: dAgo(365), nextDue: addDays(today(), 5), photos: [], certs: [], history: [], notes: "", createdAt: recv, demo: true });
+  await save("labs", lab, { name: "Laboratoire Exemple", contact: "", email: "", phone: "", address: "", accreditation: "ISO 17025 (exemple)", leadDays: 14, notes: "", demo: true });
+  const tools = [["Clé dynamométrique 20-100 Nm", "service", 200], ["Multimètre Fluke 87V", "service", 20], ["Manomètre pneus 0-250 psi", "lab", 3], ["Pied à coulisse 150 mm", "service", -4], ["Tensiomètre de câbles", "us", 90], ["Jeu de clés plates", "service", null]];
+  let n = 1;
+  for (const [name, status, dueIn] of tools) {
+    const no = "EX-T-" + String(n++).padStart(3, "0");
+    await save("tools", dId("o"), { toolNo: no, name: name + " (exemple)", pn: "", serial: "", brand: "", model: "", category: "", location: "Caisse " + (1 + n % 2), owner: settings().name || "", calRequired: dueIn !== null, intervalMonths: 12, status,
+      lastCalDate: dueIn !== null ? addDays(today(), dueIn - 365) : "", nextDue: dueIn !== null ? addDays(today(), dueIn) : "", job: status === "lab" ? { labId: lab, sentDate: dAgo(6), ref: "EX-001", expected: addDays(today(), 8) } : undefined,
+      photos: [], certs: [], history: [], shipments: [], notes: "", demo: true });
   }
 }
 ACTIONS["demo-gen"] = async el => {

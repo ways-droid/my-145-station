@@ -128,6 +128,19 @@ ok "shift repris : nouvel avion refusé au terrain" "$(curl -s -H "$HT" -X PUT -
 ok "shift repris : fiche du shift verrouillée" "$(curl -s -H "$HT" -X PATCH -d '{"checkNote":"x"}' $U/docs/handovers/2026-11-19-day)" 'clôturé'
 ok "shift repris : le bureau corrige encore" "$(curl -s -H "$B" -X PATCH -d '{"done":"Transit OK, roue changée"}' $U/docs/shiftItems/v1)" '"ok":true'
 ok "historique : shift nommé" "$(curl -s -H "$A" "$U/log?coll=shiftItems")" 'Avion 9H-ABC'
+echo "> outillage"
+F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
+ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'
+curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-002\",\"name\":\"Manomètre\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$P\",\"history\":[]}" $U/docs/tools/tq2 >/dev/null
+ok "terrain : n'ajoute pas d'outil" "$(curl -s -H "$HT" -X PUT -d '{"toolNo":"X","name":"X"}' $U/docs/tools/tq9)" 'rôle'
+ok "terrain : sort un outil utilisable" "$(curl -s -H "$HT" -X PATCH -d '{"out":{"staffId":"s1","reg":"9H-ABC","at":"2026-11-19T10:00:00Z"},"history":[{"at":"2026-11-19T10:00:00Z","type":"out","text":"Marc"}]}' $U/docs/tools/tq1)" '"ok":true'
+ok "terrain : outil à l'étalonnage dépassé bloqué" "$(curl -s -H "$HT" -X PATCH -d '{"out":{"staffId":"s1","at":"2026-11-19T10:00:00Z"}}' $U/docs/tools/tq2)" 'ne peut pas sortir'
+ok "terrain : ne change pas le registre" "$(curl -s -H "$HT" -X PATCH -d '{"nextDue":"2099-01-01","name":"Autre"}' $U/docs/tools/tq2 >/dev/null; curl -s -H "$HT" $U/docs/tools/tq2)" "\"nextDue\":\"$P\""
+ok "terrain : n'efface pas l'historique" "$(curl -s -H "$HT" -X PATCH -d '{"history":[]}' $U/docs/tools/tq1)" 'Historique'
+ok "terrain : rentre l'outil" "$(curl -s -H "$HT" -X PATCH -d '{"out":null,"history":[{"at":"2026-11-19T10:00:00Z","type":"out","text":"Marc"},{"at":"2026-11-19T12:00:00Z","type":"in","text":"Marc"}]}' $U/docs/tools/tq1)" '"ok":true'
+no "outil rentré" "$(curl -s -H "$HT" $U/docs/tools/tq1)" '"out":{'
+ok "terrain : laboratoires en lecture seule" "$(curl -s -H "$HT" -X PUT -d '{"name":"Labo X"}' $U/docs/labs/lx)" 'rôle'
+ok "historique : outil nommé" "$(curl -s -H "$A" "$U/log?coll=tools")" 'Outil TLV-T-001'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'

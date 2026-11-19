@@ -276,7 +276,7 @@ const NOUNS = {
   "bouteille": "cylinder", "bouteilles": "cylinders", "client": "customer", "clients": "customers", "véhicule": "vehicle", "véhicules": "vehicles", "outil": "tool", "outils": "tools",
   "facture": "invoice", "factures": "invoices", "document": "document", "documents": "documents", "élément": "item", "éléments": "items", "intervention": "job", "interventions": "jobs",
   "pneu": "tyre", "pneus": "tyres", "référence": "item", "références": "items", "livraison": "delivery", "livraisons": "deliveries", "article": "item", "articles": "items",
-  "devis": "quotes", "panne": "fault", "pannes": "faults", "jour": "day", "jours": "days", "mois": "months", "affiché": "shown", "affichés": "shown", "pièce": "piece"
+  "devis": "quotes", "panne": "fault", "pannes": "faults", "jour": "day", "jours": "days", "affiché": "shown", "affichés": "shown", "pièce": "piece"
 };
 const nounEn = w => NOUNS[w] ?? null;
 const g = s => trCore(s) ?? s;   // traduit si connu, sinon garde
@@ -816,3 +816,41 @@ Object.assign(EN, {
   "Work Type (article)": "Work Type (item)", "Work Type (texte)": "Work Type (text)", "Description (n° de WO du client…)": "Description (customer WO no.…)",
   "Station Control : contrôles de fin de shift (un par ligne)": "Station Control: end-of-shift checks (one per line)"
 });
+
+/* ---- outillage de la station ---- */
+Object.assign(EN, {
+  "Outillage": "Tooling", "Sortie / retour d'outils": "Tool sign-out / return", "Ajouter un outil": "Add a tool", "Sortis": "Signed out", "Au labo": "At the lab", "Étalonnage dépassé": "Calibration overdue", "Hors service": "Unserviceable",
+  "En service": "In service", "Perdu": "Lost", "Retiré": "Retired", "Retirés": "Retired", "Registre": "Register", "Étalonnage": "Calibration", "Laboratoires": "Laboratories", "Utilisables": "Usable", "Inutilisables": "Not usable",
+  "N° outil": "Tool no.", "Outil": "Tool", "Emplacement": "Location", "Statut": "Status", "Prochain étalonnage": "Next calibration", "Sans étalonnage": "No calibration", "Sorti": "Signed out", "Rentré": "Returned",
+  "N° d'outil, désignation, P/N, S/N, emplacement…": "Tool no., description, P/N, S/N, location…", "Aucun outil ne correspond.": "No tool matches.", "Aucun outil. Ajoutez les outils de la station avec leur n° d'étiquette.": "No tools. Add the station tools with their label number.",
+  "Outils sortis de l'outillage et pas encore rentrés. À vérifier au Tool Check de fin de shift (MOE 2.6.5).": "Tools signed out and not returned yet. To check at the end-of-shift Tool Check (MOE 2.6.5).",
+  "Sorti par": "Signed out by", "Sortis par": "Signed out by", "Avion": "Aircraft", "Depuis": "Since", "Rentrer": "Return", "Tous les outils sont rentrés.": "All tools are returned.",
+  "Cochez les outils à envoyer ensemble au laboratoire.": "Tick the tools to send together to the lab.", "Échéance": "Due date", "Labo habituel": "Usual lab", "Aucun outil n'arrive à échéance dans les 60 prochains jours.": "No tool falls due in the next 60 days.",
+  "Laboratoire": "Laboratory", "Référence": "Reference", "Envoyé le": "Sent on", "Retour prévu": "Expected back", "retour prévu": "expected back", "Retour du labo": "Back from lab", "Aucun outil au laboratoire.": "No tool at the lab.",
+  "Outil sorti : à rentrer d'abord": "Tool signed out: return it first", "Avion (facultatif)": "Aircraft (optional)", "Scanner ou saisir le n° de l'outil : il sort s'il est rentré, il rentre s'il est sorti": "Scan or type the tool number: it is signed out if in, returned if out",
+  "Terminer": "Done", "Outil inconnu : ajoutez-le au registre": "Unknown tool: add it to the register", "Étalonnage dépassé : ne pas utiliser": "Calibration overdue: do not use", "Choisissez qui sort l'outil": "Choose who signs the tool out",
+  "Cet outil ne peut pas sortir": "This tool cannot be signed out", "Sortir": "Sign out", "Sortir l'outil": "Sign out the tool", "Outil sorti": "Tool signed out", "Outil rentré": "Tool returned",
+  "Envoyer au laboratoire": "Send to the laboratory", "Aucun laboratoire enregistré : ajoutez-en un dans l'onglet Laboratoires.": "No laboratory recorded: add one in the Laboratories tab.", "Date d'envoi": "Shipping date",
+  "Référence (bon d'envoi, commande…)": "Reference (delivery note, order…)", "Transporteur": "Carrier", "Pas d'envoi (déposé / enlevé)": "No shipment (dropped off / collected)", "N° de suivi": "Tracking no.", "Choisissez le laboratoire.": "Choose the laboratory.",
+  "Envoyer au labo": "Send to lab", "Enregistrer un étalonnage": "Record a calibration", "Date d'étalonnage": "Calibration date", "Résultat": "Result", "N° de certificat": "Certificate no.", "Réalisé par": "Performed by", "Périodicité (mois)": "Interval (months)",
+  "Certificat (PDF ou photo)": "Certificate (PDF or photo)", "Le certificat pourra être joint plus tard.": "The certificate can be attached later.", "Remarques (valeurs relevées, ajustages…)": "Remarks (readings, adjustments…)",
+  "Non conforme : l'outil passe hors service.": "Not compliant: the tool becomes unserviceable.", "Étalonnage enregistré : outil hors service": "Calibration recorded: tool unserviceable", "Étalonnage enregistré : outil en service": "Calibration recorded: tool in service",
+  "Conforme": "Compliant", "Conforme après ajustage": "Compliant after adjustment", "Non conforme": "Not compliant", "Raison": "Reason", "Confirmer": "Confirm",
+  "Mettez une étiquette « Unserviceable » sur l'outil et rangez-le en quarantaine.": "Put an “Unserviceable” tag on the tool and store it in quarantine.",
+  "Mettre hors service": "Mark unserviceable", "Déclarer perdu": "Declare lost", "Remettre en service": "Return to service", "Ne plus utiliser": "Retire", "Désignation": "Description", "Part number (P/N)": "Part number (P/N)", "N° de série (S/N)": "Serial no. (S/N)",
+  "Marque / modèle": "Make / model", "Catégorie": "Category", "Propriétaire": "Owner", "Pas d'étalonnage pour cet outil": "No calibration for this tool", "Périodicité": "Interval", "Dernier étalonnage": "Last calibration",
+  "Certificats": "Certificates", "Valide jusqu'au": "Valid until", "Labo": "Lab", "Ouvrir": "Open", "pas de fichier": "no file", "Aucun certificat enregistré.": "No certificate recorded.", "Suivi des envois": "Shipment tracking",
+  "Photos": "Photos", "Aucune photo.": "No photo.", "Historique": "History", "Rien pour l'instant.": "Nothing yet.", "Modifier la fiche": "Edit", "Nouvel outil": "New tool", "N° d'outil (étiquette)": "Tool no. (label)",
+  "Caisse 1, étagère B…": "Box 1, shelf B…", "Outil à étalonner": "Tool requires calibration", "Outil enregistré": "Tool saved", "Le n° d'outil": "Tool no.", "existe déjà": "already exists",
+  "Supprimer cet outil du registre ? Pour un outil qui n'est plus utilisé, préférez « Retirer » : son historique reste consultable.": "Delete this tool from the register? For a tool no longer used, prefer “Retire”: its history stays available.",
+  "Envoyé au labo": "Sent to lab", "Étalonné": "Calibrated", "Remis en service": "Returned to service", "Note": "Note", "Vers le labo": "To the lab", "Aucun envoi enregistré.": "No shipment recorded.",
+  "Outils sortis, au labo, étalonnages dépassés ou proches.": "Tools signed out, at the lab, calibrations overdue or due soon.", "sortis": "signed out", "au labo": "at the lab", "étalonnages dépassés": "calibrations overdue",
+  "Aucune échéance dans les 30 jours.": "No due date in the next 30 days.", "Retour du labo · ": "Back from lab · ", "Enregistrer un étalonnage · ": "Record a calibration · ",
+  "Ajoutez les labos où la station envoie ses outils (par exemple WAYS) : ils pourront être choisis à chaque envoi.": "Add the labs where the station sends its tools (for example WAYS): they can be chosen for each shipment.",
+  "Historique de l'outil non modifiable.": "The tool history cannot be changed.", "Outil hors service, au labo ou étalonnage dépassé : il ne peut pas sortir.": "Tool unserviceable, at the lab or calibration overdue: it cannot be signed out."
+});
+rule(/^(\d+) outils? de la station$/, n => `${n.split(" ")[0]} station tool${+n.split(" ")[0] > 1 ? "s" : ""}`);
+rule(/^(\d+) depuis plus de 12 h$/, "$1 for more than 12 h"); rule(/^(\d+) dans les 30 jours$/, "$1 within 30 days");
+rule(/^À étalonner \(60 prochains jours\)$/, "To calibrate (next 60 days)"); rule(/^Envoyer au labo \((\d+)\)$/, "Send to lab ($1)"); rule(/^Envoyer (\d+) outils?$/, "Send $1 tool(s)");
+rule(/^(.+) : étalonnage dépassé \(onglet Étalonnage\)$/, "$1: calibration overdue (Calibration tab)");
+rule(/^(\d+) mois$/, "$1 months");

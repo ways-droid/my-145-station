@@ -26,7 +26,7 @@ const wStat = (v, l, cls = "", attrs = "") => `<div class="w-stat ${cls}" ${attr
 
 /* ---- widgets ---- */
 WIDGETS.shortcuts = { h: 4, t: "Raccourcis", ic: "⚡", c: "blue", size: "m", d: "Les actions les plus courantes en un clic.",
-  r() { const b = [["etalonnage", "tool-reception", "Réceptionner des outils", ""], ["flotte", "fault-form", "Signaler une panne", ""], ["admin", "note-form", "Nouvelle note", ""], ["flotte", "veh-form", "Ajouter un véhicule", ""]].filter(x => allowed(x[0]));
+  r() { const b = [["etalonnage", "tool-scan", "Sortie / retour d'outils", ""], ["flotte", "fault-form", "Signaler une panne", ""], ["admin", "note-form", "Nouvelle note", ""], ["flotte", "veh-form", "Ajouter un véhicule", ""]].filter(x => allowed(x[0]));
     return `<div class="w-short">${b.map(([, a, l, x]) => `<button class="btn ${a === "fault-form" ? "btn-alert" : ""}" data-a="${a}" ${x} ${dis()}>${esc(tr(l))}</button>`).join("")}</div>`; } };
 WIDGETS.fleet_state = { h: 5, t: "État des véhicules", ic: "🚗", c: "orange", m: "flotte", size: "s", d: "Véhicules disponibles, en panne, immobilisés.",
   r() { const st = activeVehicles().map(vehState), c = k => st.filter(s => s[1] === k).length;
@@ -39,10 +39,10 @@ WIDGETS.faults = { h: 8, t: "Pannes et défauts", ic: "⚠", c: "red", m: "flott
   go() { UI.tab.flotte = "pannes"; } };
 WIDGETS.fleet_due = { h: 9, t: "Échéances véhicules", ic: "📅", c: "orange", m: "flotte", size: "m", d: "Contrôles techniques, assurances, entretiens à venir (45 jours).",
   r() { const t = fleetTasks(45); return `<div class="w-list">${t.slice(0, 6).map(taskRow).join("") || wEmpty("Rien dans les 45 prochains jours.")}</div>${t.length > 6 ? `<div class="muted small">… et ${t.length - 6} autres</div>` : ""}${wLink("flotte", "À faire")}`; } };
-WIDGETS.calib = { h: 8, t: "Outillage", ic: "🔬", c: "green", m: "etalonnage", size: "m", d: "Outils en cours, prêts à rendre, échéances.",
-  r() { const n = st => S.tools.filter(t => colOf(t) === st).length, due = toolsDue(30).sort((a, b) => a.nextDue.localeCompare(b.nextDue));
-    return `<div class="w-stats">${wStat(n("recu") + n("picked") + n("labo"), "en atelier")}${wStat(n("a_livrer"), "à rendre", n("a_livrer") ? "good" : "")}${wStat(toolsDue(0).length, "échéances dépassées", toolsDue(0).length ? "bad" : "")}</div>
-      <div class="w-list">${due.slice(0, 4).map(t => `<div class="list-row click" data-a="tool-open" data-id="${t.id}"><span>${esc(t.name)} <span class="mono small muted">${esc(t.serial)}</span><div class="muted small">${esc(clientName(t.clientId))}</div></span>${dueChip(t.nextDue)}</div>`).join("") || wEmpty("Aucune échéance dans les 30 jours.")}</div>${wLink("etalonnage")}`; } };
+WIDGETS.calib = { h: 8, t: "Outillage", ic: "🔬", c: "green", m: "etalonnage", size: "m", d: "Outils sortis, au labo, étalonnages dépassés ou proches.",
+  r() { const out = toolsOut(), over = S.tools.filter(tOverdue), due = toolsDue(30).sort((a, b) => a.nextDue.localeCompare(b.nextDue));
+    return `<div class="w-stats">${wStat(out.length, "sortis", out.some(t => outHours(t) > 12) ? "warn" : "")}${wStat(S.tools.filter(t => tStatus(t) === "lab").length, "au labo")}${wStat(over.length, "étalonnages dépassés", over.length ? "bad" : "")}</div>
+      <div class="w-list">${due.slice(0, 4).map(t => `<div class="list-row click" data-a="tool-open" data-id="${t.id}"><span>${esc(t.name)} <span class="mono small muted">${esc(tLabel(t))}</span><div class="muted small">${esc(t.location || "")}</div></span>${dueChip(t.nextDue)}</div>`).join("") || wEmpty("Aucune échéance dans les 30 jours.")}</div>${wLink("etalonnage")}`; } };
 WIDGETS.notes = { h: 7, t: "Mes notes", ic: "📝", c: "grey", m: "admin", size: "m", ok: () => typeof notesAll === "function", d: "Notes épinglées (ou les plus récentes).",
   r() { const all = notesAll().sort(noteSort), pin = all.filter(n => n.pinned), list = (pin.length ? pin : all).slice(0, 4);
     return `<div class="w-notes">${list.map(n => `<button class="w-note nc-${n.color || "def"}" data-a="note-form" data-id="${n.id}"><b>${esc(noteTitle(n))}</b><span>${esc((n.body || "").slice(0, 120))}</span></button>`).join("") || wEmpty("Aucune note.")}</div>
