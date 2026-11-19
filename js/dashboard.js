@@ -55,11 +55,12 @@ function dashItems() {   /* disposition : [{id, x, y, w, h}] ; anciennes disposi
     return { id: x.id, x: Number.isFinite(raw.x) ? raw.x : undefined, y: Number.isFinite(raw.y) ? raw.y : undefined, w: raw.w || WSPAN[x.size] || 6, h: raw.h || w.h || 6 }; });
 }
 const DASH = { bodies: {} };
+function wBody(id) { try { DASH.bodies[id] = WIDGETS[id].r(); } catch (e) { console.error(e); DASH.bodies[id] = wEmpty("Ce widget n'a pas pu s'afficher."); } return DASH.bodies[id]; }
 function dashSig(str) { let h = 0; for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 VIEWS.dashboard = {
   render() {
     const t = today(), edit = !!UI.dashEdit, items = dashItems();
-    DASH.bodies = {}; for (const it of items) { try { DASH.bodies[it.id] = WIDGETS[it.id].r(); } catch (e) { console.error(e); DASH.bodies[it.id] = wEmpty("Ce widget n'a pas pu s'afficher."); } }
+    DASH.bodies = {}; for (const it of items) wBody(it.id);
     const sig = dashSig(JSON.stringify(items) + edit + Object.values(DASH.bodies).join(""));
     const h = new Date().getHours(), hi = h < 12 ? "Bonjour" : h < 18 ? "Bon après-midi" : "Bonsoir";
     return `<div class="dash-hero">${logoSvg("currentColor", "none", "ghost")}` + head(`${hi}${ME && ME.name && !ME.key ? ", " + esc(ME.name.split(" ")[0]) : ""}`, `${esc(settings().name)} · ${fmtDate(t)}`,
@@ -84,6 +85,7 @@ async function dashMount() {
   try { await loadGridstack(); } catch (e) { el.innerHTML = `<div class="err">La grille n'a pas pu être chargée.</div>`; return; }
   const GS = window.GridStack && (window.GridStack.GridStack || window.GridStack); if (!GS || !document.body.contains(el)) return;
   const edit = !!UI.dashEdit, items = dashItems(), key = items.map(i => i.id).join(",");
+  for (const it of items) if (DASH.bodies[it.id] === undefined) wBody(it.id);   /* widget d'un module chargé après le premier affichage */
   el.classList.toggle("editing", edit);
   if (el._gs && el._key === key) {   /* même widgets : on met seulement à jour leur contenu (et le mode) */
     for (const it of items) { const b = el.querySelector(`[gs-id="${it.id}"] .w-b`), html = DASH.bodies[it.id]; if (b && b._html !== html) { b.innerHTML = html; b._html = html; } }

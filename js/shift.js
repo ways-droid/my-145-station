@@ -5,9 +5,10 @@
    4. Station Control (contrôles de fin de shift), 5. manpower et signatures des chefs d'équipe.
    handovers/<AAAA-MM-JJ>-<day|night> = { date, shift, foreman, extra[], checks{}, out{by,at}, in{by,at} }
    shiftItems/<id> = { ho, kind: todo|visit|equip, … } (une ligne = un document : plusieurs personnes saisissent en même temps)
-   L'écriture des pages Notion viendra ensuite (espace Notion de test d'abord). Rien ici ne remplace la CRS dans AMOS. */
+   Le bouton Notion écrit la page du shift sous la page Notion choisie dans Paramètres (api/notion.php). Rien ici ne remplace la CRS dans AMOS. */
 const SHIFTS = { day: "Jour (08-20)", night: "Nuit (20-08)" };
-const STATION_CHECKS = ["Outillage rangé et compté", "Équipements (GPU, ASU, azote…) contrôlés et rangés", "Clés et véhicules en ordre", "Magasin et pièces rangés", "Bureau, documents et ordinateurs en ordre"];
+/* contrôles du handover approuvé (modifiables dans Paramètres), écrits dans Notion deux par ligne */
+const STATION_CHECKS = ["Tool Check Per MOE 2.6.5", "Temp / Humidity Per MOE 2.3.1", "Cleanliness of Office", "Line Vans Cleaned and Restocked"];
 const stationChecks = () => { const s = String(settings().stationChecks || "").split("\n").map(x => x.trim()).filter(Boolean); return s.length ? s : STATION_CHECKS; };
 const hoId = (date, sh) => `${date}-${sh}`;
 const hoDoc = id => S.handovers.find(h => h.id === id);
@@ -35,7 +36,7 @@ function visitCheck(v) {
 const hoClosed = h => !!(h && h.in && h.in.at);
 
 VIEWS.shift = {
-  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) render(true); }); },
+  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) render(true); }); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); },
   render() {
     if (!UI.shift) UI.shift = currentShift();
     const [date, sh] = UI.shift, id = hoId(date, sh), h = hoDoc(id) || {}, cur = currentShift(), isCur = cur[0] === date && cur[1] === sh;
@@ -43,7 +44,9 @@ VIEWS.shift = {
     return head("Shift", "Planning des avions et handover : les 5 sections du handover de la station", "",
       `<div class="row-g wrap"><button class="btn sm" data-a="shift-go" data-n="-1" aria-label="Shift précédent">‹</button><b class="rmonth">${esc(shiftName(date, sh))}</b><button class="btn sm" data-a="shift-go" data-n="1" aria-label="Shift suivant">›</button>
         <input type="date" id="shift-date" value="${esc(date)}" aria-label="Date"><div class="seg">${Object.keys(SHIFTS).map(k => `<button data-a="shift-sh" data-sh="${k}" class="${k === sh ? "on" : ""}">${k === "day" ? "Jour" : "Nuit"}</button>`).join("")}</div>
-        ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}</div>`) +
+        ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
+        ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
+        ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`) +
       (hoClosed(h) ? `<div class="banner good">Handover terminé : remis par ${esc(h.out?.by || "?")} et repris par ${esc(h.in.by)} (${fmtDT(h.in.at)}).</div>` : "") +
       (bad ? `<div class="banner warn">${plural(bad, "avion")} sans CRS qualifié affecté : voir la section 2.</div>` : "") +
       shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + shiftChecks(id, h) + shiftCrew(id, date, sh, h);
@@ -150,7 +153,7 @@ ACTIONS["equip-form"] = el => {
 function shiftChecks(id, h) {
   const ed = hoEd(id), ck = h.checks || {};
   return sec(4, "Station Control", "Contrôles de fin de shift.", "",
-    `<div class="pad stack">${stationChecks().map((c, i) => { const x = ck[c]; return `<label class="chk"><input type="checkbox" data-hock="${esc(c)}" data-ho="${id}" ${x ? "checked" : ""} ${ed ? "" : "disabled"}> ${esc(c)}${x ? ` <span class="muted small">· ${esc(x.by || "")} ${fmtDT(x.at)}</span>` : ""}</label>`; }).join("")}
+    `<div class="pad stack"><div class="ho-checks">${stationChecks().map((c, i) => { const x = ck[c]; return `<label class="chk"><input type="checkbox" data-hock="${esc(c)}" data-ho="${id}" ${x ? "checked" : ""} ${ed ? "" : "disabled"}> ${esc(c)}${x ? ` <span class="muted small">· ${esc(x.by || "")} ${fmtDT(x.at)}</span>` : ""}</label>`; }).join("")}</div>
     ${field("ho-ckn", "Remarque Station Control", h.checkNote, { type: "textarea" })}</div>`);
 }
 async function hoPatch(id, data) {
@@ -238,3 +241,29 @@ async function loadFr24() {
 ACTIONS["fr24-save"] = async () => { const k = val("fr24-key"); if (!k) return; try { await API.call("POST", "fr24/config", { key: k }); toast("Clé Flightradar24 enregistrée"); } catch (e) { toast(tr(e.message)); } loadFr24(); };
 ACTIONS["fr24-off"] = () => confirmBox("Retirer la clé Flightradar24 ?", async () => { await API.call("POST", "fr24/config", { key: "" }); loadFr24(); }, "Retirer");
 ACTIONS["fr24-test"] = async () => { try { await API.call("POST", "fr24/test", {}); toast("Connexion Flightradar24 OK"); } catch (e) { toast(tr(e.message)); } };
+
+/* ---- Notion : page du handover (sous la page parente choisie dans Paramètres ; jeton gardé sur le serveur) ---- */
+let NOTION = null;
+async function notionStatus() { if (!SERVER || !API || !ME) return null; if (NOTION) return NOTION; try { NOTION = await API.call("GET", "notion/status"); } catch { NOTION = { configured: false }; } return NOTION; }
+ACTIONS["ho-notion"] = el => {
+  const id = el.dataset.ho, h = hoDoc(id) || {}, [date, sh] = [id.slice(0, 10), id.slice(11)];
+  const crew = Array.from(new Set([...onShift(date, sh).map(p => p.id), ...(h.extra || [])]));
+  confirmBox(`${h.notion?.url ? "Renvoyer" : "Envoyer"} le handover ${esc(shiftName(date, sh))} vers Notion ?<div class="muted small" style="margin-top:6px">${esc(tr(h.notion?.url ? "La page déjà envoyée pour ce shift sera remplacée (l'ancienne va dans la corbeille de Notion)." : "Une page est créée sous la page Notion choisie dans Paramètres, avec les 5 sections."))}</div>`, async () => {
+    el.disabled = true;
+    try { const r = await API.call("POST", "notion/push", { ho: id, crew, checks: stationChecks() }); toast(r.replaced ? "Page Notion remplacée" : "Handover envoyé vers Notion"); }
+    catch (e) { toast(tr(e.message)); }
+    el.disabled = false;
+  }, h.notion?.url ? "Renvoyer" : "Envoyer");
+};
+function notionCardShell() { return isAdmin() ? `<section class="panel"><div class="pad"><h3>Notion (handover)</h3><div class="muted small">Le handover de chaque shift est écrit sous une seule page Notion, choisie ici. L'outil ne modifie jamais une autre page. Dans Notion : créez une intégration interne, copiez son jeton, puis ajoutez l'intégration à cette page (••• › Connexions).</div></div><div class="pad" id="notion-card"><span class="muted">…</span></div></section>` : ""; }
+async function loadNotion() {
+  const el = document.getElementById("notion-card"); if (!el) return;
+  NOTION = null; const s = await notionStatus();
+  el.innerHTML = `<div class="stack"><div class="row-g wrap">${s && s.token ? `<span class="chip good">Jeton enregistré ${esc(s.hint || "")}</span><button class="btn sm" data-a="notion-off">Retirer le jeton</button>` : `<span class="chip">Pas de jeton</span>`}
+    <input type="password" id="notion-token" placeholder="${esc(tr("Jeton d'intégration Notion"))}" autocomplete="off" style="min-width:260px"><button class="btn sm primary" data-a="notion-save">Enregistrer le jeton</button></div>
+    <div class="row-g wrap"><input id="notion-parent" placeholder="${esc(tr("Lien de la page Notion du handover"))}" value="${esc(s && s.parent ? s.parent : "")}" class="mono" style="min-width:320px"><button class="btn sm" data-a="notion-parent">Enregistrer la page</button>${s && s.configured ? `<button class="btn sm" data-a="notion-test">Tester</button>` : ""}</div></div>`;
+}
+ACTIONS["notion-save"] = async () => { const k = val("notion-token"); if (!k) return; try { await API.call("POST", "notion/config", { token: k }); toast("Jeton Notion enregistré"); } catch (e) { toast(tr(e.message)); } loadNotion(); };
+ACTIONS["notion-parent"] = async () => { try { await API.call("POST", "notion/config", { parent: val("notion-parent") }); toast("Page Notion enregistrée"); } catch (e) { toast(tr(e.message)); } loadNotion(); };
+ACTIONS["notion-off"] = () => confirmBox("Retirer le jeton Notion ?", async () => { await API.call("POST", "notion/config", { token: "" }); loadNotion(); }, "Retirer");
+ACTIONS["notion-test"] = async () => { try { const r = await API.call("POST", "notion/test", {}); toast(tr("Connexion Notion OK") + " · " + (r.title || "")); } catch (e) { toast(tr(e.message)); } };

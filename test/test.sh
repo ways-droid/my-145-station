@@ -148,6 +148,47 @@ no "FR24 : clé jamais renvoyée" "$(curl -s -H "$A" $U/fr24/status)" 'fr24-good
 R=$(curl -s -H "$HT" -X POST -d '{"regs":["9h-abc","4X-ICA","OO-NOP"]}' $U/fr24/track)
 ok "FR24 : avion en vol avec ETA" "$R" '"eta":"2026-11-19T14:35:00Z"'; ok "FR24 : vol terminé" "$R" '"landed":"2026-11-19T10:02:00Z"'; ok "FR24 : avion sans vol" "$R" '"OO-NOP":\[\]'
 pkill -f "127.0.0.1:8773" || true
+echo "> notion"
+pkill -f "127.0.0.1:8774" || true; rm -rf $T/notion; mkdir -p $T/notion
+(NOTION_MOCK_DIR=$T/notion php -S 127.0.0.1:8774 "$D/notion-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["notion_base","http://127.0.0.1:8774/v1"]);' $T/t.db
+NG="secret_notion_good_token_123"; NP="https://www.notion.so/TLV-ACTIVITY-TEST-Do-not-Delete-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa?pvs=4"
+ok "Notion non configuré" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-11-19-day"}' $U/notion/push)" "pas configuré"
+ok "Notion : config réservée aux admins" "$(curl -s -H "$B" -X POST -d "{\"token\":\"$NG\"}" $U/notion/config)" 'administrateurs'
+ok "Notion : lien de page invalide refusé" "$(curl -s -H "$A" -X POST -d '{"parent":"https://www.notion.so/rien"}' $U/notion/config)" 'invalide'
+curl -s -H "$A" -X POST -d '{"token":"secret_notion_bad_token_999"}' $U/notion/config >/dev/null
+ok "Notion : sans page parente, rien n'est écrit" "$(curl -s -H "$A" -X POST -d '{}' $U/notion/test)" 'page parente'
+ok "Notion : page parente lue depuis le lien" "$(curl -s -H "$A" -X POST -d "{\"parent\":\"$NP\"}" $U/notion/config)" '"parent":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"'
+ok "Notion : mauvais jeton expliqué" "$(curl -s -H "$A" -X POST -d '{}' $U/notion/test)" 'jeton refusé'
+curl -s -H "$A" -X POST -d "{\"token\":\"$NG\"}" $U/notion/config >/dev/null
+ok "Notion : test affiche la page parente" "$(curl -s -H "$A" -X POST -d '{}' $U/notion/test)" 'TLV - ACTIVITY TEST'
+no "Notion : jeton jamais renvoyé" "$(curl -s -H "$A" $U/notion/status)" "$NG"
+ok "Notion : shift inconnu" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-01-01-day"}' $U/notion/push)" 'pas encore de fiche'
+CK='["Tool Check Per MOE 2.6.5","Cleanliness of Office","Temp / Humidity Per MOE 2.3.1","Line Vans Cleaned and Restocked","Outillage"]'
+curl -s -H "$B" -X PUT -d '{"ho":"2026-11-19-day","kind":"todo","reg":"9H-ABC","text":"Roue n°3 à changer","note":"Pièce attendue"}' $U/docs/shiftItems/t1 >/dev/null
+curl -s -H "$B" -X PUT -d '{"ho":"2026-11-19-day","kind":"equip","user":"MT","reg":"9H-ABC","item":"GPU","qty":2,"unit":"HR"}' $U/docs/shiftItems/e1 >/dev/null
+R=$(curl -s -H "$HT" -X POST -d "{\"ho\":\"2026-11-19-day\",\"crew\":[\"s1\",\"s2\"],\"checks\":$CK}" $U/notion/push)
+ok "Notion : le terrain envoie le handover (shift clôturé)" "$R" '"ok":true'; ok "Notion : lien de la page" "$R" 'notion.so'
+NS=$(curl -s -H "Authorization: Bearer $NG" -H "Notion-Version: 2022-06-28" http://127.0.0.1:8774/v1/_dump)
+J() { echo "$NS" | php -r '$S=json_decode(stream_get_contents(STDIN),true); $o=$S["obj"]; '"$1"; }
+ok "Notion : page créée sous la page de test" "$(J 'foreach($o as $id=>$x) if(($x["title"]??"")==="TLV 19/11/2026 - Day Shift"||str_ends_with($x["title"]??"","19/11/2026 - Day Shift")) echo $x["parent"]["page_id"];')" 'aaaaaaaa-aaaa'
+ok "Notion : les 5 sections dans l'ordre" "$(J 'foreach($o as $x) if(str_ends_with($x["title"]??"","Day Shift")) echo implode(" | ",array_map(fn($c)=>$c["text"],$x["children"]));')" '1. Uncompleted work | Uncompleted work | 2. Shift Work Planned/Done | Shift Work Planned/Done | 3. Equipment & Materials | Equipment & Materials | 4. Station Control | Station Control | .*5. Manpower & Foreman signatures | .*Taken over by : Autre Personne.* | Manpower'
+ok "Notion : bases intégrées" "$(J 'foreach($o as $x) if(($x["object"]??"")==="database"&&!$x["inline"]) echo "NON";  echo "ok";')" '^ok$'
+ok "Notion : avion avec CRS et travail fait" "$(J 'foreach($o as $x) if(($x["title"]??"")==="Shift Work Planned/Done") echo json_encode($x["rows"],JSON_UNESCAPED_UNICODE);')" 'C REG":"9H-ABC".*"CRS":"Autre Personne".*"Work Done":"Transit OK, roue changée"'
+ok "Notion : travail non terminé" "$(J 'foreach($o as $x) if(($x["title"]??"")==="Uncompleted work") echo json_encode($x["rows"],JSON_UNESCAPED_UNICODE);')" 'Roue n°3 à changer'
+ok "Notion : matériel par client" "$(J 'foreach($o as $x) if(($x["title"]??"")==="Equipment & Materials") echo json_encode($x["rows"]);')" 'User":"MT".*"Qty":2'
+R=$(J 'foreach($o as $x) if(($x["title"]??"")==="Station Control") echo json_encode($x["rows"],JSON_UNESCAPED_UNICODE);')
+ok "Notion : Station Control en deux colonnes" "$R" '"Name":"Tool Check Per MOE 2.6.5","Done ✅":false,"Name.":"Cleanliness of Office"'
+ok "Notion : contrôle coché reporté" "$R" '"Name":"Outillage","Done ✅":true,"Name.":"","Done ✅.":false'
+ok "Notion : manpower" "$(J 'foreach($o as $x) if(($x["title"]??"")==="Manpower") echo json_encode($x["rows"]);')" '"Name":"Marc Terrain","Function":"Mechanic","Type ratings":"B767 E"'
+ok "Notion : lien gardé sur le shift" "$(curl -s -H "$HT" $U/docs/handovers/2026-11-19-day)" '"notion":{"url":"https:\/\/www.notion.so'
+R=$(curl -s -H "$B" -X POST -d "{\"ho\":\"2026-11-19-day\",\"crew\":[\"s1\"],\"checks\":$CK}" $U/notion/push)
+ok "Notion : renvoi remplace la page de l'outil" "$R" '"replaced":true'
+NS=$(curl -s -H "Authorization: Bearer $NG" -H "Notion-Version: 2022-06-28" http://127.0.0.1:8774/v1/_dump)
+ok "Notion : seule l'ancienne page de l'outil part à la corbeille" "$(J 'echo implode(",",array_filter($S["log"],fn($l)=>str_starts_with($l,"archive")));')" '^archive c*1$'
+no "Notion : la vraie page n'est jamais touchée" "$(J 'echo json_encode($o["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]).implode(",",$S["log"]);')" 'archived\|bbbbbbbb'
+ok "Notion : tout est écrit sous la page de test" "$(J 'foreach($S["log"] as $l) if(str_starts_with($l,"page ")&&!str_ends_with($l,"under aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")) echo "AILLEURS "; echo "ok";')" '^ok$'
+pkill -f "127.0.0.1:8774" || true
 echo "> dropbox"
 ok "adresses Dropbox réelles" "$(cd "$D/../api" && php -r 'function kv_get($k){return null;} require "dropbox.php"; echo dbx_url("oauth2","token")," ",dbx_url("api","files/list_folder")," ",dbx_url("content","files/upload");')" 'https://api.dropboxapi.com/oauth2/token https://api.dropboxapi.com/2/files/list_folder https://content.dropboxapi.com/2/files/upload'
 pkill -f "127.0.0.1:8771" || true
@@ -230,6 +271,7 @@ echo "> environnement de test"
 ok "test inactif" "$(curl -s -H "$B" $U/sandbox)" '"active":false'
 ok "test refusé au terrain" "$(curl -s -H "$HT" -X POST -d '{}' $U/sandbox/start)" 'bureau'
 ok "test activé" "$(curl -s -H "$B" -X POST -d '{}' $U/sandbox/start)" '"active":true'
+ok "test : rien n'est écrit dans Notion" "$(curl -s -H "$B" -X POST -d '{"ho":"2026-11-19-day"}' $U/notion/push)" 'Environnement de test'
 ok "profil en test" "$(curl -s -H "$B" $U/auth/me)" '"sandbox":{'
 curl -s -H "$B" -X PUT -d '{"name":"SBX-1"}' $U/docs/clients/sbx-1 >/dev/null
 curl -s -H "$B" -X PATCH -d '{"name":"26/164-TEST"}' $U/docs/clients/c-m1 >/dev/null
