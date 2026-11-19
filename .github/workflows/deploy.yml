@@ -68,7 +68,12 @@ jobs:
           DIR: ${{ vars.TEST_DIR || 'test' }}
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp > /dev/null
-          lftp -u "$USER,$PASS" "sftp://$HOST" -e "
+          # Mot de passe passé par variable d'environnement (caractères spéciaux sans risque) ;
+          # espaces ou retours à la ligne copiés par erreur autour des secrets retirés.
+          HOST=$(printf %s "$HOST" | tr -d '[:space:]'); HOST=${HOST#sftp://}
+          USER=$(printf %s "$USER" | tr -d '[:space:]')
+          export LFTP_PASSWORD=$(printf %s "$PASS" | tr -d '\r\n')
+          lftp --env-password -u "$USER" "sftp://$HOST" -e "
             set sftp:auto-confirm yes;
             set net:max-retries 2;
             mkdir -p $DIR;
