@@ -1,0 +1,123 @@
+/* ======================= Historique des actions & pastille Profil ======================= */
+/* Le serveur note chaque création, modification, suppression, validation, envoi, rapprochement, connexion…
+   (api/log.php). Ici : la page Management → Historique, l'encart « Historique » des fiches, et la pastille Profil. */
+const LOG_ACT = {
+  create: ["Création", "good"], update: ["Modification", "info"], delete: ["Suppression", "bad"], validate: ["Validation", "warn"],
+  paid: ["Payée", "good"], cancel: ["Annulation", "bad"], link: ["Rapprochement", "good"], unlink: ["Lien retiré", ""],
+  archive: ["Archivage", ""], unarchive: ["Désarchivage", ""], reply: ["Réponse Peppol", "info"], falco: ["Envoi à Falco", "warn"],
+  falco_error: ["Erreur Falco", "bad"], mail: ["E-mail préparé", "warn"], pdf: ["PDF téléchargé", ""], print: ["Impression", ""], login: ["Connexion", ""]
+};
+const LOG_MOD = { docs: "Ventes", clients: "Clients", products: "Produits & prix", purchases: "Achats", bankTx: "Banque", bankAccounts: "Banque", codaFiles: "Banque",
+  vehicles: "Flotte", vehEvents: "Flotte", faults: "Flotte", driverLogs: "Flotte", tires: "Flotte", fines: "Flotte", vehDocs: "Flotte",
+  bottles: "Gaz", gasMoves: "Gaz", deliveries: "Gaz", gasTypes: "Gaz", tools: "Étalonnage", labs: "Étalonnage",
+  adminDocs: "Administration", adminFolders: "Administration", notes: "Notes", drivers: "Flotte", settings: "Paramètres", auth: "Connexions" };
+const LOG_FIELD = { status: "Statut", number: "N°", date: "Date", dueDate: "Échéance", clientId: "Client", lines: "Lignes", amount: "Montant", name: "Nom",
+  email: "E-mail", phone: "Téléphone", address: "Adresse", vat: "TVA", price: "Prix", notes: "Notes", note: "Note", km: "Kilométrage", matches: "Pièces reliées",
+  archived: "Archivé", paymentStatus: "Paiement", response: "Réponse", plate: "Plaque", model: "Modèle", driver: "Chauffeur", type: "Type", cost: "Coût",
+  vehicleId: "Véhicule", ref: "Référence", label: "Libellé", qty: "Quantité", nick: "Nom personnalisé", color: "Couleur", kind: "Type de pièce" };
+const logOpen = { docs: "doc-open", purchases: "pur-open", vehicles: "veh-open" };
+const logVal = (k, v) => {
+  if (k === "status" && typeof STATUS !== "undefined" && STATUS[v]) return tr(STATUS[v][0]);
+  if (k === "clientId" && v && v !== "—") { const c = S.clients.find(x => x.id === v); if (c) return c.name; }
+  if (k === "vehicleId" && v && v !== "—") { const x = S.vehicles.find(y => y.id === v); if (x) return x.plate || x.id; }
+  return v;
+};
+const logWhen = at => { const d = new Date(at); return `${fmtDate(d.toISOString().slice(0, 10))} ${d.toLocaleTimeString(LANG === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" })}`; };
+function logDetail(x) {
+  const d = x.details || {}, out = [];
+  if (d.changes) out.push(d.changes.filter(c => c[0] !== "…").slice(0, 6).map(([k, a, b]) => `<span class="lg-ch"><b>${esc(tr(LOG_FIELD[k] || k))}</b> ${a !== "—" && k !== "lines" ? `${esc(String(logVal(k, a)))} → ` : ""}${esc(String(logVal(k, b)))}</span>`).join("") + (d.changes.length > 6 ? `<span class="muted"> +${d.changes.length - 6}</span>` : ""));
+  if (d.docs && d.docs.length) out.push(d.docs.map(m => `<button class="linkbtn mono small" data-a="${m.coll === "purchases" ? "pur-open" : "doc-open"}" data-id="${esc(m.id)}">${esc(m.number || m.id)}</button>`).join(", "));
+  if (d.to) out.push(`à ${esc(d.to)}`);
+  if (d.note) out.push(`<span class="muted">${esc(d.note)}</span>`);
+  return out.join(" ");
+}
+const logActChip = a => { const x = LOG_ACT[a] || [a, ""]; return `<span class="chip ${x[1]}">${esc(tr(x[0]))}</span>`; };
+const logWho = x => x.kind === "system" ? `<span class="muted">⚙ ${esc(x.by)}</span>` : esc(x.by);
+
+/* ---------- encart « Historique » dans une fiche (chargé à l'ouverture) ---------- */
+function histBox(coll, id, related) {
+  if (!SERVER || !ME || !isOffice() || !id) return "";
+  return `<details class="hist" data-hist="${coll}" data-hid="${esc(id)}" ${related ? "data-rel=\"1\"" : ""}><summary>${esc(tr("Historique"))}</summary><div class="hist-b muted small">Chargement…</div></details>`;
+}
+document.addEventListener("toggle", async e => {
+  const el = e.target; if (!el.matches || !el.matches("details[data-hist]") || !el.open || el.dataset.done) return;
+  el.dataset.done = "1"; const b = el.querySelector(".hist-b");
+  try {
+    const r = await API.call("GET", `log?coll=${encodeURIComponent(el.dataset.hist)}&id=${encodeURIComponent(el.dataset.hid)}${el.dataset.rel ? "&related=1" : ""}&limit=100`);
+    b.classList.remove("muted", "small");
+    b.innerHTML = r.items.length ? `<ol class="hist-l">${r.items.map(x => `<li><span class="hist-t">${logWhen(x.at)}</span><span>${logActChip(x.action)} <b>${logWho(x)}</b>${x.coll !== el.dataset.hist ? ` · ${esc(x.label || "")}` : ""}${logDetail(x) ? `<div class="hist-d">${logDetail(x)}</div>` : ""}</span></li>`).join("")}</ol>`
+      : `<span class="muted small">${esc(tr("Aucune action notée depuis la mise en place de l'historique."))}</span>`;
+  } catch (x) { b.innerHTML = `<span class="err">${esc(tr(x.message))}</span>`; }
+}, true);
+
+/* ---------- page Management → Historique ---------- */
+let LOGS = null, logPeople = null;
+function logFilt() { UI.lf = UI.lf || { days: "7", by: "", mod: "", act: "", src: "" }; return UI.lf; }
+async function logLoad(more) {
+  const f = logFilt(), p = new URLSearchParams({ limit: "150" });
+  if (f.days) p.set("from", String(Date.now() - (+f.days) * 86400000));
+  if (f.by) p.set("by", f.by);
+  if (f.act) p.set("action", f.act); else if (f.src) p.set("action", f.src);
+  if (UI.q.trim()) p.set("q", UI.q.trim());
+  if (more && LOGS && LOGS.items.length) p.set("before", String(LOGS.items[LOGS.items.length - 1].at));
+  const r = await API.call("GET", "log?" + p.toString());
+  LOGS = more && LOGS ? { items: LOGS.items.concat(r.items), more: r.more } : r;
+  if (!logPeople) { try { logPeople = (await API.call("GET", "log/people")).people; } catch { logPeople = []; } }
+  if (location.hash === "#historique") render(true);
+}
+VIEWS.historique = { title: "Historique", render: () => {
+  if (!SERVER) return head("Historique", "Qui a fait quoi, et quand") + `<div class="panel empty">L'historique des actions est tenu par le serveur ways.support.</div>`;
+  const f = logFilt();
+  if (!LOGS) { logLoad(); return head("Historique", "Qui a fait quoi, et quand") + `<div class="panel empty muted">Chargement…</div>`; }
+  const items = LOGS.items.filter(x => !f.mod || LOG_MOD[x.coll] === f.mod);
+  const opt = (v, l, cur) => `<option value="${esc(v)}" ${cur === v ? "selected" : ""}>${esc(tr(l))}</option>`;
+  const mods = [...new Set(Object.values(LOG_MOD))];
+  let lastDay = "";
+  const rows = items.map(x => {
+    const day = new Date(x.at).toISOString().slice(0, 10), sep = day !== lastDay ? `<tr class="lg-day"><td colspan="5">${esc(fmtDate(day))}</td></tr>` : ""; lastDay = day;
+    const lbl = x.label || x.id, a = logOpen[x.coll];
+    return `${sep}<tr class="hov"><td class="num nowrap muted">${new Date(x.at).toLocaleTimeString(LANG === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" })}</td><td class="nowrap">${logWho(x)}</td><td>${logActChip(x.action)}</td>
+      <td>${a && x.action !== "delete" ? `<button class="linkbtn" data-a="${a}" data-id="${esc(x.id)}">${esc(lbl)}</button>` : esc(lbl)}<div class="muted small">${esc(tr(LOG_MOD[x.coll] || x.coll))}</div></td><td class="small">${logDetail(x)}</td></tr>`;
+  }).join("");
+  return head("Historique", "Qui a fait quoi, et quand · créations, modifications, suppressions, validations, envois, rapprochements, connexions") +
+    `<div class="panel">${searchBar("Rechercher une facture, un client, une plaque, une personne…")}
+    <div class="toolbar df-bar">
+      <label class="df"><span>Période</span><select data-lf="days">${opt("1", "Aujourd'hui", f.days)}${opt("7", "7 derniers jours", f.days)}${opt("30", "30 derniers jours", f.days)}${opt("365", "12 derniers mois", f.days)}${opt("", "Tout", f.days)}</select></label>
+      <label class="df"><span>Personne</span><select data-lf="by">${opt("", "Tout le monde", f.by)}${(logPeople || []).map(n => opt(n, n, f.by)).join("")}</select></label>
+      <label class="df"><span>Module</span><select data-lf="mod">${opt("", "Tous", f.mod)}${mods.map(m => opt(m, m, f.mod)).join("")}</select></label>
+      <label class="df"><span>Action</span><select data-lf="act">${opt("", "Toutes", f.act)}${Object.entries(LOG_ACT).map(([k, v]) => opt(k, v[0], f.act)).join("")}</select></label>
+      <label class="df"><span>Origine</span><select data-lf="src">${opt("", "Personnes et systèmes", f.src)}${opt("user", "Personnes seulement", f.src)}${opt("system", "Synchronisations seulement", f.src)}</select></label>
+      ${f.by || f.mod || f.act || f.src || f.days !== "7" ? `<button class="linkbtn" data-a="lf-reset">Effacer les filtres</button>` : ""}</div>
+    <div class="tablewrap"><table class="lg-t"><thead><tr><th>Heure</th><th>Qui</th><th>Action</th><th>Élément</th><th>Détail</th></tr></thead><tbody>${rows}</tbody></table>
+    ${items.length ? "" : `<div class="empty">${esc(tr("Aucune action pour ces filtres."))}</div>`}
+    ${LOGS.more ? `<div class="pad"><button class="btn" data-a="lf-more">Afficher plus</button></div>` : ""}</div></div>`;
+} };
+document.addEventListener("change", e => { const s = e.target.closest && e.target.closest("select[data-lf]"); if (s) { logFilt()[s.dataset.lf] = s.value; if (s.dataset.lf === "act" && s.value) logFilt().src = ""; logLoad(); } });
+ACTIONS["lf-reset"] = () => { UI.lf = null; logLoad(); };
+ACTIONS["lf-more"] = el => { el.disabled = true; logLoad(true); };
+let logQT = null;
+document.addEventListener("input", e => { if (e.target.id === "q" && location.hash === "#historique") { clearTimeout(logQT); logQT = setTimeout(() => logLoad(), 400); } });
+window.addEventListener("hashchange", () => { if (location.hash === "#historique") { LOGS = null; } });
+
+/* actions faites dans le navigateur, notées dans l'historique */
+function logClient(coll, id, action, to) { if (SERVER && API && ME && id) API.call("POST", "log/event", { coll, id, action, to: to || "" }).catch(() => {}); }
+
+/* ---------- pastille Profil (en haut à droite) ---------- */
+let SESS = null;
+const initials = n => String(n || "?").split(/[\s-]+/).filter(Boolean).slice(0, 2).map(w => w[0].toUpperCase()).join("");
+function profilePill() {
+  if (!SERVER || !ME) return "";
+  return `<button class="prof" data-a="prof-open" aria-haspopup="dialog" title="${esc(tr("Profil"))}"><span class="prof-av r-${esc(ME.role)}">${esc(initials(ME.name))}</span><span class="prof-n">${esc(ME.name)}</span><span class="prof-r">${esc(tr(ROLE_LBL[ME.role] || ME.role))}</span></button>`;
+}
+ACTIONS["prof-open"] = async () => {
+  if (!SESS && API && !ME.key) { try { SESS = (await API.call("GET", "auth/me")).session; } catch { } }
+  const t = ms => new Date(ms).toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const left = SESS ? Math.max(0, SESS.expires - Date.now()) : 0, h = Math.floor(left / 3600000), mn = Math.floor(left / 60000) % 60;
+  modal(`${mHead("Profil")}<div class="body stack">
+    <div class="row-g" style="align-items:center"><span class="prof-av big r-${esc(ME.role)}">${esc(initials(ME.name))}</span><div><div style="font-size:18px;font-weight:700">${esc(ME.name)}</div><div class="muted">${esc(tr(ROLE_LBL[ME.role] || ME.role))}${ME.email ? ` · ${esc(ME.email)}` : ""}</div></div></div>
+    <dl class="kv">${ME.key ? `<dt>Session</dt><dd>Clé d'accès provisoire (pas de session nominative)</dd>` : SESS ? `<dt>Connecté depuis</dt><dd>${esc(t(SESS.since))}</dd>
+      <dt>Session valable jusqu'à</dt><dd>${esc(t(SESS.expires))} <span class="muted small">(encore ${h} h ${String(mn).padStart(2, "0")})</span></dd>` : ""}
+      <dt>Droits</dt><dd class="small">${ME.role === "admin" ? "Tout, y compris les utilisateurs et les paramètres" : ME.role === "bureau" ? "Tout sauf la gestion des utilisateurs" : ME.role === "garage" ? "Les véhicules présents dans votre garage, leurs entretiens et pannes" : ME.role === "chauffeur" ? "Véhicules, signalement de pannes, vos trajets et amendes" : "Gaz, flotte, étalonnage et signalement de pannes"}</dd></dl></div>
+    <footer>${isOffice() && !ME.key ? `<div class="left"><button class="btn" data-a="prof-hist">Mon historique</button></div>` : ""}<button class="btn" data-close>Fermer</button><button class="btn danger" data-a="server-logout">Se déconnecter</button></footer>`);
+};
+ACTIONS["prof-hist"] = () => { closeModal(); UI.lf = { days: "30", by: ME.name, mod: "", act: "", src: "" }; LOGS = null; location.hash = "#historique"; };

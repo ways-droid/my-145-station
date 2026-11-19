@@ -1,0 +1,83 @@
+# Déploiement automatique de l'ERP W.A.Y.S. vers ways.support (ONE.COM) par SFTP.
+#
+#  - Chaque modification sur la branche main  → https://ways.support/erp-test/
+#  - Bouton « Run workflow » avec cible = production → https://ways.support/erp/
+#
+# Secrets à créer dans GitHub (Settings → Secrets and variables → Actions) :
+#   SFTP_HOST      hôte SFTP indiqué dans le panneau ONE.COM (SSH & SFTP)
+#   SFTP_USER      nom d'utilisateur SFTP
+#   SFTP_PASSWORD  mot de passe SFTP
+#
+# config.php n'est jamais envoyé : chaque dossier (erp-test, erp) garde le sien sur le serveur.
+
+name: Déploiement ONE.COM
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      cible:
+        description: "Où déployer ?"
+        type: choice
+        options: [test, production]
+        default: test
+
+concurrency:
+  group: deploy-${{ github.event.inputs.cible || 'test' }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Contrôle PHP
+        run: for f in api/*.php; do php -l "$f"; done
+
+      - name: Test de l'API
+        run: bash test/test.sh > /dev/null
+
+      - name: Choix du dossier
+        id: dest
+        run: |
+          if [ "${{ github.event.inputs.cible }}" = "production" ]; then
+            echo "dir=erp" >> "$GITHUB_OUTPUT"
+          else
+            echo "dir=erp-test" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Préparation des fichiers
+        run: |
+          mkdir -p site
+          # Application (quand elle sera dans le dépôt) : index.html, js/, assets/
+          [ -f index.html ] && cp index.html site/
+          [ -f confidentialite.html ] && cp confidentialite.html site/
+          [ -f site.htaccess ] && cp site.htaccess site/.htaccess
+          for d in js assets; do [ -d "$d" ] && cp -r "$d" site/; done
+          mkdir -p site/api site/client
+          cp api/*.php api/.htaccess api/schema.sql site/api/ && rm -f site/api/config.php
+          cp -r api/vendor site/api/
+          cp client/*.js site/client/
+
+      - name: Envoi SFTP
+        env:
+          HOST: ${{ secrets.SFTP_HOST }}
+          USER: ${{ secrets.SFTP_USER }}
+          PASS: ${{ secrets.SFTP_PASSWORD }}
+          DIR: ${{ steps.dest.outputs.dir }}
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y lftp > /dev/null
+          lftp -u "$USER,$PASS" "sftp://$HOST" -e "
+            set sftp:auto-confirm yes;
+            set net:max-retries 2;
+            mkdir -p $DIR;
+            mirror --reverse --verbose --exclude-glob config.php site/ $DIR/;
+            bye"
+
+      - name: Vérification
+        run: |
+          sleep 3
+          curl -fsS "https://ways.support/${{ steps.dest.outputs.dir }}/api/health" || \
+            echo "::warning::health ne répond pas encore — config.php est-il en place sur le serveur ?"

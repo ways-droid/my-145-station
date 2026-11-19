@@ -1,0 +1,16 @@
+# Toutes les requêtes /api/... passent par index.php
+RewriteEngine On
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteRule ^(.*)$ index.php?p=$1 [QSA,L]
+
+# Le passage de l'en-tête Authorization à PHP
+RewriteCond %{HTTP:Authorization} .
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+
+# Fichiers sensibles inaccessibles depuis le web
+<FilesMatch "^(config\.php|config\.sample\.php|schema\.sql|lib\.php|auth\.php|perm\.php|webfleet\.php|odoo\.php|falco\.php|ponto\.php|coda\.php|purchases\.php|assistant\.php|log\.php|sandbox\.php|dropbox\.php|whatsapp\.php|security\.php|payments\.php)$">
+  Require all denied
+</FilesMatch>
+
+# Bibliothèques (PHPMailer) : jamais appelées directement
+RewriteRule ^vendor/ - [F,L]
