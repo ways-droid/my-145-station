@@ -25,7 +25,7 @@ const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble de
 const AI_HIDDEN = ['settings', 'userPrefs'];
 const AI_NAME = 'Sindri';
 // collections que Sindri peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
-const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'travel', 'hotels', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
+const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'travel', 'hotels', 'aircraft', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
     'staff' => "personnel de la station (name, function, employer, email, phone, licences [{cat, number, expires}], ratings {type d'avion: niveau}, docs [{type, number, expires}] = visas, permis de travail, badges, examens…)",
@@ -33,6 +33,7 @@ const AI_LABELS = [
     'handovers' => 'fiches de shift (id <date>-day|night : foreman, extra, checks Station Control, out/in = remise et reprise du shift)',
     'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, planned, done, mhrs, atl, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
     'travel' => 'voyages du personnel (kind flight|hotel, staffId, status booked|cancel ; vol : date, from, to, airline, flightNo, dep, arr, pnr ; hôtel : hotelId, checkIn, checkOut, room, conf ; cost, currency)',
+    'aircraft' => 'avions servis par la station (reg = immatriculation, clientId = compagnie, acType, variant, msn, engines, licences = licences exigées pour signer [E EASA, I approbation israélienne, F FAA], amosRef, active, notes) — la maintenance et la navigabilité restent dans AMOS',
     'hotels' => 'hôtels du personnel (name, address, contact, phone, email, rate, currency)',
     'partMoves' => 'mouvements de pièces de la station (dir in|out, kind, status prep|sent|received|cancel, aog, pn, desc, serial, qty, cond, cert, certNo, amosRef, from, to, reg, carrier, awb, eta) ; le stock reste dans AMOS',
     'chargeLines' => 'lignes de Charge Sheet (date, company, reg, rotation, type, workType, description, qty, unit, price, currency, reviewed, invoiced) ; montant = qty × price',
@@ -186,7 +187,7 @@ function ai_tools($role) {
          'input_schema' => ['type' => 'object', 'properties' => $filters + ['limit' => ['type' => 'integer', 'description' => 'max 60, défaut 25']], 'required' => ['collection']]],
         ['name' => 'get_record', 'description' => "Fiche complète (toutes les lignes, tous les champs).",
          'input_schema' => ['type' => 'object', 'properties' => ['collection' => ['type' => 'string', 'enum' => $colls], 'id' => ['type' => 'string']], 'required' => ['collection', 'id']]],
-        ['name' => 'create_record', 'description' => "Crée une fiche dans l'outil (droits d'un employé Bureau). Regarde d'abord une fiche existante de la même collection avec get_record pour reprendre exactement sa structure (noms de champs, identifiants liés comme clientId ou vehicleId).",
+        ['name' => 'create_record', 'description' => "Crée une fiche dans l'outil (droits d'un employé Bureau). Regarde d'abord une fiche existante de la même collection avec get_record pour reprendre exactement sa structure (noms de champs, identifiants liés comme clientId ou vehicleId). Roster : une fiche par personne et par mois, l'identifiant <staffId>_<AAAA-MM> est donné automatiquement à partir de staffId et month ; si elle existe déjà, utilise update_record.",
          'input_schema' => ['type' => 'object', 'properties' => ['collection' => ['type' => 'string', 'enum' => array_values(array_intersect(AI_WRITABLE, $colls))], 'data' => ['type' => 'object']], 'required' => ['collection', 'data']]],
         ['name' => 'update_record', 'description' => "Modifie une fiche : seuls les champs donnés dans changes sont remplacés (valeur null = champ retiré). Pour un tableau (lignes, documents…), renvoie le tableau complet.",
          'input_schema' => ['type' => 'object', 'properties' => ['collection' => ['type' => 'string', 'enum' => array_values(array_intersect(AI_WRITABLE, $colls))], 'id' => ['type' => 'string'], 'changes' => ['type' => 'object']], 'required' => ['collection', 'id', 'changes']]],
@@ -530,6 +531,23 @@ function ai_out_msgs($msgs) {
     }, $msgs);
 }
 /* écritures de Sindri : mêmes contrôles que pour un employé Bureau (perm_write), notées dans l'historique au nom de Sindri */
+/* collections dont l'identifiant est fixé par le contenu, comme dans l'outil :
+   roster = <staffId>_<AAAA-MM> (une fiche par personne et par mois), handovers = <AAAA-MM-JJ>-day|night */
+function ai_natural_id($coll, array $data) {
+    if ($coll === 'roster') {
+        $sid = (string) ($data['staffId'] ?? ''); $m = (string) ($data['month'] ?? '');
+        if (!preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $m)) return ['error' => 'Roster : month obligatoire au format AAAA-MM.'];
+        $s = $sid !== '' && preg_match('/^[A-Za-z0-9_-]{1,80}$/', $sid) ? get_doc('staff', $sid) : null;
+        if (!$s || $s['deleted']) return ['error' => 'Roster : staffId inconnu, vérifie-le avec search_records sur staff.'];
+        return ['id' => $sid . '_' . $m];
+    }
+    if ($coll === 'handovers') {
+        $d = (string) ($data['date'] ?? ''); $sh = (string) ($data['shift'] ?? '');
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $d) || !in_array($sh, ['day', 'night'], true)) return ['error' => 'Passation : date (AAAA-MM-JJ) et shift (day|night) obligatoires.'];
+        return ['id' => "$d-$sh"];
+    }
+    return [];
+}
 function ai_by($who) { return AI_NAME . ' (pour ' . preg_replace('/^(user|token):/', '', (string) ($who['label'] ?? '?')) . ')'; }
 /* ---------- Dropbox (lecture seule pour Sindri) ---------- */
 function ai_dropbox($tool, $in) {
@@ -667,7 +685,10 @@ function ai_write($who, $role, $tool, $in, &$actions) {
         db()->beginTransaction();
         if ($tool === 'create_record') {
             $data = (array) ($in['data'] ?? []); unset($data['id'], $data['_rev']);
-            $id = 'ax' . bin2hex(random_bytes(6));
+            $nat = ai_natural_id($coll, $data);
+            if (isset($nat['error'])) { db()->rollBack(); return $nat; }
+            $id = $nat['id'] ?? 'ax' . bin2hex(random_bytes(6));
+            if (isset($nat['id']) && ($ex = get_doc($coll, $id)) && !$ex['deleted']) { db()->rollBack(); return ['error' => "Cette fiche existe déjà (id $id) : relis-la avec get_record puis modifie-la avec update_record."]; }
             $forced = $coll === 'notes' && !empty($data['team']);
             if ($coll === 'notes') { $data['team'] = false; $data['createdAt'] = $data['createdAt'] ?? gmdate('c'); $data['order'] = $data['order'] ?? -now_ms(); }
             $data = perm_write($wrole, $coll, 'put', null, $data, null, $id);

@@ -906,3 +906,37 @@ Object.assign(EN, {
   "OneDrive : dossier ou compte introuvable (vérifiez l'adresse du compte OneDrive et le dossier racine).": "OneDrive: folder or account not found (check the OneDrive account address and the root folder).",
   "Les scans se rangent par avion du shift.": "Scans are filed per shift aircraft.", "Fichier trop lourd (20 Mo maximum).": "File too large (20 MB maximum).", "Avion du shift introuvable": "Shift aircraft not found"
 });
+Object.assign(EN, {
+  "2 mois": "2 months", "Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre": "Show this month and the next, to see the schedule across the month change",
+  "Le vendredi est un jour de repos à la station (Shabbat) : vendredi moucheté dans le roster": "Friday is a day off at the station (Shabbat): Friday shown speckled in the roster"
+});
+/* ---- avions ---- */
+Object.assign(EN, {
+  "Avions": "Aircraft",
+  "Avions servis par la station : immatriculation, compagnie, type et licences exigées pour signer. La maintenance reste dans AMOS.": "Aircraft served by the station: registration, airline, type and licences required to sign. Maintenance stays in AMOS.",
+  "Immatriculation, compagnie, type, MSN…": "Registration, airline, type, MSN…",
+  "MSN": "MSN",
+  "Licences exigées": "Required licences",
+  "CRS qualifiés": "Qualified CRS",
+  "Aucun avion ne correspond.": "No aircraft match.",
+  "Aucun avion pour l'instant. Ajoutez les immatriculations servies par la station.": "No aircraft yet. Add the registrations the station serves.",
+  "CRS qualifiés : personnes actives du Personnel qualifiées sur le type, avec toutes les licences exigées (ex. E+I pour un 4X-). Les autorisations de signer restent dans AMOS.": "Qualified CRS: active staff rated on the type with all required licences (e.g. E+I for a 4X-). Certification authorisations stay in AMOS.",
+  "Compagnie aérienne": "Airline",
+  "Version": "Variant",
+  "MSN (n° de série)": "MSN (serial number)",
+  "Moteurs": "Engines",
+  "Référence AMOS": "AMOS reference",
+  "Licences exigées pour signer cet avion": "Licences required to sign this aircraft",
+  "EASA": "EASA",
+  "Approbation israélienne (4X-)": "Israeli approval (4X-)",
+  "FAA": "FAA",
+  "Par défaut : E (EASA), et I en plus pour un 4X-. Le shift vérifie que les CRS affectés ont ces licences sur le type.": "Default: E (EASA), plus I for a 4X-. The shift checks that assigned CRS hold these licences on the type.",
+  "aucun": "none",
+  "Immatriculation invalide (ex. 4X-EKA, 9H-ABC, N123AB).": "Invalid registration (e.g. 4X-EKA, 9H-ABC, N123AB).",
+  "Cet avion existe déjà.": "This aircraft already exists.",
+  "Supprimer cet avion du référentiel ? Les shifts passés ne changent pas.": "Remove this aircraft from the list? Past shifts are not changed.",
+  "Avion supprimé": "Aircraft deleted",
+  "Plus servi": "No longer served",
+  "Servi par la station": "Served by the station"
+});
+rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
