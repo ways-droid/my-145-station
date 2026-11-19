@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "roster", "handovers", "shiftItems", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
@@ -166,7 +166,7 @@ const SESSION_LS = "st-session";
 const ROLE_LBL = { admin: "Administrateur", bureau: "Bureau", terrain: "Terrain" };
 const isAdmin = () => !SERVER || !ME || ME.role === "admin";
 /* modules masqués pour le rôle Terrain (pas de clients, de prix ni d'administration) */
-const ROLE_HIDE = { terrain: ["clients", "produits", "admin", "historique", "parametres"] };
+const ROLE_HIDE = { terrain: ["charge", "clients", "produits", "admin", "historique", "parametres"] };
 const isOffice = () => !ME || ME.key || ["admin", "bureau"].includes(ME.role);
 const allowed = r => !ME || !(ROLE_HIDE[ME.role] || []).includes(r);
 const lsGet = k => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -336,12 +336,12 @@ async function init() {
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
   ["Station", [["personnel", "Personnel"], ["roster", "Roster"], ["shift", "Shift"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"]]],
-  ["Clients", [["clients", "Clients"], ["produits", "Articles et prix"]]],
+  ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
-const NAV_DOT = { clients: "white", produits: "white" };
+const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
 const ALIAS = { catalogue: "produits" };
 const route = () => { let h = location.hash.slice(1); h = ALIAS[h] || h; return VIEWS[h] && allowed(h) ? h : "dashboard"; };

@@ -792,3 +792,14 @@ Object.assign(EN, {
 });
 rule(/^(\d+) avions? sans CRS qualifié affecté : voir la section 2\.$/, "$1 aircraft without a qualified CRS assigned: see section 2.");
 rule(/^Aucun CRS qualifié (.+)$/, "No CRS qualified on $1"); rule(/^4X- : aucun CRS avec I sur (.+)$/, "4X-: no CRS with I on $1");
+/* ---- charge sheet ---- */
+Object.assign(EN, {
+  "Charge Sheet": "Charge Sheet", "Prestations facturables du mois, préparées depuis les shifts et revues avant l'envoi à la finance": "Billable work of the month, prepared from the shifts and reviewed before sending to finance",
+  "Ajouter une ligne": "Add a line", "Nouvelle ligne": "New line", "Préparer depuis les shifts": "Prepare from shifts", "À revoir": "To review", "Tout": "All", "Ligne enregistrée": "Line saved",
+  "Rechercher une immatriculation, une rotation, une description…": "Search a registration, rotation or description…", "Rien ne correspond.": "Nothing matches.", "Aucune ligne pour ce mois.": "No lines for this month.",
+  "Aucune ligne pour ce mois : cliquez sur « Préparer depuis les shifts ».": "No lines for this month: click “Prepare from shifts”.", "Créer les lignes cochées": "Create the ticked lines",
+  "Lignes proposées d'après les avions et le matériel notés dans les shifts du mois. Décochez ce qui ne se facture pas. Tout reste « à revoir » jusqu'à votre contrôle.": "Lines proposed from the aircraft and materials recorded in this month's shifts. Untick what is not billed. Everything stays “to review” until you check it.",
+  "Aucun forfait trouvé pour ce client et ce type": "No package found for this customer and type", "Article sans tarif": "Item without a rate", "— texte libre —": "— free text —",
+  "Work Type (article)": "Work Type (item)", "Work Type (texte)": "Work Type (text)", "Description (n° de WO du client…)": "Description (customer WO no.…)",
+  "Station Control : contrôles de fin de shift (un par ligne)": "Station Control: end-of-shift checks (one per line)"
+});

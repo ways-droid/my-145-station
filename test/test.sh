@@ -128,6 +128,12 @@ ok "shift repris : nouvel avion refusé au terrain" "$(curl -s -H "$HT" -X PUT -
 ok "shift repris : fiche du shift verrouillée" "$(curl -s -H "$HT" -X PATCH -d '{"checkNote":"x"}' $U/docs/handovers/2026-11-19-day)" 'clôturé'
 ok "shift repris : le bureau corrige encore" "$(curl -s -H "$B" -X PATCH -d '{"done":"Transit OK, roue changée"}' $U/docs/shiftItems/v1)" '"ok":true'
 ok "historique : shift nommé" "$(curl -s -H "$A" "$U/log?coll=shiftItems")" 'Avion 9H-ABC'
+echo "> charge sheet"
+ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
+ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'
+no "terrain : changements sans Charge Sheet" "$(curl -s -H "$HT" "$U/changes?since=0")" 'PFSC (MT Transit'
+ok "terrain : Charge Sheet non modifiable" "$(curl -s -H "$HT" -X PUT -d '{"price":1}' $U/docs/chargeLines/cl2)" 'rôle'
+ok "historique : ligne nommée" "$(curl -s -H "$A" "$U/log?coll=chargeLines")" 'Charge Sheet 261119-9HABC-MT01'
 echo "> flightradar24"
 pkill -f "127.0.0.1:8773" || true
 (php -S 127.0.0.1:8773 "$D/fr24-mock.php" >/dev/null 2>&1 &); sleep 0.5
