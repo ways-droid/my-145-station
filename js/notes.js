@@ -18,6 +18,7 @@ const noteTitle = n => n.title || (n.body || "").split("\n")[0].slice(0, 60) || 
 /* ---- liens vers les fiches de l'outil ---- */
 const NOTE_LINK = {
   vehicles: { ic: "🚗", act: "veh-open", lbl: v => [fleetNo(v), v.plate, v.model].filter(Boolean).join(" · ") },
+  staff: { ic: "👤", act: "staff-open", lbl: c => c.name },
   clients: { ic: "🏢", act: "client-form", lbl: c => c.name },
   tools: { ic: "🔧", act: "tool-open", lbl: t => [t.serial, t.name || t.model, t.brand].filter(Boolean).join(" · ") },
   faults: { ic: "⚠", act: "fault-open", lbl: f => `Panne · ${(f.description || "").slice(0, 50)}${f.vehicleId && veh(f.vehicleId) ? " · " + veh(f.vehicleId).plate : ""}` },

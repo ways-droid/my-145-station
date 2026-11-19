@@ -3,6 +3,7 @@
    Tout ce qui est créé ici porte demo: true → repère « Exemple » et suppression en un clic.
    ========================================================================= */
 const DEMO_SETS = [
+  ["personnel", "Personnel", "5 personnes, licences, qualifications, documents"],
   ["clients", "Clients & tarifs", "3 compagnies aériennes, 6 tarifs"],
   ["flotte", "Véhicules", "4 véhicules, entretiens, panne, pneus"],
   ["etalonnage", "Outillage", "1 laboratoire, 5 outils à différents stades"]
@@ -41,6 +42,14 @@ async function demoFleet() {
   }
   await save("tires", dId("t"), { width: 205, ratio: 55, rim: 16, load: "91", speed: "V", type: "Hiver", brand: "Michelin", model: "Alpin (exemple)", state: "neuf", qty: 4, location: "Rack (exemple)", dot: "3825", note: "", demo: true });
 }
+async function demoStaff() {
+  const T = acTypes(), r = n => Object.fromEntries(T.slice(0, n).map((t, i) => [t, ["E+I", "E", "E+F"][i % 3]]));
+  const ppl = [["Alex Exemple", "lead", ["B1", "B2"], 3, 20], ["Sam Démo", "foreman", ["B1"], 2, 45], ["Charlie Fictif", "engineer", ["B1"], 2, -5], ["Dana Test", "mechanic", [], 0, 200], ["Robin Essai", "storekeeper", [], 0, 120]];
+  for (const [name, fn, lic, nr, visaIn] of ppl) await save("staff", dId("s"), { name: name + " (exemple)", function: fn, employer: "Exemple Technic", base: "TLV", email: "", phone: "", active: true, shift: pick(["day", "night"]),
+    licences: lic.map(cat => ({ cat, number: "EX." + cat + "." + String(1000 + Math.floor(Math.random() * 8999)), authority: "Exemple CAA", expires: addDays(today(), 400) })), ratings: r(nr),
+    docs: [{ id: uid(), type: "visa", name: "Visa de travail (exemple)", number: "EX-V", issued: dAgo(300), expires: addDays(today(), visaIn) }, { id: uid(), type: "ramp", name: "TLV", number: "EX-R", issued: dAgo(200), expires: addDays(today(), visaIn + 60) }],
+    notes: "", demo: true });
+}
 async function demoCalib() {
   const cs = S.clients.map(c => c.id);
   const lab = dId("lab");
@@ -56,7 +65,7 @@ ACTIONS["demo-gen"] = async el => {
   const sel = [...document.querySelectorAll(".dg-opt:checked")].map(c => c.value);
   if (!sel.length) { toast("Cochez au moins un type de données."); return; }
   el.disabled = true; const label = el.textContent;
-  const run = { clients: demoClients, flotte: demoFleet, etalonnage: demoCalib };
+  const run = { personnel: demoStaff, clients: demoClients, flotte: demoFleet, etalonnage: demoCalib };
   try {
     for (const k of sel) { el.textContent = "Création : " + DEMO_SETS.find(d => d[0] === k)[1] + "…"; await run[k](); }
     toast("Données d'exemple créées");

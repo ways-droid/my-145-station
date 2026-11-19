@@ -46,7 +46,7 @@ try {
     $who  = auth_who();
     $user = $who['label'];
     $GLOBALS['LOG_WHO'] = $user;
-    $GLOBALS['ME_UID'] = notes_uid($who); $GLOBALS['ME_NAME'] = (string) ($who['user']['name'] ?? '');
+    $GLOBALS['ME_UID'] = notes_uid($who); $GLOBALS['ME_NAME'] = (string) ($who['user']['name'] ?? ''); $GLOBALS['ME_EMAIL'] = mb_strtolower(trim((string) ($who['user']['email'] ?? '')));
     if (function_exists('log_tables')) log_tables();
     sbx_init();                                          // environnement de test de cette session ?
     sbx_guard($route, $parts, $method);   // hors transaction (MySQL valide implicitement toute transaction sur un CREATE)
@@ -179,7 +179,7 @@ try {
         foreach ($pdo->query('SELECT coll, id, data FROM ways_docs WHERE deleted = 0 ORDER BY coll, id') as $r) {
             $res[$r['coll']][$r['id']] = json_decode($r['data'], true);
         }
-        header('Content-Disposition: attachment; filename="ways-export-' . date('Ymd-His') . '.json"');
+        header('Content-Disposition: attachment; filename="station-export-' . date('Ymd-His') . '.json"');
         out($res);
     }
 

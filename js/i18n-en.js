@@ -730,3 +730,26 @@ Object.assign(EN, {
   "Quelles pannes de véhicules sont encore ouvertes ?": "Which vehicle faults are still open?", "Liste les tarifs du client MT": "List the rates for customer MT", "Résume mes notes de la semaine": "Summarise my notes from this week",
   "État des véhicules": "Vehicle status", "Voir les véhicules": "View vehicles", "Bon de commande": "Purchase order", "Continuer": "Continue"
 });
+/* ---- personnel et qualifications ---- */
+Object.assign(EN, {
+  "Personnel": "Staff", "Équipe": "Team", "Qualifications": "Qualifications", "Échéances": "Due dates", "Ajouter une personne": "Add a person", "Nouvelle personne": "New person",
+  "Nom": "Name", "Fonction": "Function", "Licences": "Licences", "Prochaine échéance": "Next due date", "Tous": "All", "Anciens": "Former",
+  "Rechercher un nom, une licence, un type d'avion…": "Search a name, licence or aircraft type…", "Personne ne correspond.": "No one matches.", "Aucune personne pour l'instant.": "No one yet.",
+  "Personnes qualifiées": "Qualified people", "Employeur": "Employer", "Station de base": "Home station", "Nationalité": "Nationality", "Horaire habituel": "Usual shift",
+  "Nom et prénom": "Full name", "E-mail (le même que son compte, pour qu'il voie sa fiche)": "E-mail (same as their account, so they can see their record)",
+  "Ajouter une licence": "Add a licence", "N° de licence": "Licence no.", "Autorité": "Authority", "Expiration": "Expiry",
+  "Qualifications par type d'avion": "Aircraft type qualifications", "Aucune licence enregistrée.": "No licence recorded.", "Aucune.": "None.", "Documents": "Documents",
+  "Ajouter un document": "Add a document", "Aucun document.": "No documents.", "Documents visibles par le bureau et par la personne elle-même.": "Documents are visible to the office and to the person themselves.",
+  "Fiche enregistrée": "Record saved", "Ne fait plus partie de la station": "No longer at the station", "(fiche gardée, sortie des listes et des échéances)": "(record kept, removed from lists and due dates)",
+  "Passeport": "Passport", "Visa": "Visa", "Permis de travail": "Work permit", "Badge piste / aéroport": "Ramp / airport pass", "Examen (CAAI…)": "Exam (CAAI…)", "Autorisation run-up": "Run-up authorisation",
+  "Formation (Human Factors, EWIS…)": "Training (Human Factors, EWIS…)", "Aptitude médicale": "Medical fitness", "Permis de conduire / piste": "Driving / airside licence", "Autre": "Other",
+  "Jour (08-20)": "Day (08-20)", "Nuit (20-08)": "Night (20-08)", "Horaire libre": "Custom hours",
+  "Intitulé / pays / aéroport": "Title / country / airport", "Type d'avion (si applicable)": "Aircraft type (if applicable)", "N° du document": "Document no.", "Date d'émission": "Issue date", "Date d'expiration": "Expiry date",
+  "Échéances des 90 prochains jours (et dépassées) : licences et documents en cours.": "Due dates in the next 90 days (and overdue): current licences and documents.",
+  "Rien dans les 90 prochains jours.": "Nothing in the next 90 days.", "Rien dans les 60 prochains jours.": "Nothing in the next 60 days.", "Échéances du personnel": "Staff due dates",
+  "Licences, visas, permis, badges et examens qui expirent (60 jours).": "Licences, visas, permits, passes and exams expiring (60 days).", "Voir le personnel": "View staff",
+  "Types d'avion suivis (séparés par des virgules)": "Aircraft types tracked (comma-separated)", "Approbation israélienne": "Israeli approval",
+  "E = licence EASA · I = approbation israélienne (requise pour signer les avions 4X- en Israël) · F = licence FAA.": "E = EASA licence · I = Israeli approval (required to sign 4X- aircraft in Israel) · F = FAA licence.",
+  "Ajoutez d'abord les types d'avion dans Paramètres (Station).": "First add the aircraft types in Settings (Station).", "Les autorisations de signer (CRS) restent gérées dans AMOS.": "Certifying authorisations (CRS) stay in AMOS."
+});
+rule(/^(\d+) personnes? · licences, qualifications et documents$/, "$1 people · licences, qualifications and documents");

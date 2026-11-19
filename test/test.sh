@@ -100,6 +100,17 @@ curl -s -H "$K" -X PUT -d '{"plate":"2-XYZ-999"}' $U/docs/vehicles/v-2 >/dev/nul
 A="Authorization: Bearer $S"
 ok "modules retirés : collection inconnue" "$(curl -s -H "$A" $U/docs/docs)" 'Collection inconnue'
 ok "modules retirés : route inconnue" "$(curl -s -H "$A" $U/webfleet/status)" '404\|inconnu\|introuvable\|Not found\|not found'
+echo "> personnel"
+curl -s -H "$K" -X PUT -d '{"name":"Marc Terrain","email":"Marc@Example.test","function":"mechanic","phone":"+972 50 111","licences":[{"cat":"B1","number":"IL.66.123"}],"ratings":{"B767":"E"},"docs":[{"id":"x1","type":"passport","number":"P123456"}]}' $U/docs/staff/s1 >/dev/null
+curl -s -H "$K" -X PUT -d '{"name":"Autre Personne","email":"autre@example.test","function":"engineer","phone":"+972 50 999","licences":[{"cat":"B2","number":"IL.66.999","expires":"2027-01-01"}],"ratings":{"B777":"E+I"},"docs":[{"id":"x2","type":"visa","number":"V999"}],"notes":"privé"}' $U/docs/staff/s2 >/dev/null
+ok "terrain : sa propre fiche en entier" "$(curl -s -H "$HT" $U/docs/staff/s1)" 'P123456'
+R=$(curl -s -H "$HT" $U/docs/staff/s2); ok "terrain : collègue visible" "$R" 'Autre Personne'; ok "terrain : licence et qualification du collègue" "$R" '"cat":"B2"'; ok "terrain : qualification visible" "$R" 'E+I'
+no "terrain : n° de licence masqué" "$R" 'IL.66.999'; no "terrain : documents masqués" "$R" 'V999'; no "terrain : téléphone masqué" "$R" '972 50 999'; no "terrain : notes masquées" "$R" 'privé'
+no "terrain : liste sans documents des autres" "$(curl -s -H "$HT" $U/docs/staff)" 'V999'
+no "terrain : changements sans documents des autres" "$(curl -s -H "$HT" "$U/changes?since=0&colls=staff")" 'V999'
+ok "terrain : personnel en lecture seule" "$(curl -s -H "$HT" -X PATCH -d '{"name":"X"}' $U/docs/staff/s1)" 'rôle'
+ok "bureau : fiche complète" "$(curl -s -H "$B" $U/docs/staff/s2)" 'V999'
+ok "bureau : ajoute un document" "$(curl -s -H "$B" -X PATCH -d '{"docs":[{"id":"x2","type":"visa","number":"V999"},{"id":"x3","type":"ramp","name":"TLV","expires":"2027-02-01"}]}' $U/docs/staff/s2)" '"ok":true'
 echo "> dropbox"
 ok "adresses Dropbox réelles" "$(cd "$D/../api" && php -r 'function kv_get($k){return null;} require "dropbox.php"; echo dbx_url("oauth2","token")," ",dbx_url("api","files/list_folder")," ",dbx_url("content","files/upload");')" 'https://api.dropboxapi.com/oauth2/token https://api.dropboxapi.com/2/files/list_folder https://content.dropboxapi.com/2/files/upload'
 pkill -f "127.0.0.1:8771" || true
