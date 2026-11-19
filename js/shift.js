@@ -39,7 +39,7 @@ function visitCheck(v) {
 const hoClosed = h => !!(h && h.in && h.in.at);
 
 VIEWS.shift = {
-  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) render(true); }); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
+  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) { render(true); fr24AutoRun(); } }); else if (SERVER) fr24AutoRun(); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
   render() {
     if (!UI.shift) UI.shift = currentShift();
     const [date, sh] = UI.shift, id = hoId(date, sh), h = hoDoc(id) || {}, cur = currentShift(), isCur = cur[0] === date && cur[1] === sh;
@@ -219,19 +219,52 @@ function fr24Line(v) {
   if (L) t = `En vol ${L.from || "?"} → ${L.to || "?"}${L.eta ? " · ETA " + utcHM(L.eta) : ""}`;
   else if (P && P.landed) t = `Atterri ${utcHM(P.landed)}${P.to ? " à " + P.to : ""}${P.from ? " (de " + P.from + ")" : ""}`;
   else if (P && P.takeoff) t = `Parti ${utcHM(P.takeoff)}${P.from ? " de " + P.from : ""}${P.to ? " vers " + P.to : ""}`;
-  else t = "Pas de vol trouvé";
+  else t = "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)";
   return `<div class="small ${L && st && L.to && L.to !== st ? "txt-warn" : "muted"}" title="Flightradar24 · ${esc(fmtDT(f.at))}">FR24 · ${esc(tr(t))}</div>`;
 }
-ACTIONS["fr24-track"] = async el => {
-  const id = el.dataset.ho, vs = hoItems(id, "visit").filter(v => v.reg);
-  if (!vs.length) { toast("Aucune immatriculation dans ce shift."); return; }
-  el.disabled = true;
-  try { const r = await API.call("POST", "fr24/track", { regs: vs.map(v => v.reg) });
-    for (const v of vs) { const x = r.items[String(v.reg).toUpperCase().replace(/[^A-Z0-9-]/g, "")]; if (x) await patch("shiftItems", v.id, { fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}) }); }
-    toast("Positions Flightradar24 mises à jour"); }
-  catch (e) { toast(tr(e.message)); }
-  el.disabled = false;
-};
+/* heure locale de la station → instant UTC (ms) */
+function stationUtc(date, hour) {
+  const tz = settings().timeZone, guess = Date.parse(`${date}T${pad(hour)}:00:00Z`);
+  if (!tz) return new Date(`${date}T${pad(hour)}:00:00`).getTime();
+  try { const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(guess)).map(x => [x.type, x.value]));
+    const asLocal = Date.parse(`${p.year}-${p.month}-${p.day}T${pad(+p.hour % 24)}:${p.minute}:00Z`); return guess - (asLocal - guess); } catch { return guess; }
+}
+/* fenêtre UTC d'un shift (jour 08-20, nuit 20-08 heure locale) */
+const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === "night", a = stationUtc(d, night ? 20 : 8); return [a, a + 12 * 3600000]; };
+/* ARR / DEP remplis par FR24 dans les cases vides, ou dans celles que FR24 avait remplies (une saisie à la main n'est jamais écrasée) :
+   ARR = atterrissage à la station pendant le shift (ou jusqu'à 6 h avant), sinon ETA d'un vol en route vers la station ; DEP = décollage de la station pendant le shift */
+function fr24Fill(v, x) {
+  const [a, b] = shiftWindow(v.ho), st = (settings().stationCode || "").toUpperCase(), prev = v.fr24Fill || {}, out = {}, fill = {};
+  const inW = (iso, from, to) => { const t = Date.parse(iso); return !isNaN(t) && t >= from && t <= to; };
+  let arr = "", dep = "";
+  if (x.arr && inW(x.arr.at, a - 6 * 3600000, b)) arr = utcHM(x.arr.at);
+  else if (x.live && st && x.live.to === st && x.live.eta && inW(x.live.eta, a - 6 * 3600000, b + 3600000)) arr = utcHM(x.live.eta);
+  if (x.dep && inW(x.dep.at, a, b + 6 * 3600000) && (!x.arr || Date.parse(x.dep.at) > Date.parse(x.arr.at))) dep = utcHM(x.dep.at);
+  for (const [k, val] of [["arr", arr], ["dep", dep]]) { if (!val) { if (prev[k]) fill[k] = prev[k]; continue; }
+    if (!v[k] || v[k] === prev[k]) { if (v[k] !== val) out[k] = val; fill[k] = val; } }
+  out.fr24Fill = fill; return out;
+}
+async function fr24Run(id, quiet) {
+  const vs = hoItems(id, "visit").filter(v => v.reg);
+  if (!vs.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
+  const r = await API.call("POST", "fr24/track", { regs: vs.map(v => v.reg), station: settings().stationCode || "" });
+  const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  let found = 0, filled = 0;
+  for (const v of vs) { const x = r.items[key(v.reg)]; if (!x) continue; if (x.live || x.last) found++;
+    const f = fr24Fill(v, x); if (f.arr || f.dep) filled++;
+    await patch("shiftItems", v.id, Object.assign({ fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}) }, f)); }
+  if (!quiet) toast(`Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures remplies pour ${filled}` : ""}.`);
+}
+ACTIONS["fr24-track"] = async el => { el.disabled = true; try { await fr24Run(el.dataset.ho); } catch (e) { toast(tr(e.message)); } el.disabled = false; };
+/* shift en cours : mise à jour automatique à l'ouverture, au plus toutes les 15 minutes (chaque appel consomme des crédits FR24) */
+let fr24Auto = {};
+function fr24AutoRun() {
+  if (!FR24 || !FR24.configured || readOnly) return;
+  const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit").filter(v => v.reg); if (!vs.length) return;
+  const last = Math.max(fr24Auto[id] || 0, ...vs.map(v => Date.parse(v.fr24 && v.fr24.at) || 0));
+  if (Date.now() - last < 15 * 60000) return;
+  fr24Auto[id] = Date.now(); fr24Run(id, true).catch(() => {});
+}
 function fr24CardShell() {
   if (!SERVER || !isAdmin()) return "";
   return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack"><h3 class="np">Flightradar24</h3><div id="fr24-box"><div class="muted">Chargement…</div></div></div></div>`;

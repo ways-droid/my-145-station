@@ -940,3 +940,6 @@ Object.assign(EN, {
   "Servi par la station": "Served by the station"
 });
 rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
+/* ---- Flightradar24 : heures remplies ---- */
+Object.assign(EN, { "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)": "No flight in the last 72 h (FR24 does not provide scheduled flights)" });
+rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures remplies pour (\d+))?\.$/, (m, a, b, c) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times filled for ${c}` : ""}.`);
