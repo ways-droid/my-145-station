@@ -9,7 +9,9 @@
 #   SFTP_USER      nom d'utilisateur SFTP
 #   SFTP_PASSWORD  mot de passe SFTP
 # Variables facultatives (même page, onglet Variables) :
-#   TEST_DIR       dossier du sous-domaine sur l'hébergement (par défaut : test)
+#   TEST_DIR       dossier du sous-domaine sur l'hébergement (par défaut : test). Chez ONE.COM (offre Business),
+#                  chaque domaine a son dossier webroots/<id> : lancez une fois avec « list_only » pour voir
+#                  webroots/by-route/<domaine>_ -> webroots/<id>, puis mettez TEST_DIR = webroots/<id>[/sous-dossier].
 #   TEST_URL       adresse du site de test (par défaut : https://test.my-145-station.com)
 #
 # config.php n'est jamais envoyé ni écrasé : il est créé sur le serveur par api/install.php
@@ -112,6 +114,9 @@ jobs:
                   p = d + "/" + a.filename
                   try: print(p + " -> " + s.readlink(p))
                   except Exception as e: print(p + " (" + str(e) + ")")
+                  if d == "webroots" and a.filename != "by-route":
+                      try: print("    " + ", ".join(sorted(s.listdir(p))[:30]))
+                      except Exception as e: print("    (" + str(e) + ")")
           PY
             exit 0
           fi
