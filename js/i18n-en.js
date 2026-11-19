@@ -781,15 +781,28 @@ Object.assign(EN, {
   "Aucun CRS affecté": "No CRS assigned", "Équipement et matériel": "Equipment and materials", "Équipements et consommables utilisés, par client ou utilisateur.": "Equipment and consumables used, by customer or user.",
   "Client / utilisateur": "Customer / user", "Équipement ou matériel": "Equipment or material", "Quantité": "Quantity", "Rien de noté.": "Nothing recorded.", "Avion (si applicable)": "Aircraft (if applicable)", "Nouvel équipement ou matériel": "New equipment or material",
   "Station Control": "Station Control", "Contrôles de fin de shift.": "End-of-shift checks", "Remarque Station Control": "Station Control note",
-  "Outillage rangé et compté": "Tools stored and counted", "Équipements (GPU, ASU, azote…) contrôlés et rangés": "Equipment (GPU, ASU, nitrogen…) checked and stored", "Clés et véhicules en ordre": "Keys and vehicles in order",
-  "Magasin et pièces rangés": "Store and parts tidy", "Bureau, documents et ordinateurs en ordre": "Office, documents and computers in order",
   "Manpower et signatures": "Manpower and signatures", "Personnel du shift d'après le roster. La signature confirme la remise du shift, pas un travail sur avion.": "Shift staff from the roster. Signing confirms the shift handover, not work on an aircraft.",
   "Shift Foreman": "Shift Foreman", "Ajouter au shift": "Add to the shift", "Ajouté": "Added", "Personne au roster pour ce shift.": "No one on the roster for this shift.", "Remis par": "Handed over by", "Repris par": "Taken over by", "Pas encore": "Not yet",
   "Je remets le shift": "I hand over the shift", "Je reprends le shift": "I take over the shift", "Annuler les signatures": "Cancel signatures", "Remettre": "Hand over", "Reprendre": "Take over",
   "Shift en cours": "Current shift", "Avions du shift en cours, travail non terminé, CRS manquants.": "Current shift aircraft, uncompleted work, missing CRS.", "Ouvrir le shift": "Open the shift", "avions": "aircraft", "non terminés": "uncompleted", "sans CRS qualifié": "without qualified CRS",
   "Flightradar24": "Flightradar24", "Enregistrer la clé": "Save key", "Retirer la clé": "Remove key", "Tester": "Test", "Non configuré": "Not configured", "Clé API Flightradar24": "Flightradar24 API key",
-  "Positions Flightradar24 mises à jour": "Flightradar24 positions updated", "Pas de vol trouvé": "No flight found"
+  "Positions Flightradar24 mises à jour": "Flightradar24 positions updated", "Pas de vol trouvé": "No flight found",
+  "Notion (handover)": "Notion (handover)", "Page Notion ↗": "Notion page ↗", "Envoyer vers Notion": "Send to Notion", "Renvoyer vers Notion": "Send to Notion again", "Envoyer": "Send", "Renvoyer": "Send again", "Envoyé par": "Sent by",
+  "Handover envoyé vers Notion": "Handover sent to Notion", "Page Notion remplacée": "Notion page replaced",
+  "La page déjà envoyée pour ce shift sera remplacée (l'ancienne va dans la corbeille de Notion).": "The page already sent for this shift will be replaced (the old one goes to the Notion trash).",
+  "Une page est créée sous la page Notion choisie dans Paramètres, avec les 5 sections.": "A page is created under the Notion page chosen in Settings, with the 5 sections.",
+  "Le handover de chaque shift est écrit sous une seule page Notion, choisie ici. L'outil ne modifie jamais une autre page. Dans Notion : créez une intégration interne, copiez son jeton, puis ajoutez l'intégration à cette page (••• › Connexions).": "Each shift's handover is written under a single Notion page, chosen here. The tool never changes any other page. In Notion: create an internal integration, copy its token, then add the integration to that page (••• › Connections).",
+  "Jeton enregistré": "Token saved", "Retirer le jeton": "Remove token", "Pas de jeton": "No token", "Jeton d'intégration Notion": "Notion integration token", "Enregistrer le jeton": "Save token",
+  "Lien de la page Notion du handover": "Link of the Notion handover page", "Enregistrer la page": "Save page", "Jeton Notion enregistré": "Notion token saved", "Page Notion enregistrée": "Notion page saved",
+  "Retirer le jeton Notion ?": "Remove the Notion token?", "Connexion Notion OK": "Notion connection OK",
+  "Notion n'est pas configuré : ajoutez le jeton d'intégration Notion dans Paramètres.": "Notion is not set up: add the Notion integration token in Settings.",
+  "Notion : choisissez la page parente du handover dans Paramètres.": "Notion: choose the handover parent page in Settings.",
+  "Notion : jeton refusé (vérifiez le jeton d'intégration dans Paramètres).": "Notion: token refused (check the integration token in Settings).",
+  "Notion : page introuvable ou non partagée avec l'intégration (dans Notion : ••• › Connexions › ajouter l'intégration sur la page de test).": "Notion: page not found or not shared with the integration (in Notion: ••• › Connections › add the integration on the test page).",
+  "Notion : trop de demandes, réessayez dans un instant.": "Notion: too many requests, try again in a moment.", "Ce shift n'a pas encore de fiche.": "This shift has no handover yet.",
+  "Lien de page Notion invalide": "Invalid Notion page link", "Jeton Notion invalide": "Invalid Notion token"
 });
+rule(/^(Envoyer|Renvoyer) le handover (.+) vers Notion \?(.*)$/s, (m, a, b, c) => `${a === "Envoyer" ? "Send" : "Send again"} the ${b} handover to Notion?${c}`);
 rule(/^(\d+) avions? sans CRS qualifié affecté : voir la section 2\.$/, "$1 aircraft without a qualified CRS assigned: see section 2.");
 rule(/^Aucun CRS qualifié (.+)$/, "No CRS qualified on $1"); rule(/^4X- : aucun CRS avec I sur (.+)$/, "4X-: no CRS with I on $1");
 /* ---- charge sheet ---- */
