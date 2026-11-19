@@ -3,8 +3,8 @@
 // Ne fonctionne qu'une fois : dès que config.php existe, cette page se bloque.
 
 $configFile = __DIR__ . '/config.php';
-$envName    = basename(dirname(__DIR__));            // "erp-test" ou "erp"
-$uploadDir  = __DIR__ . '/../../../httpd.private/ways-uploads-' . $envName;
+$envName    = basename(dirname(__DIR__));            // nom du dossier, ex. « test »
+$uploadDir  = __DIR__ . '/../../../httpd.private/st-uploads-' . $envName;
 
 function h($s) { return htmlspecialchars((string) $s, ENT_QUOTES, 'UTF-8'); }
 

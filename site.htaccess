@@ -1,4 +1,4 @@
-# Dossier de l'ERP (erp-test / erp) : sert index.html quand on ouvre le dossier lui-même.
+# Dossier du site (ex. test) : sert index.html quand on ouvre le dossier lui-même.
 # Le serveur ne trouvait pas toujours la page d'accueil du dossier (403 « Forbidden » sur /erp-test ou /erp-test/).
 RewriteEngine On
 # /erp-test → /erp-test/ (sinon les chemins relatifs js/… seraient faux)
