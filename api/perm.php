@@ -102,6 +102,7 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
         return $new;
     }
     if ($coll === 'tools') return tools_terrain_write($op, $old, $new);
+    if ($coll === 'partMoves' && $op === 'delete') deny();   // le magasinier saisit et met à jour, le bureau supprime
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
 }

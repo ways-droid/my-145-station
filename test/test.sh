@@ -141,6 +141,11 @@ ok "terrain : rentre l'outil" "$(curl -s -H "$HT" -X PATCH -d '{"out":null,"hist
 no "outil rentré" "$(curl -s -H "$HT" $U/docs/tools/tq1)" '"out":{'
 ok "terrain : laboratoires en lecture seule" "$(curl -s -H "$HT" -X PUT -d '{"name":"Labo X"}' $U/docs/labs/lx)" 'rôle'
 ok "historique : outil nommé" "$(curl -s -H "$A" "$U/log?coll=tools")" 'Outil TLV-T-001'
+echo "> pièces"
+ok "terrain : envoi de pièce" "$(curl -s -H "$HT" -X PUT -d '{"dir":"out","kind":"station","status":"prep","pn":"123-456","qty":1,"from":"TLV","to":"ETM","aog":true}' $U/docs/partMoves/pm1)" '"ok":true'
+ok "terrain : met à jour l'envoi" "$(curl -s -H "$HT" -X PATCH -d '{"status":"sent","awb":"1234567890","carrier":"dhl"}' $U/docs/partMoves/pm1)" '"ok":true'
+ok "terrain : ne supprime pas" "$(curl -s -H "$HT" -X DELETE $U/docs/partMoves/pm1)" 'rôle'
+ok "historique : mouvement nommé" "$(curl -s -H "$A" "$U/log?coll=partMoves")" 'Envoi 123-456 TLV→ETM'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'

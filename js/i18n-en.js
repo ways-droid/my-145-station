@@ -854,3 +854,21 @@ rule(/^(\d+) depuis plus de 12 h$/, "$1 for more than 12 h"); rule(/^(\d+) dans 
 rule(/^À étalonner \(60 prochains jours\)$/, "To calibrate (next 60 days)"); rule(/^Envoyer au labo \((\d+)\)$/, "Send to lab ($1)"); rule(/^Envoyer (\d+) outils?$/, "Send $1 tool(s)");
 rule(/^(.+) : étalonnage dépassé \(onglet Étalonnage\)$/, "$1: calibration overdue (Calibration tab)");
 rule(/^(\d+) mois$/, "$1 months");
+
+/* ---- pièces ---- */
+Object.assign(EN, {
+  "Pièces": "Parts", "Envois et réceptions de pièces de la station. Le stock et les commandes restent dans AMOS.": "Station parts shipments and receipts. Stock and orders stay in AMOS.",
+  "Réception attendue": "Expected receipt", "Nouvel envoi": "New shipment", "À envoyer": "To ship", "Expédié": "Shipped", "Expédiés": "Shipped", "État de la pièce": "Part condition", "en retard": "late", "AOG": "AOG", "En cours": "In progress", "Reçus et annulés": "Received and cancelled",
+  "P/N, désignation, S/N, réf. AMOS, AWB, station…": "P/N, description, S/N, AMOS ref., AWB, station…", "Envois": "Shipments", "Réceptions": "Receipts", "Réception": "Receipt", "Envoi": "Shipment",
+  "Pièce": "Part", "Qté": "Qty", "De → vers": "From → to", "Réf. AMOS": "AMOS ref.", "Transport": "Transport", "Reçu": "Received", "Annulé": "Cancelled", "Certificat à vérifier": "Certificate to check", "Certificat vérifié": "Certificate checked",
+  "Aucun envoi ni réception en cours.": "No shipment or receipt in progress.", "Rien ici pour l'instant.": "Nothing here yet.", "Réceptionné": "Received", "Reçu à destination": "Received at destination",
+  "Mouvement": "Movement", "Transfert entre stations": "Transfer between stations", "Fournisseur": "Supplier", "Réparation": "Repair", "Prêt / emprunt": "Loan", "Autre": "Other", "Core / pour réparation": "Core / for repair",
+  "Certificat": "Certificate", "Arrivée prévue": "Expected arrival", "Reçu le": "Received on", "Documents": "Documents", "Aucun document (Form 1, bon de livraison…).": "No documents (Form 1, delivery note…).", "+ Joindre": "+ Attach",
+  "Marqué envoyé": "Marked shipped", "Annuler ce mouvement de pièce ?": "Cancel this part movement?", "Annuler le mouvement": "Cancel the movement", "Date de réception": "Receipt date", "Reçu par": "Received by",
+  "La réception dans le stock se fait dans AMOS.": "Booking into stock is done in AMOS.", "Confirmer la réception": "Confirm receipt", "Réception enregistrée": "Receipt recorded", "Modifier le mouvement": "Edit the movement",
+  "Type": "Type", "N° de série / lot": "Serial / batch no.", "Unité": "Unit", "N° de certificat": "Certificate no.", "Réf. AMOS (commande, transfert…)": "AMOS ref. (order, transfer…)", "De": "From", "Vers": "To",
+  "Avion (si la pièce est pour un avion)": "Aircraft (if the part is for an aircraft)", "AWB / n° de suivi": "AWB / tracking no.", "AOG : avion bloqué au sol en attente de cette pièce": "AOG: aircraft on ground waiting for this part",
+  "Mouvement enregistré": "Movement saved", "Supprimer ce mouvement de pièce ?": "Delete this part movement?", "Pièces en cours": "Parts in progress", "Envois et réceptions de pièces en cours, AOG, retards.": "Parts shipments and receipts in progress, AOG, delays.",
+  "en cours": "in progress", "Aucun mouvement en cours.": "No movement in progress."
+});
+rule(/^Réception · (.+)$/, "Receipt · $1"); rule(/^Pièce et certificat vérifiés \(P\/N, S\/N, état, (.+)\)$/, "Part and certificate checked (P/N, S/N, condition, $1)");
