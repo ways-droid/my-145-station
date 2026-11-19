@@ -1,0 +1,84 @@
+# Déploiement de my-145-station vers l'environnement de TEST chez ONE.COM (par SFTP).
+#
+#   https://test.my-145-station.com  ←  dossier « test » de l'hébergement (sous-domaine ONE.COM)
+#
+# Lancement à la main seulement : onglet Actions → « Déploiement test (ONE.COM) » → Run workflow.
+# Rien ne part tant que les trois secrets ne sont pas créés dans GitHub
+# (Settings → Secrets and variables → Actions → New repository secret) :
+#   SFTP_HOST      hôte SFTP indiqué dans le panneau ONE.COM (rubrique SSH & SFTP)
+#   SFTP_USER      nom d'utilisateur SFTP
+#   SFTP_PASSWORD  mot de passe SFTP
+# Variables facultatives (même page, onglet Variables) :
+#   TEST_DIR       dossier du sous-domaine sur l'hébergement (par défaut : test)
+#   TEST_URL       adresse du site de test (par défaut : https://test.my-145-station.com)
+#
+# config.php n'est jamais envoyé ni écrasé : il est créé sur le serveur par api/install.php
+# (base MySQL, clé d'accès), puis api/setup.php (premier administrateur). Les clés des services
+# (Notion, Flightradar24, OneDrive…) se saisissent ensuite dans Paramètres, jamais dans GitHub.
+
+name: Déploiement test (ONE.COM)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-test
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Secrets présents ?
+        env:
+          HOST: ${{ secrets.SFTP_HOST }}
+          USER: ${{ secrets.SFTP_USER }}
+          PASS: ${{ secrets.SFTP_PASSWORD }}
+        run: |
+          if [ -z "$HOST" ] || [ -z "$USER" ] || [ -z "$PASS" ]; then
+            echo "::error::Secrets SFTP_HOST, SFTP_USER et SFTP_PASSWORD à créer dans GitHub (environnement « test » ou dépôt) avant de déployer."
+            exit 1
+          fi
+
+      - name: Contrôles (PHP, JavaScript, tests de l'API)
+        run: |
+          for f in api/*.php; do php -l "$f" > /dev/null; done
+          for f in js/*.js client/*.js; do node --check "$f"; done
+          bash test/test.sh > /dev/null
+
+      - name: Préparation des fichiers
+        run: |
+          mkdir -p site/api site/client
+          cp index.html confidentialite.html site/
+          cp site.htaccess site/.htaccess
+          cp -r js site/
+          cp api/*.php api/.htaccess api/schema.sql site/api/ && rm -f site/api/config.php
+          cp -r api/vendor site/api/
+          cp client/*.js site/client/
+          echo "${GITHUB_SHA::7} $(date -u +%FT%TZ)" > site/version.txt
+
+      - name: Envoi SFTP
+        env:
+          HOST: ${{ secrets.SFTP_HOST }}
+          USER: ${{ secrets.SFTP_USER }}
+          PASS: ${{ secrets.SFTP_PASSWORD }}
+          DIR: ${{ vars.TEST_DIR || 'test' }}
+        run: |
+          sudo apt-get -qq update && sudo apt-get -qq install -y lftp > /dev/null
+          lftp -u "$USER,$PASS" "sftp://$HOST" -e "
+            set sftp:auto-confirm yes;
+            set net:max-retries 2;
+            mkdir -p $DIR;
+            mirror --reverse --verbose --exclude-glob config.php site/ $DIR/;
+            bye"
+
+      - name: Vérification
+        env:
+          URL: ${{ vars.TEST_URL || 'https://test.my-145-station.com' }}
+        run: |
+          sleep 3
+          curl -fsS "$URL/api/health" || \
+            echo "::warning::$URL/api/health ne répond pas encore : ouvrez $URL/api/install.php pour la première installation."

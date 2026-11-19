@@ -35,7 +35,7 @@ test/                  test automatique local (PHP + SQLite, faux services)
 `bash test/test.sh` (PHP 8 + SQLite). Le workflow GitHub `Contrôles` lance `php -l`, `node --check` et ce test à chaque push et pull request.
 
 ## Déploiement
-Aucun déploiement automatique pour l'instant : il sera ajouté quand le serveur de my-145-station et ses secrets existeront. Installation sur un serveur : copier les fichiers, ouvrir `api/install.php` (base, `config.php`, clé d'accès), puis `api/setup.php` (boîte d'envoi des codes, code maître, premier administrateur).
+Environnement de test chez ONE.COM (`test.my-145-station.com`) : workflow « Déploiement test (ONE.COM) », lancé à la main depuis l'onglet Actions, avec les secrets `SFTP_HOST`, `SFTP_USER`, `SFTP_PASSWORD` (voir `.github/workflows/deploy.yml`). `config.php` n'est jamais envoyé. Avant l'utilisation réelle : serveur dédié en Europe. Installation sur un serveur : copier les fichiers, ouvrir `api/install.php` (base, `config.php`, clé d'accès), puis `api/setup.php` (boîte d'envoi des codes, code maître, premier administrateur).
 
 ## Choix techniques
 - **Une table générique** (`ways_docs`) : chaque collection est stockée en JSON ; aucune migration de schéma pour ajouter un champ.
