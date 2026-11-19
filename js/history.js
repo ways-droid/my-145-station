@@ -5,19 +5,18 @@ const LOG_ACT = {
   create: ["Création", "good"], update: ["Modification", "info"], delete: ["Suppression", "bad"], validate: ["Validation", "warn"],
   paid: ["Payée", "good"], cancel: ["Annulation", "bad"], link: ["Rapprochement", "good"], unlink: ["Lien retiré", ""],
   archive: ["Archivage", ""], unarchive: ["Désarchivage", ""], reply: ["Réponse Peppol", "info"], falco: ["Envoi à Falco", "warn"],
-  falco_error: ["Erreur Falco", "bad"], mail: ["E-mail préparé", "warn"], pdf: ["PDF téléchargé", ""], print: ["Impression", ""], login: ["Connexion", ""]
+  mail: ["E-mail préparé", "warn"], pdf: ["PDF téléchargé", ""], print: ["Impression", ""], login: ["Connexion", ""]
 };
-const LOG_MOD = { docs: "Ventes", clients: "Clients", products: "Produits & prix", purchases: "Achats", bankTx: "Banque", bankAccounts: "Banque", codaFiles: "Banque",
-  vehicles: "Flotte", vehEvents: "Flotte", faults: "Flotte", driverLogs: "Flotte", tires: "Flotte", fines: "Flotte", vehDocs: "Flotte",
-  bottles: "Gaz", gasMoves: "Gaz", deliveries: "Gaz", gasTypes: "Gaz", tools: "Étalonnage", labs: "Étalonnage",
-  adminDocs: "Administration", adminFolders: "Administration", notes: "Notes", drivers: "Flotte", settings: "Paramètres", auth: "Connexions" };
+const LOG_MOD = { clients: "Clients", products: "Articles et prix",
+  vehicles: "Véhicules", vehEvents: "Véhicules", faults: "Véhicules", driverLogs: "Véhicules", tires: "Véhicules", vehDocs: "Véhicules",
+  tools: "Outillage", labs: "Outillage", links: "Liens",
+  adminDocs: "Administration", adminFolders: "Administration", notes: "Notes", settings: "Paramètres", auth: "Connexions" };
 const LOG_FIELD = { status: "Statut", number: "N°", date: "Date", dueDate: "Échéance", clientId: "Client", lines: "Lignes", amount: "Montant", name: "Nom",
   email: "E-mail", phone: "Téléphone", address: "Adresse", vat: "TVA", price: "Prix", notes: "Notes", note: "Note", km: "Kilométrage", matches: "Pièces reliées",
-  archived: "Archivé", paymentStatus: "Paiement", response: "Réponse", plate: "Plaque", model: "Modèle", driver: "Chauffeur", type: "Type", cost: "Coût",
+  archived: "Archivé", paymentStatus: "Paiement", response: "Réponse", plate: "Plaque", model: "Modèle", driver: "Pris par", type: "Type", cost: "Coût",
   vehicleId: "Véhicule", ref: "Référence", label: "Libellé", qty: "Quantité", nick: "Nom personnalisé", color: "Couleur", kind: "Type de pièce" };
-const logOpen = { docs: "doc-open", purchases: "pur-open", vehicles: "veh-open" };
+const logOpen = { vehicles: "veh-open", tools: "tool-open", clients: "client-form", products: "prod-form", faults: "fault-open" };
 const logVal = (k, v) => {
-  if (k === "status" && typeof STATUS !== "undefined" && STATUS[v]) return tr(STATUS[v][0]);
   if (k === "clientId" && v && v !== "—") { const c = S.clients.find(x => x.id === v); if (c) return c.name; }
   if (k === "vehicleId" && v && v !== "—") { const x = S.vehicles.find(y => y.id === v); if (x) return x.plate || x.id; }
   return v;
@@ -26,7 +25,6 @@ const logWhen = at => { const d = new Date(at); return `${fmtDate(d.toISOString(
 function logDetail(x) {
   const d = x.details || {}, out = [];
   if (d.changes) out.push(d.changes.filter(c => c[0] !== "…").slice(0, 6).map(([k, a, b]) => `<span class="lg-ch"><b>${esc(tr(LOG_FIELD[k] || k))}</b> ${a !== "—" && k !== "lines" ? `${esc(String(logVal(k, a)))} → ` : ""}${esc(String(logVal(k, b)))}</span>`).join("") + (d.changes.length > 6 ? `<span class="muted"> +${d.changes.length - 6}</span>` : ""));
-  if (d.docs && d.docs.length) out.push(d.docs.map(m => `<button class="linkbtn mono small" data-a="${m.coll === "purchases" ? "pur-open" : "doc-open"}" data-id="${esc(m.id)}">${esc(m.number || m.id)}</button>`).join(", "));
   if (d.to) out.push(`à ${esc(d.to)}`);
   if (d.note) out.push(`<span class="muted">${esc(d.note)}</span>`);
   return out.join(" ");
@@ -66,7 +64,7 @@ async function logLoad(more) {
   if (location.hash === "#historique") render(true);
 }
 VIEWS.historique = { title: "Historique", render: () => {
-  if (!SERVER) return head("Historique", "Qui a fait quoi, et quand") + `<div class="panel empty">L'historique des actions est tenu par le serveur ways.support.</div>`;
+  if (!SERVER) return head("Historique", "Qui a fait quoi, et quand") + `<div class="panel empty">L'historique des actions est tenu par le serveur.</div>`;
   const f = logFilt();
   if (!LOGS) { logLoad(); return head("Historique", "Qui a fait quoi, et quand") + `<div class="panel empty muted">Chargement…</div>`; }
   const items = LOGS.items.filter(x => !f.mod || LOG_MOD[x.coll] === f.mod);
@@ -80,7 +78,7 @@ VIEWS.historique = { title: "Historique", render: () => {
       <td>${a && x.action !== "delete" ? `<button class="linkbtn" data-a="${a}" data-id="${esc(x.id)}">${esc(lbl)}</button>` : esc(lbl)}<div class="muted small">${esc(tr(LOG_MOD[x.coll] || x.coll))}</div></td><td class="small">${logDetail(x)}</td></tr>`;
   }).join("");
   return head("Historique", "Qui a fait quoi, et quand · créations, modifications, suppressions, validations, envois, rapprochements, connexions") +
-    `<div class="panel">${searchBar("Rechercher une facture, un client, une plaque, une personne…")}
+    `<div class="panel">${searchBar("Rechercher un client, une plaque, un outil, une personne…")}
     <div class="toolbar df-bar">
       <label class="df"><span>Période</span><select data-lf="days">${opt("1", "Aujourd'hui", f.days)}${opt("7", "7 derniers jours", f.days)}${opt("30", "30 derniers jours", f.days)}${opt("365", "12 derniers mois", f.days)}${opt("", "Tout", f.days)}</select></label>
       <label class="df"><span>Personne</span><select data-lf="by">${opt("", "Tout le monde", f.by)}${(logPeople || []).map(n => opt(n, n, f.by)).join("")}</select></label>

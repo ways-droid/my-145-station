@@ -2,7 +2,7 @@
 // Environnement de test, par session : une fois activé, les écritures de CETTE session vont dans une couche à part
 // (ways_docs_sbx) posée par-dessus la base principale ; les lectures voient la base principale + la couche de test.
 // En quittant, la couche est effacée : la base principale n'a reçu aucun des changements faits pendant le test.
-// Les actions qui sortent de l'ERP (Falco, Peppol, Odoo, Ponto, Webfleet, utilisateurs, réglages) sont bloquées.
+// Les actions qui sortent de l'outil (Falco, Peppol, Odoo, Ponto, Webfleet, utilisateurs, réglages) sont bloquées.
 //
 //  GET  sandbox          état
 //  POST sandbox/start    active le test pour la session courante
@@ -63,18 +63,12 @@ function sbx_changes($since, $colls, $rows) {
     return $rows;
 }
 
-/* actions bloquées pendant un test : tout ce qui sort de l'ERP ou change sa configuration */
+/* actions bloquées pendant un test : tout ce qui sort de l'outil ou change sa configuration */
 function sbx_guard($route, $parts, $method) {
     if (!sbx_id() || $method === 'GET') return;
     $act = $parts[1] ?? '';
-    $msg = "Environnement de test : cette action est désactivée (elle agirait en dehors de l'ERP ou sur sa configuration). Quittez le test pour la faire.";
-    if (in_array($route, ['webfleet', 'odoo', 'falco', 'ponto'], true)) {
-        if (in_array($act, ['sync', 'tick'], true)) out(['ok' => true, 'skipped' => true, 'sandbox' => true]);
-        fail(409, $msg);
-    }
-    if ($route === 'achats') { if ($act === 'sync') out(['ok' => true, 'skipped' => true, 'sandbox' => true]); if (in_array($act, ['paid', 'response'], true)) fail(409, $msg); }
+    $msg = "Environnement de test : cette action est désactivée (elle agirait en dehors de l'outil ou sur sa configuration). Quittez le test pour la faire.";
     if ($route === 'assistant' && in_array($act, ['config', 'test'], true)) fail(409, $msg);
-    if ($route === 'pay') fail(409, $msg);
     if ($route === 'whatsapp' && $act !== 'status') fail(409, $msg);
     if ($route === 'dropbox') { if ($act === 'tick') out(['ok' => true, 'skipped' => true, 'sandbox' => true]); if (!in_array($act, ['list', 'search', 'link', 'new', 'new-ack'], true)) fail(409, $msg); }
     if ($route === 'auth' && ($act === 'users' || $act === 'smtp' || $act === 'test-mail')) fail(409, $msg);

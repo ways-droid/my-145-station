@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>W.A.Y.S. ERP</title>
+<title>my-145-station</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
@@ -283,7 +283,7 @@ form.panel footer { display: flex; justify-content: flex-end; padding: 14px 16px
   .nav-h { display: none; }
 }
 
-/* ---- couleurs W.A.Y.S. : vert, bleu, jaune, rouge, orange, gris ---- */
+/* ---- couleurs : vert, bleu, jaune, rouge, orange, gris ---- */
 :root { --green: #16a34a; --blue: #2563eb; --yellow: #eab308; --red: #dc2626; --orange: #f97316; --grey: #6b7280;
   --green-bg: #dcfce7; --blue-bg: #dbeafe; --yellow-bg: #fef9c3; --red-bg: #fee2e2; --orange-bg: #ffedd5; --grey-bg: #eef0f3;
   --green-ink: #166534; --blue-ink: #1e40af; --yellow-ink: #854d0e; --red-ink: #991b1b; --orange-ink: #9a3412; --grey-ink: #374151;
@@ -393,12 +393,12 @@ tr.pfrow td:first-child { box-shadow: inset 4px 0 0 var(--pfc); } tr.pfrow.pf-si
 
 /* ---- logo ---- */
 .brand-wrap { display: flex !important; align-items: center; gap: 12px; padding: 4px 8px 20px !important; text-decoration: none; background: none !important; box-shadow: none !important; }
-.logo-tile { width: 50px; height: 50px; border-radius: 13px; background: #fff; display: grid; place-items: center; flex: none; box-shadow: 0 4px 14px rgba(136,2,28,.35), inset 0 0 0 1px rgba(255,255,255,.6); }
+.logo-tile { width: 50px; height: 50px; border-radius: 13px; background: #fff; display: grid; place-items: center; flex: none; box-shadow: 0 4px 14px rgba(31,79,191,.30), inset 0 0 0 1px rgba(255,255,255,.6); }
 .brand-wrap .logo-tile { display: grid !important; }
 .logo-tile svg { width: 42px; height: auto; display: block; }
 .brand-wrap > span:last-child { display: grid; line-height: 1.15; }
 .brand { padding: 0 !important; font-size: 21px !important; color: #fff !important; letter-spacing: .04em; }
-.brand i { font-style: normal; color: #d0435a; }
+.brand i { font-style: normal; color: #8eacf3; }
 .brand-sub { padding: 2px 0 0 !important; font-size: 11.5px; opacity: .65; }
 .dash-hero { position: relative; overflow: hidden; border-radius: 16px; padding: 20px 22px 4px; margin: -4px 0 18px;
   background: linear-gradient(110deg, rgba(136,2,28,.10) 0%, rgba(136,2,28,.03) 45%, rgba(193,193,193,.18) 100%); border: 1px solid var(--line); }
@@ -919,15 +919,6 @@ table.vlist a.btn { white-space: nowrap; } .wf-tile .val.sm { font-size: 13px; l
 .nt-sw.nc-def { background: var(--panel); } .nt-sw.on { border-color: var(--ink); box-shadow: 0 0 0 2px var(--info); }
 .nt-share { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 
-/* ---- Garages ---- */
-.gcards { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 12px; }
-.gcard { text-align: left; font: inherit; color: inherit; cursor: pointer; padding: 14px 16px; display: grid; gap: 6px; border-top: 3px solid var(--series-2); }
-.gcard:hover { box-shadow: 0 4px 14px rgba(0,0,0,.1); }
-.gcard.alert { border-top-color: var(--bad); box-shadow: 0 0 0 2px color-mix(in srgb, var(--bad) 30%, transparent); }
-.gc-n { font-size: 15px; } .gc-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; } .gc-veh { display: flex; flex-wrap: wrap; gap: 4px; }
-.gsheet { display: grid; gap: 16px; } .gsec { display: grid; gap: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
-.gcom { border-left: 3px solid var(--line); padding: 4px 10px; }
-
 /* ---- Tableau de bord à widgets ---- */
 .wgrid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .wdg { grid-column: span 6; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 1px 2px rgba(16,24,40,.05); border-top: 4px solid var(--tc, var(--accent)); display: flex; flex-direction: column; min-width: 0; }
@@ -1004,20 +995,10 @@ table.vlist a.btn { white-space: nowrap; } .wf-tile .val.sm { font-size: 13px; l
 <script src="js/core.js"></script>
 <script src="js/i18n.js"></script>
 <script src="js/i18n-en.js"></script>
-<script src="js/sales.js"></script>
-<script src="js/gas.js"></script>
+<script src="js/base.js"></script>
 <script src="js/fleet.js"></script>
-<script src="js/fines.js"></script>
-<script src="js/dbximport.js"></script>
 <script src="js/demo.js"></script>
-<script src="js/telematics.js"></script>
-<script src="js/drivers.js"></script>
 <script src="js/notes.js"></script>
-<script src="js/garages.js"></script>
-<script src="js/odoo.js"></script>
-<script src="js/falco.js"></script>
-<script src="js/bank.js"></script>
-<script src="js/purchases.js"></script>
 <script src="js/assistant.js"></script>
 <script src="js/history.js"></script>
 <script src="js/calib.js"></script>
@@ -1025,10 +1006,7 @@ table.vlist a.btn { white-space: nowrap; } .wf-tile .val.sm { font-size: 13px; l
 <script src="js/dropbox.js"></script>
 <script src="js/whatsapp.js"></script>
 <script src="js/dashboard.js"></script>
-<script src="js/paylink.js"></script>
 <script src="js/security.js"></script>
-<script src="js/reminders.js"></script>
-<script src="js/analytics.js"></script>
 <script src="js/links.js"></script>
 </body>
 </html>

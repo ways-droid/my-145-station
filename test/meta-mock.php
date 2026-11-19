@@ -18,5 +18,5 @@ if (preg_match('#^/v[\d.]+/(\d+)/message_templates$#', $u)) {
 if (preg_match('#^/v[\d.]+/(\d+)/register$#', $u)) { file_put_contents($log, json_encode(['register' => $b]) . "\n", FILE_APPEND); $j(['success' => true]); }
 if (preg_match('#^/v[\d.]+/(\d+)/subscribed_apps$#', $u)) $j(['success' => true]);
 if (preg_match('#^/v[\d.]+/media-1$#', $u)) $j(['url' => 'http://127.0.0.1:8772/media/abc', 'mime_type' => 'image/jpeg', 'file_size' => 13, 'id' => 'media-1']);
-if (preg_match('#^/v[\d.]+/(\d+)$#', $u)) $j(['display_phone_number' => '+32 470 99 88 77', 'verified_name' => 'W.A.Y.S.', 'quality_rating' => 'GREEN', 'code_verification_status' => 'VERIFIED', 'platform_type' => 'CLOUD_API', 'id' => '123']);
+if (preg_match('#^/v[\d.]+/(\d+)$#', $u)) $j(['display_phone_number' => '+32 470 99 88 77', 'verified_name' => 'Station', 'quality_rating' => 'GREEN', 'code_verification_status' => 'VERIFIED', 'platform_type' => 'CLOUD_API', 'id' => '123']);
 $j(['error' => ['message' => "Unknown path $u", 'code' => 100]], 400);

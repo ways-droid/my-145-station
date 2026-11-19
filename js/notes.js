@@ -15,18 +15,12 @@ const noteLabels = () => [...new Set(notesAll().flatMap(n => n.labels || []))].s
 const noteSort = (a, b) => (!!b.pinned - !!a.pinned) || ((a.order ?? 0) - (b.order ?? 0)) || String(b.updatedAt || "").localeCompare(String(a.updatedAt || ""));
 const noteTitle = n => n.title || (n.body || "").split("\n")[0].slice(0, 60) || "Note sans titre";
 
-/* ---- liens vers les fiches de l'ERP ---- */
+/* ---- liens vers les fiches de l'outil ---- */
 const NOTE_LINK = {
   vehicles: { ic: "🚗", act: "veh-open", lbl: v => [fleetNo(v), v.plate, v.model].filter(Boolean).join(" · ") },
-  drivers: { ic: "👤", act: "driver-form", by: "name", lbl: d => d.name },
-  docs: { ic: "🧾", act: "doc-open", lbl: d => `${({ facture: "Facture", nc: "Note de crédit", devis: "Devis" })[d.kind] || "Document"} ${d.number || "brouillon"}${d.clientName ? " · " + d.clientName : ""}` },
-  purchases: { ic: "📥", act: "pur-open", lbl: p => `Achat ${p.number || ""} · ${p.supplierName || ""}` },
   clients: { ic: "🏢", act: "client-form", lbl: c => c.name },
   tools: { ic: "🔧", act: "tool-open", lbl: t => [t.serial, t.name || t.model, t.brand].filter(Boolean).join(" · ") },
-  fines: { ic: "🚨", act: "fine-form", lbl: f => `Amende ${f.number || ""} · ${f.date ? fmtDate(f.date) : ""}${f.vehicleId && veh(f.vehicleId) ? " · " + veh(f.vehicleId).plate : ""}` },
   faults: { ic: "⚠", act: "fault-open", lbl: f => `Panne · ${(f.description || "").slice(0, 50)}${f.vehicleId && veh(f.vehicleId) ? " · " + veh(f.vehicleId).plate : ""}` },
-  bottles: { ic: "🧪", act: "bottle-open", lbl: b => `Bouteille ${b.serial || ""}` },
-  deliveries: { ic: "📦", act: "delivery-open", lbl: d => `Livraison ${d.number || d.no || ""}${d.date ? " · " + fmtDate(d.date) : ""}` },
 };
 function noteLinkSearch(q) {
   q = (q || "").toLowerCase().trim(); if (q.length < 2) return [];
@@ -114,7 +108,7 @@ ACTIONS["note-form"] = el => {
     <div id="nt-links"></div>
     ${canEdit ? `<div class="nt-tools row-g wrap">
       <label class="btn sm">📎 Joindre des fichiers<input type="file" id="nt-up" multiple hidden></label>
-      <span class="nt-linkbox"><input id="nt-lq" class="sm" placeholder="🔗 Lier à une fiche (plaque, facture, chauffeur, outil…)"><div id="nt-lres" class="ac-pop" hidden></div></span>
+      <span class="nt-linkbox"><input id="nt-lq" class="sm" placeholder="🔗 Lier à une fiche (plaque, client, outil…)"><div id="nt-lres" class="ac-pop" hidden></div></span>
       <label class="small row-g"><input type="checkbox" id="nt-pin" ${n.pinned ? "checked" : ""}> 📌 Épingler</label></div>
     <div class="row-g wrap nt-colors" role="radiogroup" aria-label="Couleur">${Object.entries(NOTE_COLORS).map(([k, l]) => `<button type="button" class="nt-sw nc-${k || "def"} ${(n.color || "") === k ? "on" : ""}" data-col="${k}" title="${l}" aria-label="${l}"></button>`).join("")}</div>
     <div class="nt-labels row-g wrap"><span id="nt-labs"></span><input id="nt-lab" class="sm" list="nt-lablist" placeholder="🏷 Ajouter une étiquette (Entrée)"><datalist id="nt-lablist">${noteLabels().map(l => `<option value="${esc(l)}">`).join("")}</datalist></div>` : ""}

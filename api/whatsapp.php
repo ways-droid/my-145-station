@@ -1,17 +1,16 @@
 <?php
 /* ======================= WhatsApp (API Cloud de Meta, numéro dédié à l'équipe) =======================
-   - Un numéro W.A.Y.S. (SIM dédiée) relié en « API seule » à l'app Meta de l'entreprise : aucune application WhatsApp
-     n'utilise ce numéro, l'ERP et Axel le surveillent. Identifiants (jeton, secret de l'app) dans ways_kv, jamais renvoyés.
+   - Un numéro de la station (SIM dédiée) relié en « API seule » à l'app Meta de l'entreprise : aucune application WhatsApp
+     n'utilise ce numéro, l'outil et Axel le surveillent. Identifiants (jeton, secret de l'app) dans ways_kv, jamais renvoyés.
    - Webhook public : api/whatsapp/webhook (vérification par jeton, signature X-Hub-Signature-256 du secret de l'app).
-   - Équipe seulement (pour commencer) : numéros reconnus = liste de Paramètres (personne de l'ERP ou chauffeur)
-     + chauffeurs ayant ce GSM dans leur fiche (option). Axel répond avec les droits de la personne (chauffeur = terrain) ;
-     la conversation est la même que dans le panneau Axel de l'ERP (fil privé de la personne).
+   - Équipe seulement : numéros reconnus = liste de Paramètres (personne inscrite dans l'outil).
+     Axel répond avec les droits de la personne ; la conversation est la même que dans le panneau Axel (fil privé de la personne).
    - Numéros inconnus : réponse automatique (une fois par semaine et par numéro) ; messages gardés pour les administrateurs.
    - Réponse au webhook immédiate, traitement juste après (fastcgi_finish_request) ; file wa_queue reprise si besoin. */
 
 const WA_GRAPH = 'https://graph.facebook.com/';
 const WA_RATE = 30;              // messages par personne et par 10 minutes
-const WA_UNKNOWN_TXT = "Bonjour, ce numéro WhatsApp est réservé à l'équipe de W.A.Y.S. Pour nous joindre, merci d'utiliser nos coordonnées habituelles.";
+const WA_UNKNOWN_TXT = "Bonjour, ce numéro WhatsApp est réservé à l'équipe de la station. Pour nous joindre, merci d'utiliser nos coordonnées habituelles.";
 
 function wak($k, $d = '') { $v = kv_get($k); return $v === null || $v === '' ? (string) $d : (string) $v; }
 function wa_configured() { return wak('wa_token') !== '' && wak('wa_phone_id') !== '' && wak('wa_secret') !== ''; }
@@ -51,7 +50,7 @@ function wa_http($method, $url, $body = null, $raw = false, $timeout = 30) {
 function wa_fmt($t) {
     $t = preg_replace('/^#{1,6}\s*(.+)$/m', '*$1*', (string) $t);
     $t = preg_replace('/\*\*(.+?)\*\*/s', '*$1*', $t);
-    $t = preg_replace('/\[([^\]]+)\]\(erp:[^)\s]+\)/', '$1', $t);   // liens internes de l'ERP : seulement le libellé
+    $t = preg_replace('/\[([^\]]+)\]\(erp:[^)\s]+\)/', '$1', $t);   // liens internes de l'outil : seulement le libellé
     $t = preg_replace('/\[([^\]]+)\]\((https?:[^)]+)\)/', '$1 ($2)', $t);
     $t = preg_replace('/^\s*[-*]\s+/m', '• ', $t);
     return trim($t);
@@ -73,16 +72,11 @@ function wa_typing($msgId) {   // « lu » + « en train d'écrire… » pendant
 function wa_stat($k, $n = 1) { $s = json_decode(wak('wa_stats_' . gmdate('Y-m'), '{}'), true) ?: []; $s[$k] = ($s[$k] ?? 0) + $n; kv_set('wa_stats_' . gmdate('Y-m'), json_encode($s)); }
 
 /* ---------- envoi d'un fichier (Axel → la personne qui lui parle) ---------- */
-/* numéro WhatsApp d'une personne de l'ERP : liste de l'équipe, ou GSM de la fiche chauffeur */
+/* numéro WhatsApp d'une personne de l'outil : liste de l'équipe */
 function wa_number_of($uid) {
     $uid = (string) $uid; if ($uid === '') return '';
     foreach (wa_contacts() as $c) {
         if (($c['kind'] ?? '') === 'user' && ($c['ref'] ?? '') === $uid) return $c['num'];
-        if (($c['kind'] ?? '') === 'driver' && 'drv:' . ($c['ref'] ?? '') === $uid) return $c['num'];
-    }
-    if (str_starts_with($uid, 'drv:') && ($r = get_doc('drivers', substr($uid, 4))) && !$r['deleted']) {
-        $d = json_decode($r['data'], true) ?: [];
-        foreach (['phone', 'phonePrivate'] as $f) if (!empty($d[$f]) && ($n = wa_norm($d[$f])) !== '') return $n;
     }
     return '';
 }
@@ -98,64 +92,23 @@ function wa_upload_media($bytes, $mime, $name) {
     if ($st >= 400 || empty($d['id'])) throw new RuntimeException('WhatsApp : envoi du fichier refusé (' . ($d['error']['message'] ?? "HTTP $st") . ')');
     return $d['id'];
 }
-/* ---------- chauffeurs : quels documents peuvent-ils recevoir ? ---------- */
-const WA_DRV_TYPES = ['coc' => 'certificat de conformité', 'immat' => "certificat d'immatriculation", 'ct' => 'certificat de contrôle technique', 'assurance' => "certificat d'assurance"];
-const WA_DRV_DAYS = 30;
-const WA_DRV_ONLY = "Je peux seulement t'envoyer les documents de bord d'un véhicule que tu utilises : certificat de conformité, certificat d'immatriculation, certificat de contrôle technique ou certificat d'assurance.";
-function wa_name_key($s) {
-    $s = mb_strtolower(trim((string) $s)); $a = iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $s); if ($a !== false) $s = $a;
-    $w = preg_split('/[^a-z0-9]+/', $s, -1, PREG_SPLIT_NO_EMPTY); sort($w); return implode(' ', $w);   // « Dupont Jean » = « Jean Dupont »
-}
-/* le chauffeur conduit ce véhicule maintenant, ou l'a conduit / s'y est identifié dans les 30 derniers jours */
-function wa_driver_uses($name, $vid) {
-    $k = wa_name_key($name); if ($k === '') return false;
-    $since = time() - WA_DRV_DAYS * 86400;
-    $p = get_doc('vehPos', $vid);
-    if ($p && !$p['deleted'] && wa_name_key((json_decode($p['data'], true) ?: [])['driver'] ?? '') === $k) return true;
-    foreach (['trips' => 'start', 'driverLogs' => 'date'] as $coll => $f)
-        foreach (od_coll_docs($coll) as $t) if (($t['vehicleId'] ?? '') === $vid && wa_name_key($t['driver'] ?? '') === $k && strtotime((string) ($t[$f] ?? '')) >= $since) return true;
-    return false;
-}
-function wa_driver_file_ok($who, $fid) {
-    foreach (od_coll_docs('vehicles') as $vid => $v) foreach ((array) ($v['docs'] ?? []) as $d) if (($d['file'] ?? '') === $fid) {
-        $type = (string) ($d['type'] ?? '');
-        if (!isset(WA_DRV_TYPES[$type])) return WA_DRV_ONLY;
-        $old = function_exists('dbx_old_ids') ? dbx_old_ids($v['docs']) : [];
-        if (!empty($d['old']) || isset($old[$d['id'] ?? ''])) return "Ce document n'est plus en vigueur : je ne peux t'envoyer que le " . WA_DRV_TYPES[$type] . ' actuel.';
-        $veh = trim(($v['fleetNo'] ?? '') . ' ' . ($v['plate'] ?? ''));
-        if (wa_driver_uses($who['user']['name'] ?? '', $vid)) return true;
-        return "Je ne vois pas que tu utilises le véhicule $veh : ni en ce moment, ni sur un trajet ou une identification des " . WA_DRV_DAYS . " derniers jours. "
-            . "Identifie-toi d'abord sur le véhicule (clé ou badge chauffeur WebFleet au démarrage, ou par un collègue du bureau), puis redemande-moi le document.";
-    }
-    return WA_DRV_ONLY;
-}
-/* Axel envoie un fichier de l'ERP (fileId) ou de Dropbox (dropboxPath) sur le WhatsApp de la personne qui lui parle — à elle seule */
+/* Axel envoie un fichier de l'outil (fileId) ou de Dropbox (dropboxPath) sur le WhatsApp de la personne qui lui parle — à elle seule */
 function wa_send_file_to_me($who, $in) {
-    if (!wa_configured()) return ['error' => "WhatsApp n'est pas relié à l'ERP."];
+    if (!wa_configured()) return ['error' => "WhatsApp n'est pas relié à l'outil."];
     if (function_exists('sbx_id') && sbx_id()) return ['error' => 'Environnement de test : envoi WhatsApp désactivé.'];
     $uid = (string) ($who['user']['id'] ?? ''); $num = wa_number_of($uid);
     if ($num === '') return ['error' => "Je ne connais pas ton numéro WhatsApp : un administrateur doit l'ajouter dans Paramètres → WhatsApp de l'équipe (« Qui peut écrire à Axel »)."];
     $last = (int) wak('wa_in:' . $num, '0');
-    if (time() - $last > 86000) return ['error' => "WhatsApp n'autorise l'envoi d'un fichier que dans les 24 h qui suivent ton dernier message au numéro W.A.Y.S. Envoie-moi d'abord un message sur WhatsApp (par ex. « envoie-moi … »), puis je pourrai te l'envoyer."];
+    if (time() - $last > 86000) return ['error' => "WhatsApp n'autorise l'envoi d'un fichier que dans les 24 h qui suivent ton dernier message au numéro de la station Envoie-moi d'abord un message sur WhatsApp (par ex. « envoie-moi … »), puis je pourrai te l'envoyer."];
     $fid = preg_replace('/[^a-f0-9]/', '', (string) ($in['fileId'] ?? '')); $path = trim((string) ($in['dropboxPath'] ?? ''));
-    if (role_of($who) === 'garage') {   // garage : documents des véhicules présents chez lui
-        if ($fid === '') return ['error' => "Je peux seulement t'envoyer les documents des véhicules présents dans ton garage."];
-        $at = garage_vehicles(me_garage()); $ok = false;
-        foreach (od_coll_docs('vehicles') as $vid => $v) if (isset($at[$vid])) foreach ((array) ($v['docs'] ?? []) as $d) if (($d['file'] ?? '') === $fid) $ok = true;
-        if (!$ok) return ['error' => "Je peux seulement t'envoyer les documents des véhicules présents dans ton garage."];
-    }
-    if (in_array(role_of($who), ['terrain', 'chauffeur'], true)) {   // chauffeurs : documents de bord d'un véhicule qu'ils conduisent, rien d'autre
-        if ($fid === '') return ['error' => WA_DRV_ONLY];
-        $chk = wa_driver_file_ok($who, $fid); if ($chk !== true) return ['error' => $chk];
-    }
     if ($fid !== '') {
         $st = db()->prepare('SELECT name, mime, size FROM ways_files WHERE id = ?'); $st->execute([$fid]); $meta = $st->fetch(PDO::FETCH_ASSOC);
         $f = rtrim(cfg('upload_dir'), '/') . "/$fid";
-        if (!$meta || !is_file($f)) return ['error' => "Fichier introuvable dans l'ERP ($fid)."];
+        if (!$meta || !is_file($f)) return ['error' => "Fichier introuvable dans l'outil ($fid)."];
         if ((int) $meta['size'] > 95 * 1048576) return ['error' => 'Fichier trop volumineux pour WhatsApp (100 Mo maximum).'];
         $bytes = file_get_contents($f); $name = (string) $meta['name']; $mime = (string) $meta['mime'] ?: 'application/octet-stream';
     } elseif ($path !== '') {
-        if (!function_exists('dbx_connected') || !dbx_connected()) return ['error' => "Dropbox n'est pas relié à l'ERP."];
+        if (!function_exists('dbx_connected') || !dbx_connected()) return ['error' => "Dropbox n'est pas relié à l'outil."];
         $p = dbx_norm_path($path); if (!dbx_in_scope($p)) return ['error' => "Ce fichier n'est pas dans les dossiers Dropbox autorisés."];
         $m = dbx_rpc('files/get_metadata', ['path' => $p]);
         if (($m['.tag'] ?? '') !== 'file') return ['error' => "Ce n'est pas un fichier."];
@@ -163,7 +116,7 @@ function wa_send_file_to_me($who, $in) {
         [$bytes] = dbx_download($p); $name = basename($p);
         $mime = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'doc' => 'application/msword', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
                  'xls' => 'application/vnd.ms-excel', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'txt' => 'text/plain', 'csv' => 'text/plain'][strtolower(pathinfo($p, PATHINFO_EXTENSION))] ?? 'application/pdf';
-    } else return ['error' => 'Indique fileId (fichier de l\'ERP) ou dropboxPath (fichier Dropbox).'];
+    } else return ['error' => 'Indique fileId (fichier de l\'outil) ou dropboxPath (fichier Dropbox).'];
     $img = in_array($mime, ['image/jpeg', 'image/png'], true) && strlen($bytes) <= 5 * 1048576;
     try {
         $mid = wa_upload_media($bytes, $mime, $name);
@@ -178,13 +131,13 @@ function wa_send_file_to_me($who, $in) {
 
 /* ---------- message à un membre de l'équipe (demandé à Axel) ----------
    WhatsApp n'accepte un texte libre que dans les 24 h qui suivent le dernier message de la personne au numéro
-   W.A.Y.S. ; au-delà, seul un modèle approuvé par Meta peut partir : « message_equipe »
-   (« Message de {{1}} via l'ERP W.A.Y.S. : {{2}} »), créé depuis Paramètres → WhatsApp. */
+   de la station ; au-delà, seul un modèle approuvé par Meta peut partir : « message_equipe »
+   (« Message de {{1}} via my-145-station : {{2}} »), créé depuis Paramètres → WhatsApp. */
 const WA_TPL_NAME = 'message_equipe';
-const WA_TPL_BODY = "Message de {{1}} via l'ERP W.A.Y.S. :\n\n{{2}}\n\nRépondez ici pour parler à Axel.";
+const WA_TPL_BODY = "Message de {{1}} via my-145-station :\n\n{{2}}\n\nRépondez ici pour parler à Axel.";
 function wa_tpl() { return ['name' => wak('wa_tpl_name', WA_TPL_NAME), 'lang' => wak('wa_tpl_lang', 'fr'), 'status' => wak('wa_tpl_status', ''), 'error' => wak('wa_tpl_error', '')]; }
 function wa_window_open($num) { return time() - (int) wak('wa_in:' . $num, '0') < 86000; }
-/* membres joignables : numéros de la liste de l'équipe, puis chauffeurs avec GSM (si activé) */
+/* membres joignables : numéros de la liste de l'équipe */
 function wa_team_targets() {
     $out = []; $seen = [];
     $names = []; foreach (db()->query('SELECT id, name, active FROM ways_users') as $u) $names[$u['id']] = (int) $u['active'] === 1 ? $u['name'] : null;
@@ -193,11 +146,6 @@ function wa_team_targets() {
         if (!$n || isset($seen[$c['num']])) continue; $seen[$c['num']] = 1;
         $out[] = ['name' => $n, 'num' => $c['num'], 'kind' => $c['kind'], 'ref' => (string) $c['ref']];
     }
-    if (wak('wa_auto_drivers', '1') === '1' && function_exists('od_coll_docs'))
-        foreach (od_coll_docs('drivers') as $id => $d) if (empty($d['wfGone']) && !empty($d['name'])) foreach (['phone', 'phonePrivate'] as $f) {
-            $n = !empty($d[$f]) ? wa_norm($d[$f]) : ''; if ($n === '' || isset($seen[$n])) continue; $seen[$n] = 1;
-            $out[] = ['name' => $d['name'], 'num' => $n, 'kind' => 'driver', 'ref' => (string) $id]; break;
-        }
     return $out;
 }
 function wa_find_target($q) {
@@ -208,7 +156,7 @@ function wa_find_target($q) {
     return array_values(array_filter($all, function ($t) use ($words) { $n = ' ' . norm_name($t['name']) . ' '; foreach ($words as $w) if (strpos($n, $w) === false) return false; return true; }));
 }
 function wa_send_team($fromName, $t, $text) {
-    if (!wa_configured()) throw new RuntimeException("WhatsApp n'est pas relié à l'ERP.");
+    if (!wa_configured()) throw new RuntimeException("WhatsApp n'est pas relié à l'outil.");
     if (function_exists('sbx_id') && sbx_id()) throw new RuntimeException('Environnement de test : envoi WhatsApp désactivé.');
     $text = trim($text); $how = 'texte';
     if (wa_window_open($t['num'])) wa_send_text($t['num'], "💬 *Message de $fromName* (via Axel) :\n\n$text");
@@ -232,7 +180,7 @@ function wa_tpl_create() {
     if (wak('wa_waba') === '') throw new RuntimeException("Identifiant du compte WhatsApp Business (WABA ID) manquant.");
     $tp = wa_tpl();
     $r = wa_http('POST', wak('wa_waba') . '/message_templates', ['name' => $tp['name'], 'language' => $tp['lang'], 'category' => 'UTILITY',
-        'components' => [['type' => 'BODY', 'text' => WA_TPL_BODY, 'example' => ['body_text' => [['Élise Dupont', "Peux-tu passer prendre le véhicule 009 au garage avant 16 h ?"]]]]]]);
+        'components' => [['type' => 'BODY', 'text' => WA_TPL_BODY, 'example' => ['body_text' => [['Élise Dupont', "Peux-tu préparer le kit de roue pour le vol de 16 h ?"]]]]]]);
     kv_set('wa_tpl_status', (string) ($r['status'] ?? 'PENDING')); kv_set('wa_tpl_error', '');
 }
 function wa_tpl_check() {
@@ -252,17 +200,8 @@ function wa_identify($num) {
             if ($u = $st->fetch(PDO::FETCH_ASSOC)) return ['who' => ['kind' => 'session', 'user' => $u, 'label' => 'user:' . $u['name']], 'role' => $u['role'], 'name' => $u['name']];
             return null;   // compte désactivé
         }
-        if (($c['kind'] ?? '') === 'driver') return wa_driver_who($c['ref'] ?? '', $c['name'] ?? '');
     }
-    if (wak('wa_auto_drivers', '1') === '1' && function_exists('od_coll_docs'))
-        foreach (od_coll_docs('drivers') as $id => $d) if (empty($d['wfGone'])) foreach (['phone', 'phonePrivate'] as $f) if (!empty($d[$f]) && wa_norm($d[$f]) === $num) return wa_driver_who($id, $d['name'] ?? '');
     return null;
-}
-function wa_driver_who($id, $name) {
-    $r = get_doc('drivers', $id);
-    if ($r && !$r['deleted']) { $dd = json_decode($r['data'], true) ?: []; if (!empty($dd['wfGone'])) return null; $name = $dd['name'] ?? $name; }   // désactivé dans WebFleet : plus reconnu
-    if ($name === '') return null;
-    return ['who' => ['kind' => 'session', 'user' => ['id' => 'drv:' . $id, 'name' => $name, 'role' => 'chauffeur'], 'label' => 'user:' . $name], 'role' => 'chauffeur', 'name' => $name];
 }
 
 /* ---------- réception ---------- */
@@ -277,7 +216,7 @@ function wa_webhook($method) {
     $sig = (string) ($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? '');
     kv_set('wa_last_hook', (string) now_ms());   // Meta a bien appelé l'adresse (diagnostic)
     if (wak('wa_secret') === '' || !hash_equals('sha256=' . hash_hmac('sha256', $raw, wak('wa_secret')), $sig)) {
-        kv_set('wa_error', "Meta a transmis un message, mais sa signature ne correspond pas : l'App secret saisi dans l'ERP n'est pas celui de l'app « WAYS ERP » (" . date('d/m H:i') . ').');
+        kv_set('wa_error', "Meta a transmis un message, mais sa signature ne correspond pas : l'App secret saisi dans l'outil n'est pas celui de l'app Meta (" . date('d/m H:i') . ').');
         http_response_code(401); echo 'bad signature'; exit;
     }
     $d = json_decode($raw, true) ?: [];
@@ -327,7 +266,7 @@ function wa_handle($m) {
     if ($type === 'text') $text = (string) ($m['text']['body'] ?? '');
     elseif (in_array($type, ['image', 'document', 'video', 'sticker'], true)) {
         $med = $m[$type] ?? []; $text = (string) ($med['caption'] ?? '');
-        if ($type === 'image' || $type === 'document') { try { $files[] = wa_media($med, $type); } catch (Throwable $e) { wa_send_text($num, "Je n'ai pas pu récupérer ton fichier (" . $e->getMessage() . "). Réessaie ou dépose-le dans l'ERP."); return; } }
+        if ($type === 'image' || $type === 'document') { try { $files[] = wa_media($med, $type); } catch (Throwable $e) { wa_send_text($num, "Je n'ai pas pu récupérer ton fichier (" . $e->getMessage() . "). Réessaie ou dépose-le dans l'outil."); return; } }
         else { wa_send_text($num, "Je ne sais pas lire ce type de fichier. Envoie plutôt une photo ou un PDF."); return; }
     } elseif ($type === 'audio') { wa_send_text($num, "Je ne peux pas écouter les messages vocaux : écris-moi ta demande 🙂"); return; }
     elseif ($type === 'location') { $l = $m['location'] ?? []; $text = 'Position partagée : ' . ($l['name'] ?? '') . ' ' . ($l['address'] ?? '') . ' (' . ($l['latitude'] ?? '') . ', ' . ($l['longitude'] ?? '') . ')'; }
@@ -345,7 +284,7 @@ function wa_handle($m) {
     $reply = (string) ($res['reply'] ?? '');
     $acts = (array) ($res['actions'] ?? []);
     $done = array_filter($acts, fn($a) => in_array($a['op'] ?? '', ['create', 'update', 'deleted'], true));
-    if ($done) $reply .= "\n\n_" . count($done) . ' modification' . (count($done) > 1 ? 's' : '') . " dans l'ERP (annulable" . (count($done) > 1 ? 's' : '') . " depuis le panneau Axel)._";
+    if ($done) $reply .= "\n\n_" . count($done) . ' modification' . (count($done) > 1 ? 's' : '') . " dans l'outil (annulable" . (count($done) > 1 ? 's' : '') . " depuis le panneau Axel)._";
     wa_send_text($num, $reply !== '' ? $reply : 'OK');
 }
 function wa_media($med, $type) {
@@ -374,7 +313,7 @@ function wa_status() {
     $s = json_decode(wak('wa_stats_' . gmdate('Y-m'), '{}'), true) ?: [];
     return ['configured' => wa_configured(), 'phoneId' => wak('wa_phone_id') ?: null, 'wabaId' => wak('wa_waba') ?: null, 'ver' => wa_ver(),
         'number' => json_decode(wak('wa_number', 'null'), true), 'tokenHint' => wak('wa_token') !== '' ? '…' . substr(wak('wa_token'), -4) : null, 'secretSet' => wak('wa_secret') !== '',
-        'verify' => wak('wa_verify') ?: null, 'webhook' => wa_webhook_url(), 'contacts' => wa_contacts(), 'autoDrivers' => wak('wa_auto_drivers', '1') === '1',
+        'verify' => wak('wa_verify') ?: null, 'webhook' => wa_webhook_url(), 'contacts' => wa_contacts(),
         'unknownReply' => wak('wa_unknown_reply', '1') === '1', 'unknownTxt' => wak('wa_unknown_txt', WA_UNKNOWN_TXT), 'unknown' => array_reverse(json_decode(wak('wa_unknown', '[]'), true) ?: []),
         'error' => wak('wa_error') ?: null, 'lastIn' => (int) wak('wa_last_in', '0') ?: null, 'queue' => count(json_decode(wak('wa_queue', '[]'), true) ?: []),
         'stats' => ['in' => (int) ($s['in'] ?? 0), 'out' => (int) ($s['out'] ?? 0)], 'registered' => wak('wa_pin') !== '', 'sub' => wak('wa_sub') ?: null, 'lastHook' => (int) wak('wa_last_hook', '0') ?: null, 'tpl' => wa_tpl(), 'tplBody' => WA_TPL_BODY];
@@ -386,7 +325,7 @@ function wa_subscribe() {
     catch (Throwable $e) { kv_set('wa_sub', $e->getMessage()); }
 }
 function wa_webhook_url() {
-    $host = $_SERVER['HTTP_HOST'] ?? 'ways.support';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/api/', PHP_URL_PATH);
     $base = preg_match('#^(.*?/api)/#', $uri, $m) ? $m[1] : '/api';
     return 'https://' . $host . $base . '/whatsapp/webhook';
@@ -412,7 +351,6 @@ function whatsapp_routes($route, $parts, $method, $who, $role) {
         foreach (['phoneId' => 'wa_phone_id', 'wabaId' => 'wa_waba'] as $f => $k) if (array_key_exists($f, $b)) { $v = preg_replace('/\D/', '', (string) $b[$f]); kv_set($k, $v); }
         if (isset($b['ver']) && preg_match('/^v\d+\.\d+$/', $b['ver'])) kv_set('wa_ver', $b['ver']);
         if (!empty($b['pin'])) { if (!preg_match('/^\d{6}$/', (string) $b['pin'])) fail(400, 'Le code PIN doit compter 6 chiffres.'); kv_set('wa_pin', (string) $b['pin']); }   // PIN déjà choisi dans le tableau de bord Meta
-        if (array_key_exists('autoDrivers', $b)) kv_set('wa_auto_drivers', $b['autoDrivers'] ? '1' : '0');
         if (array_key_exists('unknownReply', $b)) kv_set('wa_unknown_reply', $b['unknownReply'] ? '1' : '0');
         if (isset($b['unknownTxt'])) kv_set('wa_unknown_txt', mb_substr(trim((string) $b['unknownTxt']), 0, 1000));
         if (!empty($b['disconnect'])) { foreach (['wa_token', 'wa_secret', 'wa_phone_id', 'wa_waba', 'wa_number', 'wa_pin', 'wa_error'] as $k) kv_set($k, ''); log_event('settings', 'company', 'update', 'WhatsApp', 'Liaison WhatsApp retirée'); }
@@ -422,7 +360,7 @@ function whatsapp_routes($route, $parts, $method, $who, $role) {
     if ($act === 'contacts' && $method === 'POST') {
         $out = []; $seen = [];
         foreach ((array) ($b['contacts'] ?? []) as $c) {
-            $n = wa_norm($c['num'] ?? ''); $k = in_array($c['kind'] ?? '', ['user', 'driver'], true) ? $c['kind'] : '';
+            $n = wa_norm($c['num'] ?? ''); $k = ($c['kind'] ?? '') === 'user' ? $c['kind'] : '';
             if ($n === '' || $k === '' || empty($c['ref']) || isset($seen[$n])) continue; $seen[$n] = 1;
             $out[] = ['num' => $n, 'kind' => $k, 'ref' => (string) $c['ref'], 'name' => mb_substr((string) ($c['name'] ?? ''), 0, 100)];
         }
@@ -455,7 +393,7 @@ function whatsapp_routes($route, $parts, $method, $who, $role) {
         }
         if ($act === 'send-test' && $method === 'POST') {
             $n = wa_norm($b['to'] ?? ''); if ($n === '') fail(400, 'Numéro invalide');
-            wa_send_text($n, (string) ($b['text'] ?? 'Test de l\'ERP W.A.Y.S. ✓'));
+            wa_send_text($n, (string) ($b['text'] ?? 'Test de my-145-station ✓'));
             out(['ok' => true]);
         }
     } catch (RuntimeException $e) { fail(502, $e->getMessage()); }

@@ -1,5 +1,5 @@
 <?php
-// API de données de l'ERP W.A.Y.S. — https://ways.support/erp/api/
+// API de données de my-145-station (outil de gestion de station Part 145)
 //
 //  GET    health                        état du serveur (sans clé)
 //  GET    docs/{coll}                   tous les documents d'une collection
@@ -12,8 +12,6 @@
 //  POST   files (champ id facultatif : garde l'identifiant d'un fichier migré)
 //  GET    auth/status · POST auth/request {name} · POST auth/verify {name, code} → session
 //  GET    auth/me · POST auth/logout · auth/users (admin) · POST auth/test-mail (admin)
-//  GET    webfleet/status · POST webfleet/sync (tous) · webfleet/config|test|disconnect (admin)
-//  GET    odoo/status · POST odoo/sync (tous) · odoo/config|test|disconnect (admin)
 //  POST   import                        import en masse { "coll": { "id": {...}, ... }, ... }
 //  GET    export                        export complet (sauvegarde)
 //  POST   files                         envoi d'un fichier (multipart, champ "file")
@@ -23,18 +21,11 @@
 require __DIR__ . '/lib.php';
 require __DIR__ . '/auth.php';
 require __DIR__ . '/perm.php';
-require __DIR__ . '/webfleet.php';
-require __DIR__ . '/odoo.php';
-require __DIR__ . '/falco.php';
-require __DIR__ . '/ponto.php';
-require __DIR__ . '/coda.php';
-require __DIR__ . '/purchases.php';
 require __DIR__ . '/assistant.php';
 require __DIR__ . '/log.php';
 require __DIR__ . '/sandbox.php';
 require __DIR__ . '/dropbox.php';
 require __DIR__ . '/whatsapp.php';
-require __DIR__ . '/payments.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'POST' && isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
@@ -56,20 +47,12 @@ try {
     $user = $who['label'];
     $GLOBALS['LOG_WHO'] = $user;
     $GLOBALS['ME_UID'] = notes_uid($who); $GLOBALS['ME_NAME'] = (string) ($who['user']['name'] ?? '');
-    $GLOBALS['ME_GARAGE'] = ($who['user']['role'] ?? '') === 'garage' ? garage_of_user($GLOBALS['ME_UID']) : '';   // notes privées : visibles de leur auteur seulement
     if (function_exists('log_tables')) log_tables();
     sbx_init();                                          // environnement de test de cette session ?
     sbx_guard($route, $parts, $method);   // hors transaction (MySQL valide implicitement toute transaction sur un CREATE)
     $role = role_of($who);
     $pdo  = db();
     auth_private_routes($route, $parts, $method, $who);
-    webfleet_routes($route, $parts, $method, $who, $role);
-    odoo_routes($route, $parts, $method, $who, $role);
-    falco_routes($route, $parts, $method, $who, $role);
-    ponto_routes($route, $parts, $method, $who, $role);
-    payments_routes($route, $parts, $method, $who, $role);
-    coda_routes($route, $parts, $method, $who, $role);
-    purchases_routes($route, $parts, $method, $who, $role);
     assistant_routes($route, $parts, $method, $who, $role);
     log_routes($route, $parts, $method, $who, $role);
     sandbox_routes($route, $parts, $method, $who, $role);

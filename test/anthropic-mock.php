@@ -23,7 +23,7 @@ $question = ''; foreach ($msgs as $m) if ($m['role'] === 'user' && is_string($m[
 $nAsk = 0; $seen = false; foreach ($msgs as $m) { if ($m['role'] === 'user' && is_string($m['content'])) { $seen = true; $nAsk = 0; } elseif ($m['role'] === 'assistant') $nAsk++; }
 $tu = fn($id, $name, $in) => print(json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => ['input_tokens' => 10, 'output_tokens' => 5], 'content' => [['type' => 'thinking', 'thinking' => '…', 'signature' => $sig], ['type' => 'tool_use', 'id' => $id, 'name' => $name, 'input' => $in]]]));
 // longue recherche : 35 tours d'outils d'affilée (vérifie que le contexte reste valide)
-if (str_contains($question, 'Longue') && is_array($last['content'] ?? null) && $nAsk < 35) { $tu('tu_l' . $nAsk . '_' . mt_rand(), 'search_records', ['collection' => 'bankTx']); exit; }
+if (str_contains($question, 'Longue') && is_array($last['content'] ?? null) && $nAsk < 35) { $tu('tu_l' . $nAsk . '_' . mt_rand(), 'search_records', ['collection' => 'vehicles']); exit; }
 // Dropbox : recherche puis lecture du premier fichier trouvé
 if (str_contains($question, 'Dropbox') && is_array($last['content'] ?? null)) {
     $c = $last['content'][0]['content'] ?? '';
@@ -53,12 +53,6 @@ if (str_contains($question, 'Envoie-moi')) {
     if (is_array($last['content'] ?? null)) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'end_turn', 'content' => [['type' => 'text', 'text' => 'Envoi : ' . ($last['content'][0]['content'] ?? '')]], 'usage' => ['input_tokens' => 1, 'output_tokens' => 1]]); exit; }
     preg_match_all('/fileId ([a-f0-9]{32})/', json_encode($msgs, JSON_UNESCAPED_UNICODE), $mm); $tu('tu_ws', 'whatsapp_send_file', ['fileId' => end($mm[1]) ?: '', 'caption' => 'Voici']); exit;
 }
-// rapprochement : suggestions puis liaison de tous les « sure »
-if (str_contains($question, 'Rapproche') && is_array($last['content'] ?? null)) {
-    $r = json_decode((string) ($last['content'][0]['content'] ?? ''), true) ?: [];
-    if (isset($r['sure'])) { $uses = []; foreach ($r['sure'] as $k => $x) $uses[] = ['type' => 'tool_use', 'id' => "tu_lp$k", 'name' => 'link_payment', 'input' => ['txId' => $x['txId'], 'docIds' => array_column($x['docs'], 'docId'), 'how' => 'sure']];
-        if ($uses) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => ['input_tokens' => 10, 'output_tokens' => 5], 'content' => $uses]); exit; } }
-}
 // question avec fichier joint : propose l'ajout au véhicule veh-t
 if (is_array($last['content'] ?? null) && ($last['role'] ?? '') === 'user') {
     $hasDoc = false; $fid = '';
@@ -71,18 +65,14 @@ $text = fn($t) => print(json_encode(['id' => 'msg_x', 'type' => 'message', 'role
 if (is_string($last['content'] ?? null)) {
     $q = $last['content'];
     if (str_contains($q, 'OK')) { $text('OK'); exit; }
-    if (str_contains($q, 'Longue')) { $tu('tu_l0', 'search_records', ['collection' => 'bankTx']); exit; }
+    if (str_contains($q, 'Longue')) { $tu('tu_l0', 'search_records', ['collection' => 'vehicles']); exit; }
     if (str_contains($q, 'Dropbox')) { $tu('tu_dx', 'dropbox_search', ['query' => 'Autos']); exit; }
-    if (str_contains($q, 'Rapproche')) { $tu('tu_bs', 'bank_suggestions', ['date_from' => '2020-01-01']); exit; }
     if (str_contains($q, 'Retiens')) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => $usage,
         'content' => [['type' => 'tool_use', 'id' => 'tu_r', 'name' => 'remember', 'input' => ['note' => 'Les transports Airside se facturent avec l article EXP']]]]); exit; }
     if (str_contains($q, 'Crée')) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => $usage,
-        'content' => [['type' => 'tool_use', 'id' => 'tu_c', 'name' => 'create_record', 'input' => ['collection' => 'docs', 'data' => ['kind' => 'facture', 'status' => 'envoyee', 'clientId' => 'c1', 'lines' => [['label' => 'Transport', 'qty' => 1, 'price' => 50, 'vat' => 21]]]]]]]); exit; }
-    if (str_contains($q, 'Odoo')) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => $usage,
-        'content' => [['type' => 'tool_use', 'id' => 'tu_o', 'name' => 'update_record', 'input' => ['collection' => 'docs', 'id' => 'odoo-inv-100', 'changes' => ['notes' => 'x']]]]]); exit; }
-    $tool = str_contains($q, 'achat') ? ['name' => 'search_records', 'input' => ['collection' => 'purchases', 'query' => 'fedex']]
-          : (str_contains($q, 'banque') ? ['name' => 'search_records', 'input' => ['collection' => 'bankTx']]
-          : ['name' => 'aggregate', 'input' => ['collection' => 'docs', 'where' => ['kind' => 'facture'], 'sum_field' => 'totalTTC', 'group_by' => 'clientName']]);
+        'content' => [['type' => 'tool_use', 'id' => 'tu_c', 'name' => 'create_record', 'input' => ['collection' => 'clients', 'data' => ['name' => 'Cargo Test', 'code' => 'CT']]]]]); exit; }
+    $tool = str_contains($q, 'achat') ? ['name' => 'search_records', 'input' => ['collection' => 'products', 'query' => 'pfsc']]
+          : ['name' => 'aggregate', 'input' => ['collection' => 'products', 'sum_field' => 'price', 'group_by' => 'kind']];
     echo json_encode(['id' => 'msg_t', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use',
         'content' => [['type' => 'text', 'text' => 'Je regarde.'], ['type' => 'tool_use', 'id' => 'tu_1', 'name' => $tool['name'], 'input' => $tool['input']]], 'usage' => $usage]);
     exit;

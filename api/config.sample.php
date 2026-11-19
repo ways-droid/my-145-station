@@ -1,9 +1,9 @@
 <?php
-// Copier ce fichier en config.php et remplir les valeurs (panneau ONE.COM > Base de données MySQL).
+// Copier ce fichier en config.php et remplir les valeurs (base MySQL de l'hébergement de my-145-station).
 // config.php ne doit JAMAIS être partagé ni versionné.
 return [
-    // MySQL / MariaDB ONE.COM
-    'dsn'      => 'mysql:host=VOTRE_HOTE.mysql.service.one.com;dbname=VOTRE_BASE;charset=utf8mb4',
+    // MySQL / MariaDB
+    'dsn'      => 'mysql:host=VOTRE_HOTE_MYSQL;dbname=VOTRE_BASE;charset=utf8mb4',
     'db_user'  => 'VOTRE_UTILISATEUR',
     'db_pass'  => 'VOTRE_MOT_DE_PASSE',
 
@@ -14,15 +14,12 @@ return [
     ],
 
     // Dossier des fichiers envoyés (hors de la racine web si possible).
-    // Dossier privé ONE.COM (à côté de httpd.www), inaccessible depuis le web.
-    // Utiliser un sous-dossier différent pour erp-test et erp.
-    'upload_dir'     => __DIR__ . '/../../../httpd.private/ways-uploads',
+    // Dossier privé de l'hébergement, inaccessible depuis le web.
+    // Utiliser un sous-dossier différent pour l'environnement de test et la production.
+    'upload_dir'     => __DIR__ . '/../../../private/st-uploads',
     'max_upload_mb'  => 20,
 
-    // Collections autorisées (celles de l'ERP W.A.Y.S.).
-    'collections' => [
-        'clients','products','docs','gasTypes','bottles','gasMoves','deliveries',
-        'vehicles','vehEvents','faults','driverLogs','tools','tires','labs','fines',
-        'adminDocs','adminFolders','vehPos','trips','settings',
-    ],
+    // Collections supplémentaires.
+    // La liste de base est dans api/lib.php ; ajouter ici seulement des collections supplémentaires.
+    'collections' => [],
 ];

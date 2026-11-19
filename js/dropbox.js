@@ -43,9 +43,9 @@ async function loadDbx() {
   if (!s) { box.innerHTML = `<div class="err">${esc(tr("Le serveur ne répond pas."))}</div>`; return; }
   const redir = `<div class="row-g"><code class="mono small" style="user-select:all;word-break:break-all">${esc(s.redirectUri || "")}</code><button class="btn sm" data-a="dbx-copy" data-v="${esc(s.redirectUri || "")}">Copier</button></div>`;
   if (!s.connected) {
-    box.innerHTML = `<div class="stack-s"><div>Reliez le compte Dropbox de l'entreprise : documents consultables dans Administration, documents des véhicules copiés automatiquement dans leur dossier, et Axel peut y chercher. Les identifiants restent sur le serveur ways.support.</div>
+    box.innerHTML = `<div class="stack-s"><div>Reliez le compte Dropbox de l'entreprise : documents consultables dans Administration, documents des véhicules copiés automatiquement dans leur dossier, et Axel peut y chercher. Les identifiants restent sur le serveur.</div>
       <ol class="small stack-s" style="margin:0;padding-left:18px">
-        <li>Connecté au compte Dropbox de l'entreprise, ouvrez <b>dropbox.com/developers/apps</b> → <b>Create app</b> → <b>Scoped access</b> → <b>Full Dropbox</b> → nom « WAYS ERP ».</li>
+        <li>Connecté au compte Dropbox de l'entreprise, ouvrez <b>dropbox.com/developers/apps</b> → <b>Create app</b> → <b>Scoped access</b> → <b>Full Dropbox</b> → nom « my-145-station ».</li>
         <li>Onglet <b>Permissions</b> : cochez <span class="mono">account_info.read</span>, <span class="mono">files.metadata.read</span>, <span class="mono">files.content.read</span>, <span class="mono">files.content.write</span>, puis <b>Submit</b>.</li>
         <li>Onglet <b>Settings</b> → <b>Redirect URIs</b> : ajoutez exactement cette adresse :${redir}</li>
         <li>Toujours dans <b>Settings</b>, copiez l'<b>App key</b> et l'<b>App secret</b> (« Show ») et collez-les ici.</li>
@@ -67,12 +67,12 @@ async function loadDbx() {
 }
 /* juste après l'autorisation Dropbox : proposer le choix des dossiers */
 function dbxAfterConnect(s) {
-  let f = null; try { f = sessionStorage.getItem("ways-dbx-pick"); sessionStorage.removeItem("ways-dbx-pick"); } catch {}
+  let f = null; try { f = sessionStorage.getItem("st-dbx-pick"); sessionStorage.removeItem("st-dbx-pick"); } catch {}
   if (f && s && s.connected && !(s.folders || []).length) setTimeout(() => ACTIONS["dbx-pick"](), 300);
 }
 ACTIONS["dbx-copy"] = el => { navigator.clipboard?.writeText(el.dataset.v).then(() => toast("Adresse copiée"), () => toast("Sélectionnez l'adresse et copiez-la")); };
 ACTIONS["dbx-form"] = () => {
-  const m = modal(`${mHead("App Dropbox de l'ERP")}<form autocomplete="off"><div class="body stack-s"><div class="fields">
+  const m = modal(`${mHead("App Dropbox de l'outil")}<form autocomplete="off"><div class="body stack-s"><div class="fields">
     ${field("dx-key", "App key", "", { required: !(DBX && DBX.appSet), cls: "mono", ph: DBX && DBX.appSet ? "inchangée" : "" })}${field("dx-sec", "App secret", "", { type: "password", required: !(DBX && DBX.appSet), ph: DBX && DBX.appSet ? "inchangé" : "" })}</div>
     <div class="hint">Console Dropbox → votre app → onglet Settings. Enregistrés sur le serveur uniquement.</div><div class="err" id="dx-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></footer></form>`, "sm");
@@ -82,12 +82,12 @@ ACTIONS["dbx-form"] = () => {
     catch (x) { m.querySelector("#dx-err").textContent = tr(x.message); } };
 };
 ACTIONS["dbx-connect"] = async () => {
-  try { const r = await API.call("POST", "dropbox/auth-url", {}); try { sessionStorage.setItem("ways-dbx-pick", "1"); } catch {} location.href = r.url; } catch (e) { toast(tr(e.message)); }
+  try { const r = await API.call("POST", "dropbox/auth-url", {}); try { sessionStorage.setItem("st-dbx-pick", "1"); } catch {} location.href = r.url; } catch (e) { toast(tr(e.message)); }
 };
 /* choix des dossiers visibles et synchronisés : code maître, puis arborescence complète du Dropbox */
 ACTIONS["dbx-pick"] = () => {
   const m = modal(`${mHead("Dossiers Dropbox visibles et synchronisés")}<form autocomplete="off"><div class="body stack-s">
-    <div>Seuls les dossiers choisis (et leurs sous-dossiers) seront visibles dans l'ERP, consultables par Axel et utilisés pour la copie des documents des véhicules. Ce choix est protégé par le <b>code maître</b>.</div>
+    <div>Seuls les dossiers choisis (et leurs sous-dossiers) seront visibles dans l'outil, consultables par Axel et utilisés pour la copie des documents des véhicules. Ce choix est protégé par le <b>code maître</b>.</div>
     ${field("dp-code", "Code maître", "", { type: "password", required: true, autofocus: true })}<div class="err" id="dp-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Continuer</button></footer></form>`, "sm");
   const c = m.querySelector("#dp-code"); c.setAttribute("inputmode", "numeric"); c.setAttribute("autocomplete", "off");
@@ -132,8 +132,8 @@ function dbxPicker(token) {
 ACTIONS["dbx-opts"] = () => {
   const s = DBX || {};
   const m = modal(`${mHead("Réglages Dropbox")}<form><div class="body stack-s">
-    ${field("dx-veh", "Dossier des véhicules dans Dropbox", s.vehPath || "", { ph: "/WAYS SPRL Utility/Vehicles", cls: "mono", wide: true })}
-    <div class="hint">Chemin tel qu'il apparaît dans l'adresse dropbox.com/home/… (par ex. <span class="mono">/Ludovic Masuir/WAYS SPRL Utility/Vehicles</span>). Utilisé pour les véhicules sans lien « Dossier Dropbox ».</div>
+    ${field("dx-veh", "Dossier des véhicules dans Dropbox", s.vehPath || "", { ph: "/Station/Vehicles", cls: "mono", wide: true })}
+    <div class="hint">Chemin tel qu'il apparaît dans l'adresse dropbox.com/home/… (par ex. <span class="mono">/Station/Vehicles</span>). Utilisé pour les véhicules sans lien « Dossier Dropbox ».</div>
     <label class="chk line"><input type="checkbox" id="dx-sync" ${s.vehSync ? "checked" : ""}> Copier automatiquement les documents des véhicules dans Dropbox</label>
     <div><div class="small" style="margin-bottom:6px">Couleur du dossier Dropbox dans Administration <span class="muted">(le jaune est réservé à vos dossiers, le bleu aux dossiers système)</span></div>
       <div class="row-g wrap">${DBX_COLORS.map(([k, l]) => `<label class="dx-sw c-${k}"><input type="radio" name="dx-col" value="${k}" ${s.color === k ? "checked" : ""}><span class="folder-ic sm">${typeof folderSvg !== "undefined" ? folderSvg : ""}</span>${esc(tr(l))}</label>`).join("")}</div></div>
@@ -145,7 +145,7 @@ ACTIONS["dbx-opts"] = () => {
     catch (x) { m.querySelector("#dx-err").textContent = tr(x.message); } };
 };
 ACTIONS["dbx-resync"] = async () => { try { const r = await API.call("POST", "dropbox/resync", {}); toast(r.queue ? `${plural(r.queue, "document")} à copier` : "Tous les documents sont déjà dans Dropbox"); await dbxRefresh(); loadDbx(); dbxTick(true); } catch (e) { toast(tr(e.message)); } };
-ACTIONS["dbx-off"] = () => confirmBox("Déconnecter Dropbox ? L'ERP n'y aura plus accès ; rien n'est supprimé dans Dropbox ni dans l'ERP.", async () => { await API.call("POST", "dropbox/disconnect", {}); await dbxRefresh(); loadDbx(); }, "Déconnecter");
+ACTIONS["dbx-off"] = () => confirmBox("Déconnecter Dropbox ? L'outil n'y aura plus accès ; rien n'est supprimé dans Dropbox ni dans l'outil.", async () => { await API.call("POST", "dropbox/disconnect", {}); await dbxRefresh(); loadDbx(); }, "Déconnecter");
 ACTIONS["dbx-open-admin"] = () => { const f = adocF(); f.folder = "_dbx"; UI.dbxPath = ""; location.hash = "#admin"; render(true); };
 
 /* ---------- Administration : dossier Dropbox ---------- */

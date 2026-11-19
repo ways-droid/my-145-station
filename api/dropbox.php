@@ -1,6 +1,6 @@
 <?php
 /* ======================= Liaison Dropbox =======================
-   Un compte Dropbox de l'entreprise relié à l'ERP (OAuth 2, jeton de rafraîchissement « offline »).
+   Un compte Dropbox de l'entreprise relié à l'outil (OAuth 2, jeton de rafraîchissement « offline »).
    - App créée par l'administrateur dans la console Dropbox (clé + secret saisis dans Paramètres, gardés dans ways_kv).
    - Espace d'équipe : les chemins sont ceux de l'adresse web (dropbox.com/home/<chemin>), via Dropbox-API-Path-Root.
    - Consultation (Administration → dossier Dropbox), recherche, ouverture par lien temporaire (4 h).
@@ -27,7 +27,7 @@ function dbx_url($kind, $ep) {
 
 /* adresse de retour OAuth : à déclarer telle quelle dans la console Dropbox */
 function dbx_redirect_uri() {
-    $host = $_SERVER['HTTP_HOST'] ?? 'ways.support';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $uri = parse_url($_SERVER['REQUEST_URI'] ?? '/api/', PHP_URL_PATH);
     $base = preg_match('#^(.*?/api)/#', $uri, $m) ? $m[1] : '/api';
     $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' || !preg_match('/^(127\.|localhost)/', $host);
@@ -110,7 +110,7 @@ function dbx_mkdir($path) {
 }
 
 /* ---------- dossiers autorisés (choisis par l'administrateur avec le code maître) ----------
-   Seuls ces dossiers (et leurs sous-dossiers) sont visibles dans l'ERP, consultables par Axel et utilisés pour la copie
+   Seuls ces dossiers (et leurs sous-dossiers) sont visibles dans l'outil, consultables par Axel et utilisés pour la copie
    des documents des véhicules. Aucun dossier choisi = rien de visible. */
 function dbx_scope() { return array_values(array_filter((array) (json_decode(dbk('dbx_folders', '[]'), true) ?: []), 'is_string')); }
 function dbx_in_scope($p) {
@@ -157,7 +157,7 @@ function dbx_unlocked($who, $t) {
 /* ---------- suivi par Axel : nouveaux fichiers dans des dossiers suivis ----------
    dbx_watch : [{path, cursor, by, at}] (choisis par le bureau / les administrateurs, dans les dossiers autorisés).
    Les nouveaux fichiers deviennent des événements (dbx_new, numérotés) ; chaque personne a son « vu jusqu'à »
-   (dbx_seen:<id>) et Axel lui propose « Analyser ? Oui / Non ». Les fichiers copiés par l'ERP lui-même sont ignorés. */
+   (dbx_seen:<id>) et Axel lui propose « Analyser ? Oui / Non ». Les fichiers copiés par l'outil lui-même sont ignorés. */
 const DBX_WATCH_EVERY = 120;   // secondes
 function dbx_watches() { return array_values(array_filter((array) (json_decode(dbk('dbx_watch', '[]'), true) ?: []), fn($w) => !empty($w['path']))); }
 function dbx_mine_add($p) { $m = json_decode(dbk('dbx_mine', '[]'), true) ?: []; $m[] = mb_strtolower($p); kv_set('dbx_mine', json_encode(array_slice($m, -300))); }
@@ -196,7 +196,7 @@ function dbx_watch_check($force = false) {
     kv_set('dbx_seq', (string) $seq); kv_set('dbx_watch', json_encode($keep, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     return $n;
 }
-/* copie d'un fichier Dropbox dans les fichiers de l'ERP (pour le ranger dans une fiche) */
+/* copie d'un fichier Dropbox dans les fichiers de l'outil (pour le ranger dans une fiche) */
 function dbx_import_file($path) {
     $p = dbx_norm_path($path); dbx_guard($p);
     $m = dbx_rpc('files/get_metadata', ['path' => $p]);
@@ -231,7 +231,7 @@ function dbx_vehicle_folder($vid, &$v, &$changed) {
     $v['dropboxLink'] = dbx_link_from_path($p); $changed = true;
     return $p;
 }
-/* anciens documents : marqués « anciens », ou remplacés par un plus récent du même type (même règle que currentDocs() de l'ERP) */
+/* anciens documents : marqués « anciens », ou remplacés par un plus récent du même type (même règle que currentDocs() de l'outil) */
 function dbx_old_ids($docs) {
     $by = []; $all = [];
     foreach ((array) $docs as $d) {
@@ -342,8 +342,8 @@ function dropbox_public_routes($route, $parts, $method) {
     $page = function ($ok, $msg) {
         header('Content-Type: text/html; charset=utf-8');
         echo '<!doctype html><meta charset="utf-8"><title>Dropbox</title><body style="font-family:system-ui;padding:40px;max-width:560px;margin:auto">'
-            . '<h2>' . ($ok ? 'Dropbox est relié à l\'ERP ✓' : 'Liaison Dropbox impossible') . '</h2><p>' . htmlspecialchars($msg) . '</p>'
-            . '<p><a href="../../#parametres">Revenir à l\'ERP</a></p>' . ($ok ? '<script>setTimeout(()=>location.href="../../#parametres",1500)</script>' : '') . '</body>';
+            . '<h2>' . ($ok ? 'Dropbox est relié à l\'outil ✓' : 'Liaison Dropbox impossible') . '</h2><p>' . htmlspecialchars($msg) . '</p>'
+            . '<p><a href="../../#parametres">Revenir à l\'outil</a></p>' . ($ok ? '<script>setTimeout(()=>location.href="../../#parametres",1500)</script>' : '') . '</body>';
         exit;
     };
     if (!empty($_GET['error'])) $page(false, 'Autorisation refusée dans Dropbox (' . ($_GET['error_description'] ?? $_GET['error']) . ').');
@@ -363,7 +363,7 @@ function dropbox_public_routes($route, $parts, $method) {
         kv_set('dbx_account', json_encode(['name' => $a['name']['display_name'] ?? '', 'email' => $a['email'] ?? '', 'team' => $a['team']['name'] ?? null], JSON_UNESCAPED_UNICODE));
     } catch (Throwable $e) { kv_set('dbx_account', json_encode(['name' => '?'])); }
     if (function_exists('log_event')) log_event('settings', 'company', 'update', 'Dropbox', 'Compte Dropbox relié', $st['by'] ?? 'ERP');
-    $page(true, 'Vous pouvez revenir à l\'ERP.');
+    $page(true, 'Vous pouvez revenir à l\'outil.');
 }
 
 function dropbox_routes($route, $parts, $method, $who, $role) {
@@ -402,7 +402,7 @@ function dropbox_routes($route, $parts, $method, $who, $role) {
             dbx_guard($b['path'] ?? '');
             $r = dbx_rpc('files/get_temporary_link', ['path' => dbx_norm_path($b['path'] ?? '')]);
             out(['link' => $r['link'] ?? '', 'name' => $r['metadata']['name'] ?? '']);
-        } catch (RuntimeException $e) { /* jamais 401 : ce code déconnecterait l'utilisateur de l'ERP */ fail($e->getCode() === 403 ? 403 : 502, $e->getMessage()); }
+        } catch (RuntimeException $e) { /* jamais 401 : ce code déconnecterait l'utilisateur de l'outil */ fail($e->getCode() === 403 ? 403 : 502, $e->getMessage()); }
     }
     if (!$admin) fail(403, 'Réservé aux administrateurs');
     /* choix des dossiers : administrateur + code maître */
@@ -447,7 +447,7 @@ function dropbox_routes($route, $parts, $method, $who, $role) {
         out(['ok' => true]);
     }
     if ($act === 'resync' && $method === 'POST') {   // recopier les documents des véhicules pas encore dans Dropbox
-        $n = 0; foreach (od_coll_docs('vehicles') as $id => $v) {
+        $n = 0; foreach (coll_docs('vehicles') as $id => $v) {
             foreach ((array) ($v['docs'] ?? []) as $i => $d) if (!empty($d['dbxErr'])) { unset($v['docs'][$i]['dbxErr']); $fix = true; }
             if (!empty($fix)) { write_doc('vehicles', $id, $v, 'dropbox'); $fix = false; }
             dbx_on_write('vehicles', $id, $v); $n++;
