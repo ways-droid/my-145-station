@@ -17,7 +17,7 @@ $arg = json_decode($_SERVER['HTTP_DROPBOX_API_ARG'] ?? 'null', true);
 $b = json_decode(file_get_contents('php://input'), true);
 switch ($u) {
     case '/api/users/get_current_account':
-        $json(['name' => ['display_name' => 'W.A.Y.S. Bureau'], 'email' => 'bureau@ways.test', 'team' => ['name' => 'W.A.Y.S.'], 'root_info' => ['.tag' => 'team', 'root_namespace_id' => '111', 'home_namespace_id' => '222']]); break;
+        $json(['name' => ['display_name' => 'Station Bureau'], 'email' => 'bureau@station.test', 'team' => ['name' => 'Station'], 'root_info' => ['.tag' => 'team', 'root_namespace_id' => '111', 'home_namespace_id' => '222']]); break;
     case '/api/files/list_folder':
         $f = $fs($b['path'] ?? ''); if (!is_dir($f)) { $err('path/not_found/'); break; }
         $e = []; foreach (scandir($f) as $n) if ($n[0] !== '.') $e[] = $meta(rtrim($b['path'], '/') . '/' . $n);

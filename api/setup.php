@@ -1,5 +1,5 @@
 <?php
-// Configuration guidée de la connexion : serveur e-mail (SMTP ONE.COM), code maître, premier administrateur.
+// Configuration guidée de la connexion : serveur e-mail (SMTP), code maître, premier administrateur.
 // Protégée par la clé d'accès de l'installation. Peut être rouverte pour changer un réglage.
 require __DIR__ . '/lib.php';
 require __DIR__ . '/auth.php';
@@ -30,7 +30,7 @@ foreach ((array) cfg('api_tokens') as $t) if (strlen($t) >= 32 && $key !== '' &&
 try { auth_tables(); } catch (Throwable $e) { page('Erreur', '<h1>Base de données injoignable</h1><p class="err">' . h($e->getMessage()) . '</p>'); }
 
 $cur = [
-    'smtp_host' => kv_get('smtp_host', 'send.one.com'), 'smtp_port' => kv_get('smtp_port', '465'),
+    'smtp_host' => kv_get('smtp_host', ''), 'smtp_port' => kv_get('smtp_port', '465'),
     'smtp_user' => kv_get('smtp_user', 'noreply@my-145-station.com'), 'smtp_from_name' => kv_get('smtp_from_name', 'my-145-station'),
 ];
 $admin = db()->query("SELECT * FROM ways_users WHERE role = 'admin' ORDER BY created_at LIMIT 1")->fetch() ?: ['name' => '', 'email' => ''];
@@ -75,7 +75,7 @@ page('Connexion de my-145-station', '<h1>Connexion de my-145-station</h1>'
     . '<p>Environnement : <b>' . h($env) . '</b>. ' . (login_configured() ? 'La connexion par code est <b>active</b> ; vous pouvez modifier les réglages ci-dessous.' : 'Cette page active la connexion par nom et code à 8 chiffres envoyé par e-mail.') . '</p>' . $msg
     . '<form method="post" autocomplete="off"><input type="hidden" name="step" value="save">'
     . '<label>Clé d\'accès de l\'installation</label><input name="key" type="password" required><small>Celle affichée par install.php. Elle autorise cette page.</small>'
-    . '<h2>Boîte d\'envoi des codes</h2><small>Créez-la d\'abord dans le panneau ONE.COM → E-mail (par exemple noreply@my-145-station.com).</small>'
+    . '<h2>Boîte d\'envoi des codes</h2><small>Créez-la d\'abord chez votre hébergeur e-mail (par exemple noreply@my-145-station.com).</small>'
     . '<label>Adresse d\'envoi</label><input name="smtp_user" value="' . h($cur['smtp_user']) . '">'
     . '<label>Mot de passe de cette boîte</label><input name="smtp_pass" type="password" placeholder="' . ($hasPass ? 'inchangé si laissé vide' : '') . '"><small>Il reste sur le serveur.</small>'
     . '<div class="row"><div><label>Serveur SMTP</label><input name="smtp_host" value="' . h($cur['smtp_host']) . '"></div><div><label>Port</label><input name="smtp_port" value="' . h($cur['smtp_port']) . '"></div></div>'

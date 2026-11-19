@@ -3,7 +3,7 @@
 // config.php ne doit JAMAIS être partagé ni versionné.
 return [
     // MySQL / MariaDB
-    'dsn'      => 'mysql:host=VOTRE_HOTE.mysql.service.one.com;dbname=VOTRE_BASE;charset=utf8mb4',
+    'dsn'      => 'mysql:host=VOTRE_HOTE_MYSQL;dbname=VOTRE_BASE;charset=utf8mb4',
     'db_user'  => 'VOTRE_UTILISATEUR',
     'db_pass'  => 'VOTRE_MOT_DE_PASSE',
 
@@ -14,9 +14,9 @@ return [
     ],
 
     // Dossier des fichiers envoyés (hors de la racine web si possible).
-    // Dossier privé ONE.COM (à côté de httpd.www), inaccessible depuis le web.
+    // Dossier privé de l'hébergement, inaccessible depuis le web.
     // Utiliser un sous-dossier différent pour l'environnement de test et la production.
-    'upload_dir'     => __DIR__ . '/../../../httpd.private/st-uploads',
+    'upload_dir'     => __DIR__ . '/../../../private/st-uploads',
     'max_upload_mb'  => 20,
 
     // Collections supplémentaires.

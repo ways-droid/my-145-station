@@ -85,10 +85,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 page('Installation my-145-station', '<h1>Installation de my-145-station</h1>'
-    . '<p>Environnement : <b>' . h($envName) . '</b>. Copie ici les informations de ta base MySQL, telles qu\'affichées dans le panneau ONE.COM (rubrique <i>Base de données MySQL</i>).</p>'
+    . '<p>Environnement : <b>' . h($envName) . '</b>. Copie ici les informations de ta base MySQL, telles qu\'affichées dans le panneau de l\'hébergeur (rubrique <i>Base de données MySQL</i>).</p>'
     . ($err ? '<p class="err">' . h($err) . '</p>' : '')
     . '<form method="post" autocomplete="off">'
-    . '<label>Hôte (serveur MySQL)</label><input name="host" value="' . h($v['host']) . '" placeholder="ex. ways-support.mysql.service.one.com">'
+    . '<label>Hôte (serveur MySQL)</label><input name="host" value="' . h($v['host']) . '" placeholder="ex. mysql.mon-hebergeur.com">'
     . '<label>Nom de la base</label><input name="name" value="' . h($v['name']) . '">'
     . '<label>Utilisateur</label><input name="user" value="' . h($v['user']) . '">'
     . '<label>Mot de passe de la base</label><input name="pass" type="password"><small>Il reste sur ton serveur, dans un fichier protégé.</small>'

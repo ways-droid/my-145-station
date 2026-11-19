@@ -73,7 +73,7 @@ async function withLang(lang, fn) {
 }
 function setUiLang(l) {
   UI_LANG = LANG = l === "en" ? "en" : "fr";
-  try { localStorage.setItem("ways-lang", UI_LANG); } catch { }
+  try { localStorage.setItem("st-lang", UI_LANG); } catch { }
   document.documentElement.lang = UI_LANG;
   closeModal(); staticDone = null; render(true);
 }

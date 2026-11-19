@@ -1,4 +1,4 @@
-/* Client de l'API W.A.Y.S. — remplace la base et les fichiers de l'artéfact claude.ai.
+/* Client de l'API my-145-station — remplace la base et les fichiers de l'artéfact claude.ai.
  *
  *   const api = WaysAPI({ base: '/erp/api/', token: '...' });
  *   await api.save('clients', 'c-001', { name: 'Liege Airport' });

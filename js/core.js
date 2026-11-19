@@ -1,16 +1,13 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["clients", "products", "docs", "gasTypes", "bottles", "gasMoves", "deliveries",
-  "vehicles", "vehEvents", "faults", "driverLogs", "tools", "tires", "labs", "fines", "adminDocs", "adminFolders", "vehPos", "trips", "bankAccounts", "bankTx", "codaFiles", "purchases", "drivers", "notes", "garages", "userPrefs", "payments", "reminders", "links"];
+const COLS = ["clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
 const UI = { q: "", filter: "tous", tab: {}, nav: {} };
 
 const DEFAULT_SETTINGS = {
-  name: "W.A.Y.S. SRL", vat: "", iban: "", address: "", email: "", phone: "", payDays: 30, quoteDays: 30,
-  bankBalance: null, bankDate: "", gasLocations: [{ id: "L1", name: "Dépôt principal" }], drivers: [],
-  supplierName: "Air Liquide Belgium", expMode: "livraison", expAmount: 0, expLabel: "Frais de transfert Airside (EXP)"
+  name: "my-145-station", approval: "", vat: "", address: "", email: "", phone: "", stationCode: "", stationName: "", timeZone: ""
 };
 const settings = () => Object.assign({}, DEFAULT_SETTINGS, S.settings);
 
@@ -18,7 +15,7 @@ const settings = () => Object.assign({}, DEFAULT_SETTINGS, S.settings);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 /* langue : interface (choix de chaque utilisateur, gardé dans son navigateur) ; LANG peut être changé
    temporairement pour produire un PDF ou un e-mail dans la langue d'un client */
-let UI_LANG = (() => { try { return localStorage.getItem("ways-lang") === "en" ? "en" : "fr"; } catch { return "fr"; } })();
+let UI_LANG = (() => { try { return localStorage.getItem("st-lang") === "en" ? "en" : "fr"; } catch { return "fr"; } })();
 let LANG = UI_LANG;
 const LOCALES = { fr: "fr-BE", en: "en-IE" };
 const _fmt = {};
@@ -32,6 +29,7 @@ const today = () => iso(new Date());
 const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
 const addMonths = (s, n) => { const d = new Date(s + "T12:00:00"); d.setMonth(d.getMonth() + n); return iso(d); };
 const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
+const fmtDT = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString(LANG === "en" ? "en-IE" : "fr-BE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); };
 const fmtDate = s => s ? new Date(s + "T12:00:00").toLocaleDateString(LOCALES[LANG], { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const MONTHS_L = { fr: ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."], en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] };
 const MONTHS = new Proxy([], { get: (t, k) => MONTHS_L[LANG][k] });
@@ -53,7 +51,7 @@ function dueChip(date, soon = 30) {
 }
 /* messages système : empilés, chacun reste assez longtemps pour être lu, et ils partent dans l'ordre d'arrivée (FIFO).
    Les 3 derniers jours sont gardés dans ce navigateur (bouton « Messages » en haut à droite). */
-const TOAST_LS = "ways-toasts", TOAST_MAX = 5;
+const TOAST_LS = "st-toasts", TOAST_MAX = 5;
 let toastLast = 0;
 function toastLog() { try { const a = JSON.parse(localStorage.getItem(TOAST_LS) || "[]"); const lim = Date.now() - 3 * 86400000; return Array.isArray(a) ? a.filter(x => x.at > lim) : []; } catch { return []; } }
 function toast(msg) {
@@ -142,17 +140,17 @@ async function saveSettings(data) {
   try { await db.doc("settings/company").set(full); } catch (e) { onErr(e); }
 }
 
-/* ======================= serveur ways.support ======================= */
+/* ======================= serveur (API PHP) ======================= */
 /* Hors claude.ai, l'application parle à l'API PHP du dossier api/ (client/ways-api.js).
    La clé d'accès provisoire est demandée une fois et gardée dans ce navigateur (en attendant le login). */
 let API = null;
 const SERVER = !(window.claude && window.claude.use) && /^https?:$/.test(location.protocol);
 const blobUrl = id => API ? API.fileUrl(id) : "/_blob/" + encodeURIComponent(id);
-const KEY_LS = "ways-api-key";
+const KEY_LS = "st-api-key";
 function keyGate(msg) {
   return new Promise(resolve => {
     const w = document.createElement("div"); w.className = "keygate";
-    w.innerHTML = `<form class="keybox"><h2>ERP W.A.Y.S.</h2>
+    w.innerHTML = `<form class="keybox"><h2>my-145-station</h2>
       <p class="muted small">${tr("Saisissez la clé d'accès de ce serveur (fournie par la page d'installation). Elle reste enregistrée dans ce navigateur.")}</p>
       ${msg ? `<div class="err">${esc(tr(msg))}</div>` : ""}
       <input type="password" id="kg-key" autocomplete="current-password" placeholder="${esc(tr("Clé d'accès"))}" required>
@@ -164,16 +162,13 @@ function keyGate(msg) {
 }
 /* utilisateur connecté (version serveur) : { name, role, email } ; rôles : admin, bureau, terrain */
 let ME = null, SBX = null;   /* SBX : environnement de test actif pour cette session ({since}) */
-const SESSION_LS = "ways-session";
-const ROLE_LBL = { admin: "Administrateur", bureau: "Bureau", terrain: "Terrain", garage: "Garage", chauffeur: "Chauffeur" };
+const SESSION_LS = "st-session";
+const ROLE_LBL = { admin: "Administrateur", bureau: "Bureau", terrain: "Terrain" };
 const isAdmin = () => !SERVER || !ME || ME.role === "admin";
-/* modules masqués pour le rôle Terrain (pas de ventes ni d'administration) */
-const ROLE_HIDE = { terrain: ["factures", "devis", "clients", "produits", "relances", "achats", "banque", "analytique", "admin", "historique", "parametres"] };
-/* garage et chauffeur : uniquement la Flotte (onglets limités, voir fleet.js) */
-const LIMITED_ROLES = ["garage", "chauffeur"];
-const isLimited = () => !!(ME && LIMITED_ROLES.includes(ME.role));
+/* modules masqués pour le rôle Terrain (pas de clients, de prix ni d'administration) */
+const ROLE_HIDE = { terrain: ["clients", "produits", "admin", "historique", "parametres"] };
 const isOffice = () => !ME || ME.key || ["admin", "bureau"].includes(ME.role);
-const allowed = r => !ME || (isLimited() ? r === "flotte" : !(ROLE_HIDE[ME.role] || []).includes(r));
+const allowed = r => !ME || !(ROLE_HIDE[ME.role] || []).includes(r);
 const lsGet = k => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
 const lsSet = (k, v) => { try { v ? localStorage.setItem(k, v) : localStorage.removeItem(k); } catch { } };
 async function apiPublic(method, path, body) {
@@ -186,8 +181,8 @@ async function apiPublic(method, path, body) {
 function loginGate() {
   return new Promise(resolve => {
     const w = document.createElement("div"); w.className = "keygate";
-    const last = lsGet("ways-last-name");
-    w.innerHTML = `<form class="keybox" id="lg"><h2>ERP W.A.Y.S.</h2>
+    const last = lsGet("st-last-name");
+    w.innerHTML = `<form class="keybox" id="lg"><h2>my-145-station</h2>
       <div id="lg-1" class="stack-s"><p class="muted small">${tr("Tapez votre nom et prénom : un code de connexion vous est envoyé par e-mail.")}</p>
         <input id="lg-name" autocomplete="username" placeholder="${esc(tr("Nom et prénom"))}" value="${esc(last)}" required>
         <button class="btn primary" id="lg-send">${tr("Recevoir mon code")}</button></div>
@@ -197,21 +192,21 @@ function loginGate() {
         <div class="row-sb small"><button type="button" class="linkbtn" id="lg-back">${tr("Changer de nom")}</button><button type="button" class="linkbtn" id="lg-again">${tr("Renvoyer le code")}</button></div></div>
       <div id="lg-3" class="stack-s hidden"></div>
       <div class="err" id="lg-err"></div></form>`;
-    const expired = lsGet("ways-expired"); lsSet("ways-expired", "");
+    const expired = lsGet("st-expired"); lsSet("st-expired", "");
     document.body.appendChild(w);
     const $ = id => w.querySelector("#" + id), err = $("lg-err");
     let step = 1;
     const show = n => { step = n; for (const k of [1, 2, 3]) $("lg-" + k).classList.toggle("hidden", n !== k); err.textContent = ""; setTimeout(() => (n === 1 ? $("lg-name") : n === 2 ? $("lg-code") : $("lg-tfa"))?.focus(), 30); };
     let T2 = null;   /* étape 2 : second facteur {ticket, tfa: "verify"|"enroll", secret, uri} */
-    const done = r => { lsSet("ways-last-name", $("lg-name").value.trim()); if (r.recovery) return showRecovery(r); w.remove(); resolve(r); };
+    const done = r => { lsSet("st-last-name", $("lg-name").value.trim()); if (r.recovery) return showRecovery(r); w.remove(); resolve(r); };
     const showRecovery = r => {
       $("lg-3").innerHTML = `<p><b>${tr("Second facteur activé.")}</b></p><p class="small">${tr("Voici vos 8 codes de secours. Chacun ne sert qu'une fois, si vous n'avez plus votre téléphone. Gardez-les en lieu sûr (gestionnaire de mots de passe, papier sous clé).")}</p>
         <pre class="tfa-rec">${r.recovery.map(esc).join("\n")}</pre><div class="row-g"><button type="button" class="btn sm" id="lg-rcopy">${tr("Copier")}</button><button type="button" class="btn sm" id="lg-rdl">${tr("Télécharger")}</button></div>
-        <label class="chk line small"><input type="checkbox" id="lg-rok"> ${tr("J'ai mis ces codes en lieu sûr")}</label><button type="button" class="btn primary" id="lg-rgo" disabled>${tr("Continuer vers l'ERP")}</button>`;
+        <label class="chk line small"><input type="checkbox" id="lg-rok"> ${tr("J'ai mis ces codes en lieu sûr")}</label><button type="button" class="btn primary" id="lg-rgo" disabled>${tr("Continuer")}</button>`;
       show(3); step = 4;
-      const txt = "ERP W.A.Y.S. — codes de secours (" + $("lg-name").value.trim() + ")\n\n" + r.recovery.join("\n") + "\n";
+      const txt = "my-145-station — codes de secours (" + $("lg-name").value.trim() + ")\n\n" + r.recovery.join("\n") + "\n";
       $("lg-rcopy").onclick = () => { navigator.clipboard && navigator.clipboard.writeText(txt); $("lg-rcopy").textContent = tr("Copié"); };
-      $("lg-rdl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = "codes-secours-erp-ways.txt"; a.click(); };
+      $("lg-rdl").onclick = () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = "codes-secours-my-145-station.txt"; a.click(); };
       $("lg-rok").onchange = () => $("lg-rgo").disabled = !$("lg-rok").checked;
       $("lg-rgo").onclick = () => { w.remove(); resolve(r); };
     };
@@ -267,7 +262,7 @@ async function connectServer() {
   if (configured) {
     let token = lsGet(SESSION_LS);
     /* session expirée (8 h) pendant l'utilisation : retour à l'écran de connexion */
-    const mkS = t => mk(t, () => { if (lsGet(SESSION_LS) === t) { lsSet(SESSION_LS, ""); lsSet("ways-expired", "1"); location.reload(); } });
+    const mkS = t => mk(t, () => { if (lsGet(SESSION_LS) === t) { lsSet(SESSION_LS, ""); lsSet("st-expired", "1"); location.reload(); } });
     if (token) { try { const api = mkS(token), me = await api.call("GET", "auth/me"); ME = me.user; API = api; SBX = me.sandbox || null; if (typeof SESS !== "undefined") SESS = me.session || null; return api; } catch (e) { lsSet(SESSION_LS, ""); } }
     const r = await loginGate();
     lsSet(SESSION_LS, r.token); ME = r.user; API = mkS(r.token); if (typeof SESS !== "undefined") SESS = { since: Date.now(), expires: Date.now() + (r.hours || 8) * 3600000 }; return API;
@@ -309,11 +304,6 @@ async function init() {
     try {
       const api = await connectServer();
       db = serverDb(api); assets = serverAssets(api);
-      if (typeof wfStart === "function") wfStart();
-      if (typeof odStart === "function") odStart();
-      if (typeof faStart === "function") faStart();
-      if (typeof poStart === "function") poStart();
-      if (typeof fpStart === "function") fpStart();
       if (typeof aiStart === "function") aiStart();
       if (typeof dbxStart === "function") dbxStart();
       if (typeof waStart === "function") waStart();
@@ -345,23 +335,21 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Opérations", [["gaz", "Gaz"], ["flotte", "Flotte"], ["etalonnage", "Étalonnage"]]],
-  ["Ventes", [["factures", "Factures"], ["devis", "Devis"], ["clients", "Clients"], ["produits", "Produits & prix"], ["relances", "Relances"]]],
-  ["Achats", [["achats", "Achats - Dépenses"], ["amendes", "Amendes"]]],
-  ["Finances", [["banque", "Banque"], ["analytique", "Analytique"]]],
+  ["Station", [["flotte", "Véhicules"], ["etalonnage", "Outillage"]]],
+  ["Clients", [["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", gaz: "blue", flotte: "orange", etalonnage: "green", signaler: "red", factures: "yellow", devis: "yellow", clients: "yellow", produits: "yellow", relances: "yellow", achats: "grey", amendes: "orange", banque: "green", analytique: "green", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
-const NAV_DOT = { factures: "white", devis: "white", clients: "white", produits: "white", relances: "white", achats: "white", amendes: "white", banque: "white", analytique: "white" };
+const NAV_DOT = { clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
 const ALIAS = { catalogue: "produits" };
-const route = () => { let h = location.hash.slice(1); h = ALIAS[h] || h; return VIEWS[h] && allowed(h) ? h : isLimited() ? "flotte" : "dashboard"; };
+const route = () => { let h = location.hash.slice(1); h = ALIAS[h] || h; return VIEWS[h] && allowed(h) ? h : "dashboard"; };
 let staticDone = null;
 window.addEventListener("hashchange", () => { UI.q = ""; UI.filter = "tous"; staticDone = null; render(true); window.scrollTo(0, 0); closeModal(); });
 
 /* compteurs du menu masquables 8 h (par navigateur) */
-const BADGE_KEY = "ways-badge-hide";
+const BADGE_KEY = "st-badge-hide";
 const badgeHides = () => { try { return JSON.parse(localStorage.getItem(BADGE_KEY) || "{}"); } catch (e) { return UI.badgeHide || {}; } };
 const badgeHidden = k => (badgeHides()[k] || 0) > Date.now();
 const badgeUntil = k => new Date(badgeHides()[k] || 0).toLocaleString(LANG === "en" ? "en-IE" : "fr-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
@@ -376,13 +364,12 @@ setInterval(() => { const h = badgeHides(); if (Object.values(h).some(t => t <= 
 function renderNav() {
   document.body.classList.toggle("sbx", !!SBX);
   const r = route();
-  const late = S.docs.filter(d => d.kind === "facture" && invStatus(d) === "retard").length;
   const faults = S.faults.filter(f => f.status !== "reparee" && isActiveVeh(f.vehicleId)).length;
   const ready = S.tools.filter(t => t.status === "a_livrer").length;
-  const badge = { factures: late, flotte: faults, etalonnage: ready, amendes: typeof fineActionCount === "function" ? fineActionCount() : 0 };
-  const badgeTip = { factures: n => `${plural(n, "facture")} en retard de paiement`, flotte: n => `${plural(n, "panne")} en cours (onglet Pannes)`, etalonnage: n => `${plural(n, "outil")} étalonné${n > 1 ? "s" : ""}, à rendre (colonne Calibrated)`, amendes: n => `${plural(n, "amende")} avec une action dans les 7 jours` };
+  const badge = { flotte: faults, etalonnage: ready };
+  const badgeTip = { flotte: n => `${plural(n, "panne")} en cours (onglet Pannes)`, etalonnage: n => `${plural(n, "outil")} étalonné${n > 1 ? "s" : ""}, à rendre (colonne Calibrated)` };
   document.getElementById("nav").innerHTML =
-    `<a href="#dashboard" class="brand-wrap" aria-label="Tableau de bord"><span class="logo-tile">${logoSvg()}</span><span><span class="brand">W<i>.</i>A<i>.</i>Y<i>.</i>S<i>.</i></span><span class="brand-sub">${esc(settings().name)}</span></span></a>` +
+    `<a href="#dashboard" class="brand-wrap" aria-label="Tableau de bord"><span class="logo-tile">${logoSvg()}</span><span><span class="brand">my<i>-</i>145<i>-</i>station</span><span class="brand-sub">${esc([settings().stationCode, settings().name].filter(Boolean).join(" · "))}</span></span></a>` +
     `<div class="lang-switch" role="group" aria-label="Langue / Language" data-noi18n><button data-a="set-lang" data-l="fr" class="${UI_LANG === "fr" ? "on" : ""}" aria-pressed="${UI_LANG === "fr"}">Français</button><button data-a="set-lang" data-l="en" class="${UI_LANG === "en" ? "on" : ""}" aria-pressed="${UI_LANG === "en"}">English</button></div>` +
     `<div class="lang-switch theme-switch" role="group" aria-label="Thème"><button data-a="set-theme" data-t="light" class="${curTheme() === "light" ? "on" : ""}" aria-pressed="${curTheme() === "light"}">☀ Clair</button><button data-a="set-theme" data-t="dark" class="${curTheme() === "dark" ? "on" : ""}" aria-pressed="${curTheme() === "dark"}">☾ Sombre</button></div>` +
     NAV.map(([h, items]) => [h, items.filter(([k]) => allowed(k))]).filter(([, items]) => items.length).map(([h, items]) => (h ? `<div class="nav-h">${h}</div>` : "") + items.map(([k, l]) =>
@@ -390,7 +377,7 @@ function renderNav() {
         : `<span class="cnt" role="button" tabindex="0" data-badge="${k}" title="${esc(badgeTip[k](badge[k]))} · cliquer pour masquer 8 h" aria-label="Masquer ce compteur pendant 8 heures">${badge[k]}</span>`) : ""}</a>`).join("")).join("") +
     (SBX ? `<div class="sbx-box"><b>${esc(tr("Environnement de test"))}</b><span class="small">${esc(tr("Rien n'est enregistré dans la base principale."))}</span><button class="btn sm" data-a="sbx-stop">${esc(tr("Quitter le test"))}</button></div>` : "") +
     (SERVER && ME ? `<div class="side-user"><div><b>${esc(ME.name)}</b><span class="muted small"> · ${tr(ROLE_LBL[ME.role] || ME.role)}</span></div><button class="linkbtn small" data-a="server-logout">${tr("Se déconnecter")}</button></div>` : "") +
-    `<div class="side-foot">${mode === "db" ? (readOnly ? "Lecture seule" : SERVER ? (S.offline ? "Serveur injoignable · nouvel essai…" : SBX ? "Environnement de test : base à part" : "Données enregistrées sur ways.support") : "Données partagées et enregistrées") : mode === "memory" ? "Aperçu : rien n'est enregistré" : "Connexion…"}</div>`;
+    `<div class="side-foot">${mode === "db" ? (readOnly ? "Lecture seule" : SERVER ? (S.offline ? "Serveur injoignable · nouvel essai…" : SBX ? "Environnement de test : base à part" : "Données enregistrées sur le serveur") : "Données partagées et enregistrées") : mode === "memory" ? "Aperçu : rien n'est enregistré" : "Connexion…"}</div>`;
 }
 function banners() {
   let h = "";
@@ -418,7 +405,6 @@ function userBusy(main) {
 }
 function render(force) {
   renderNav();
-  if (typeof refreshGarageModal === "function") try { refreshGarageModal(); } catch { }
   const r = route(), v = VIEWS[r];
   document.body.dataset.mod = MOD_COLOR[r] || "blue";
   if (v.static && staticDone === r && !force) return;
@@ -484,7 +470,7 @@ const TAB_IC = {
   euro: '<path d="M18 6a7 7 0 1 0 0 12M4 10h10M4 14h10"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
 };
-const TAB_ICON = { vehicules: "car", chauffeurs: "user", garages: "wrench", positions: "pin", trajets: "route", taches: "check", pannes: "alert", documents: "doc", pneus: "tire", amendes: "ticket",
+const TAB_ICON = { vehicules: "car", taches: "check", pannes: "alert", documents: "doc", pneus: "tire", amendes: "ticket",
   entretiens: "tools", stats: "chart", stock: "box", bouteilles: "bottle", clients: "people", livraisons: "truck", config: "cog", atelier: "flask", outils: "tools", labos: "flask", echeances: "bell",
   mouv: "bank", coda: "file", rclients: "people", ramendes: "ticket", vehicles: "car", tools: "tools", products: "tag", centres: "chart", anparam: "cog", notes: "note", gaz: "bottle", frais: "euro", etalonnage: "flask", articles: "tag" };
 const tabIcon = (route, k) => { const n = TAB_ICON[k] || (route === "admin" && k === "documents" ? "folder" : null); return n && TAB_IC[n] ? `<svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true">${TAB_IC[n]}</svg>` : ""; };
@@ -643,7 +629,7 @@ ACTIONS["sbx-start"] = () => {
   const m = modal(`${mHead("Activer l'environnement de test")}<div class="body stack-s">
     <div>Tant que le test est actif, <b>vos</b> créations, modifications et suppressions vont dans une base de test à part. La base principale et les autres utilisateurs ne voient rien.</div>
     <ul class="small" style="margin:0;padding-left:18px"><li>La colonne de gauche devient <b style="color:var(--red)">rouge</b>.</li><li>En quittant le test, tout ce qui a été fait pendant le test est effacé.</li>
-    <li>Les actions qui sortent de l'ERP sont bloquées : envoi à Falco, réponses Peppol, synchronisations Odoo / Ponto / Webfleet, réglages et utilisateurs.</li></ul></div>
+    <li>Les actions qui sortent de l'outil sont bloquées : envois WhatsApp, écritures Dropbox, réglages et utilisateurs.</li></ul></div>
     <footer><button class="btn" data-close>Annuler</button><button class="btn primary" id="sbx-go">Activer le test</button></footer>`, "sm");
   m.querySelector("#sbx-go").onclick = async e => { e.target.disabled = true; try { await API.call("POST", "sandbox/start", {}); location.reload(); } catch (x) { toast(tr(x.message)); e.target.disabled = false; } };
 };
@@ -660,10 +646,10 @@ ACTIONS["sbx-stop"] = async () => {
 ACTIONS["set-lang"] = el => setUiLang(el.dataset.l);
 /* thème clair / sombre : mémorisé par navigateur ; sans choix, suit le réglage de l'appareil */
 const sysDark = () => window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
-const curTheme = () => { try { return localStorage.getItem("ways-theme") || (sysDark() ? "dark" : "light"); } catch (e) { return sysDark() ? "dark" : "light"; } };
+const curTheme = () => { try { return localStorage.getItem("st-theme") || (sysDark() ? "dark" : "light"); } catch (e) { return sysDark() ? "dark" : "light"; } };
 const applyTheme = () => { document.documentElement.dataset.theme = curTheme(); };
 applyTheme();
-ACTIONS["set-theme"] = el => { try { localStorage.setItem("ways-theme", el.dataset.t); } catch (e) {} applyTheme(); renderNav(); };
+ACTIONS["set-theme"] = el => { try { localStorage.setItem("st-theme", el.dataset.t); } catch (e) {} applyTheme(); renderNav(); };
 document.addEventListener("click", e => {
   const bd = e.target.closest && e.target.closest("[data-badge]");
   if (bd) { e.preventDefault(); e.stopPropagation(); toggleBadge(bd.dataset.badge); }
@@ -682,7 +668,7 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => { if (e.target.id === "q") { UI.q = e.target.value; UI.focusQ = true; render(true); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("modal-root").innerHTML) closeModal(); });
 
-ACTIONS["server-logout"] = () => confirmBox(ME && !ME.key ? "Se déconnecter de l'ERP sur cet appareil ?" : "Oublier la clé d'accès dans ce navigateur ? Elle sera redemandée au prochain chargement.", async () => {
+ACTIONS["server-logout"] = () => confirmBox(ME && !ME.key ? "Se déconnecter sur cet appareil ?" : "Oublier la clé d'accès dans ce navigateur ? Elle sera redemandée au prochain chargement.", async () => {
   if (ME && !ME.key && API) { try { await API.call("POST", "auth/logout"); } catch { } }
   lsSet(SESSION_LS, ""); lsSet(KEY_LS, ""); location.reload();
 }, "Se déconnecter");

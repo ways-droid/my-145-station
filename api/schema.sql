@@ -1,5 +1,5 @@
--- Base de données de l'ERP W.A.Y.S. (MySQL 5.7+ / MariaDB 10.3+)
--- À importer une fois dans phpMyAdmin (panneau ONE.COM).
+-- Base de données de my-145-station (MySQL 5.7+ / MariaDB 10.3+)
+-- À importer une fois dans phpMyAdmin (ou laisser api/install.php la créer).
 
 CREATE TABLE IF NOT EXISTS ways_docs (
   coll        VARCHAR(64)  NOT NULL,

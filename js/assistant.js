@@ -6,13 +6,13 @@ let AI = null, aiBusy = false, aiOpen = false, aiFiles = [];   /* aiFiles : fich
 let TH = null, aiTopicsOpen = false, aiNewTopic = false;
 async function aiLoadThread() { try { TH = await API.call("GET", "assistant/thread"); } catch { TH = TH || { view: [], topics: [] }; } return TH; }
 const aiMark = (i, a, state, note) => API.call("POST", "assistant/mark", { i, a, state, note: note || "" }).catch(() => {});
-const aiAllowed = () => SERVER && API && ME && (isOffice() || ME.role === "garage");
+const aiAllowed = () => SERVER && API && ME && isOffice();
 async function aiRefresh() { try { AI = await API.call("GET", "assistant/status"); } catch { AI = null; } return AI; }
-const AI_SUGGEST = ["Quelles factures sont en retard de paiement ?", "Chiffre d'affaires HT par mois cette année", "Quelles factures d'achat restent à payer ?",
-  "Prépare un email de relance pour les factures en retard de plus de 30 jours", "Résume les mouvements bancaires de la semaine"];
-const AI_DOC_LBL = { assurance: "Assurance (carte verte)", ct: "Contrôle technique", immat: "Certificat d'immatriculation", coc: "Certificat de conformité", lpg: "Installation / réservoir LPG", badge: "Badge aéroport LGG", leasing: "Contrat de leasing / location", tachy: "Tachygraphe", adr: "ADR", autre: "Autre document" };
-const AI_OPEN = { docs: "doc-open", purchases: "pur-open", vehicles: "veh-open", bankTx: "tx-show" };
-/* beaucoup d'actions (ex. 40 paiements reliés) : un résumé repliable et « Tout annuler » plutôt que 40 cartes */
+const AI_SUGGEST = ["Quels véhicules ont une échéance ce mois-ci ?", "Quels outils arrivent à échéance d'étalonnage ?", "Quelles pannes de véhicules sont encore ouvertes ?",
+  "Liste les tarifs du client MT", "Résume mes notes de la semaine"];
+const AI_DOC_LBL = { assurance: "Assurance", ct: "Contrôle technique", immat: "Certificat d'immatriculation", coc: "Certificat de conformité", badge: "Badge aéroport", leasing: "Contrat de leasing / location", autre: "Autre document" };
+const AI_OPEN = { vehicles: "veh-open", tools: "tool-open", clients: "client-form", products: "prod-form", faults: "fault-open", notes: "note-form" };
+/* beaucoup d'actions (ex. 40 fiches modifiées) : un résumé repliable et « Tout annuler » plutôt que 40 cartes */
 function aiActions(list, mi) {
   list = list || []; if (list.length <= 4) return list.map((a, ai) => aiActionCard(a, mi, ai)).join("");
   const live = list.map((a, ai) => [a, ai]).filter(([a]) => a.op !== "delete" && a.state !== "undone");
@@ -41,7 +41,7 @@ async function aiUndo(a) {
 }
 function aiMd(t) {
   const link = s => s.replace(/\[([^\]]+)\]\(erp:([A-Za-z]+)\/([^)\s]+)\)/g, (_, l, c, id) => {
-    const a = { docs: "doc-open", purchases: "pur-open", vehicles: "veh-open" }[c];
+    const a = AI_OPEN[c];
     return a ? `<button class="linkbtn mono" data-a="${a}" data-id="${esc(id)}">${l}</button>` : `<b>${l}</b>`;
   });
   const inline = s => link(esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>"));
@@ -121,8 +121,8 @@ function aiRender() {
   const body = !AI || !TH ? `<div class="muted pad">Chargement…</div>`
     : !ready ? `<div class="pad stack-s"><div>Axel n'est pas encore configuré.</div>${isAdmin() ? `<div><a class="btn sm primary" href="#parametres" data-ai-close>Configurer dans Paramètres</a></div>` : `<div class="muted">Un administrateur doit saisir la clé API dans Paramètres.</div>`}</div>`
     : view.length ? view.map(msg).join("") + (aiNewTopic ? `<div class="ai-topic new"><span>${esc(tr("Nouveau sujet"))}</span><span class="muted">${esc(tr("posez votre question"))}</span></div>` : "")
-        + (aiBusy ? `<div class="ai-m bot muted"><span class="ai-dots"><i></i><i></i><i></i></span> ${esc(tr("Axel consulte l'ERP…"))}</div>` : "")
-    : `<div class="ai-hello"><p><b>Bonjour, je suis Axel</b>, votre collègue dans l'ERP. Demandez-moi un chiffre, une liste, un e-mail de relance, ou de créer et mettre à jour des fiches (devis et factures en brouillon, clients, interventions…).</p><p>Vous pouvez aussi <b>déposer un fichier</b> (contrôle technique, carte verte…) : je le range au bon endroit.</p><p class="muted small">Nos échanges restent entre vous et moi, et vous les retrouvez sur tous vos appareils. J'ai les droits d'un employé du bureau ; tout ce que je fais est noté dans l'historique et peut être annulé ; je ne supprime rien sans votre confirmation et je n'envoie rien hors de l'ERP.</p>
+        + (aiBusy ? `<div class="ai-m bot muted"><span class="ai-dots"><i></i><i></i><i></i></span> ${esc(tr("Axel consulte l'outil…"))}</div>` : "")
+    : `<div class="ai-hello"><p><b>Bonjour, je suis Axel</b>, votre collègue dans l'outil de la station. Demandez-moi une liste, un résumé, un e-mail, ou de créer et mettre à jour des fiches (véhicules, outillage, clients, tarifs, notes…).</p><p>Vous pouvez aussi <b>déposer un fichier</b> (contrôle technique, carte verte…) : je le range au bon endroit.</p><p class="muted small">Nos échanges restent entre vous et moi, et vous les retrouvez sur tous vos appareils. J'ai les droits d'un employé du bureau ; tout ce que je fais est noté dans l'historique et peut être annulé ; je ne supprime rien sans votre confirmation et je n'envoie rien hors de l'outil.</p>
       <div class="ai-sugg">${AI_SUGGEST.map(s => `<button type="button" class="chip-btn" data-ai-s="${esc(s)}">${esc(tr(s))}</button>`).join("")}</div></div>`;
   p.innerHTML = `<header class="ai-h"><b>✦ Axel</b><span class="muted small nowrap">${ready ? esc(((AI.models || {})[AI.model] || "").replace(/\s*\(.*\)$/, "")) : ""}</span>
       <span style="margin-left:auto" class="row-g">${topics.length ? `<button class="linkbtn small nowrap" id="ai-topics" aria-expanded="${aiTopicsOpen}">${esc(tr("Sujets"))} (${topics.length}) ${aiTopicsOpen ? "▴" : "▾"}</button>` : ""}${view.length ? `<button class="linkbtn small nowrap" id="ai-new">${esc(tr("Nouveau sujet"))}</button>` : ""}<button class="iconbtn" id="ai-x" aria-label="${esc(tr("Fermer"))}">×</button></span></header>
@@ -208,10 +208,10 @@ async function loadAi() {
   const s = await aiRefresh();
   if (!s) { box.innerHTML = `<div class="err">${esc(tr("Le serveur ne répond pas."))}</div>`; return; }
   if (!s.configured) {
-    box.innerHTML = `<div class="stack-s"><div><b>Axel</b>, un collègue IA pour le <b>bureau et les administrateurs</b> : il répond aux questions sur les données de l'ERP, prépare e-mails et résumés, et crée ou met à jour des fiches avec les droits d'un employé du bureau (ventes en brouillon, suppressions sur confirmation, rien d'envoyé hors de l'ERP).</div>
+    box.innerHTML = `<div class="stack-s"><div><b>Axel</b>, un collègue IA pour le <b>bureau et les administrateurs</b> : il répond aux questions sur les données de l'outil, prépare e-mails et résumés, et crée ou met à jour des fiches avec les droits d'un employé du bureau (suppressions sur confirmation, rien d'envoyé hors de l'outil).</div>
       <ol class="small stack-s" style="margin:0;padding-left:18px"><li>Créez un compte sur <b>console.anthropic.com</b> (Anthropic, l'éditeur de Claude) et ajoutez un moyen de paiement : facturation à l'usage.</li>
-      <li>Menu <b>API keys</b> → <b>Create key</b>, nom « ERP W.A.Y.S. ». Copiez la clé (elle commence par <span class="mono">sk-ant-</span>).</li>
-      <li>Collez-la ici et fixez un plafond mensuel. La clé reste sur le serveur ways.support.</li></ol>
+      <li>Menu <b>API keys</b> → <b>Create key</b>, nom « my-145-station ». Copiez la clé (elle commence par <span class="mono">sk-ant-</span>).</li>
+      <li>Collez-la ici et fixez un plafond mensuel. La clé reste sur le serveur.</li></ol>
       <div><button class="btn primary" data-a="ai-form">Connecter l'assistant</button></div></div>`;
     return;
   }
@@ -229,7 +229,7 @@ async function aiMemLoad() {
   const el = document.getElementById("ai-mem"); if (!el) return;
   let notes = []; try { notes = (await API.call("GET", "assistant/memory")).notes || []; } catch { el.innerHTML = `<div class="err small">${esc(tr("Lecture impossible."))}</div>`; return; }
   el.innerHTML = notes.length ? `<ul class="ai-mem">${notes.slice().reverse().map(n => `<li><span>${esc(n.text)}<span class="muted small"> · ${esc(n.by || "")} · ${esc(fmtDate(n.at))}</span></span><button class="linkbtn small" style="color:var(--bad)" data-ai-forget="${esc(n.id)}">${esc(tr("Oublier"))}</button></li>`).join("")}</ul>`
-    : `<div class="muted small">${esc(tr("Rien pour l'instant. Dites par exemple à Axel : « Retiens que les factures de Liège Airport partent toujours avec le bon de commande ».")) }</div>`;
+    : `<div class="muted small">${esc(tr("Rien pour l'instant. Dites par exemple à Axel : « Retiens que les outils partent en étalonnage chez notre laboratoire habituel ».")) }</div>`;
   el.querySelectorAll("[data-ai-forget]").forEach(b => b.onclick = async () => { if (!confirm(tr("Axel oubliera cette règle pour toute l'équipe. Continuer ?"))) return;
     b.disabled = true; try { await API.call("POST", "assistant/memory", { delete: b.dataset.aiForget }); toast(tr("Règle oubliée")); } catch (e) { toast(tr(e.message)); } aiMemLoad(); });
 }

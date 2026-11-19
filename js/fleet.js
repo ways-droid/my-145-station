@@ -4,13 +4,12 @@ const EV_TYPES = { entretien: "Entretien périodique", reparation: "Réparation"
 const SEV = { mineure: ["Mineure", "info"], importante: ["Importante", "orange"], bloquante: ["Bloquante · véhicule immobilisé", "bad"] };
 const FAULT_ST = { attente: ["En attente de validation", "orange"], ouverte: ["Ouverte", "warn"], planifiee: ["Réparation planifiée", "info"], reparee: ["Réparée", "good"] };
 const FAULT_KIND = { panne: "Panne", defaut: "Défaut", tache: "Tâche" };
-const garageName = id => ((S.garages || []).find(g => g.id === id) || {}).name || "";
 const veh = id => S.vehicles.find(v => v.id === id);
-/* identifiant W.A.Y.S. du véhicule : 000 à 999, jamais réutilisé (même après retrait ou suppression) */
+/* identifiant interne du véhicule : 000 à 999, jamais réutilisé (même après retrait ou suppression) */
 /* lettres et chiffres, en majuscules ; un identifiant uniquement numérique est complété à 3 chiffres (14 → 014) */
 const normFleetNo = x => { const t = String(x ?? "").toUpperCase().replace(/[^A-Z0-9]/g, ""); return /^\d+$/.test(t) ? t.padStart(3, "0") : t; };
 const fleetNo = v => v && v.fleetNo != null && v.fleetNo !== "" ? normFleetNo(v.fleetNo) : "";
-const noBadge = (v, sm) => fleetNo(v) ? `<span class="fleetno ${sm ? "sm" : ""}" title="Identifiant W.A.Y.S.">${fleetNo(v)}</span>` : "";
+const noBadge = (v, sm) => fleetNo(v) ? `<span class="fleetno ${sm ? "sm" : ""}" title="Identifiant interne">${fleetNo(v)}</span>` : "";
 const usedFleetNos = exceptId => new Set([...S.vehicles.filter(v => v.id !== exceptId).map(fleetNo).filter(Boolean), ...(settings().usedFleetNos || [])]);
 function nextFleetNo() { const used = usedFleetNos(); const max = Math.max(0, ...[...used].filter(x => /^\d+$/.test(x)).map(Number)); for (let i = max + 1; i < 1000; i++) { const n = String(i).padStart(3, "0"); if (!used.has(n)) return n; } for (let i = 0; i < 1000; i++) { const n = String(i).padStart(3, "0"); if (!used.has(n)) return n; } return ""; }
 const activeVehicles = () => S.vehicles.filter(v => !v.retired);
@@ -32,17 +31,10 @@ function vehState(v) {
   return ["Disponible", "good"];
 }
 const vChip = v => { const [l, c] = vehState(v); return `<span class="chip ${c}">${l}</span>`; };
-/* dernier chauffeur : le plus récent entre la prise en charge saisie dans l'ERP et Webfleet (position, trajets) — aucune attribution */
-function lastDrv(v) {
-  const c = [];
-  if (v.driver) c.push({ name: v.driver, at: v.driverDate || "", src: "erp" });
-  const p = typeof posOf === "function" ? posOf(v.id) : null;
-  if (p && p.driver) c.push({ name: p.driver, at: p.at || "", src: "webfleet" });
-  const tr0 = (S.trips || []).filter(t => t.vehicleId === v.id && t.driver).sort((a, b) => (b.end || b.start || "").localeCompare(a.end || a.start || ""))[0];
-  if (tr0) c.push({ name: tr0.driver, at: tr0.end || tr0.start || "", src: "webfleet" });
-  return c.sort((a, b) => (b.at || "").localeCompare(a.at || ""))[0] || null;
-}
-const lastDrvHtml = (v, sep) => { const d = lastDrv(v); return d ? `${esc(d.name)}${d.at ? `${sep}<span class="muted">${d.src === "webfleet" ? "Webfleet · " : ""}${fmtDate(d.at.slice(0, 10))}</span>` : ""}` : "—"; };
+/* dernière prise en charge saisie (qui a le véhicule) */
+function lastDrv(v) { return v.driver ? { name: v.driver, at: v.driverDate || "", src: "outil" } : null; }
+const kmOf = v => +v.km || 0;
+const lastDrvHtml = (v, sep) => { const d = lastDrv(v); return d ? `${esc(d.name)}${d.at ? `${sep}<span class="muted">${fmtDate(d.at.slice(0, 10))}</span>` : ""}` : "—"; };
 const driverOptions = cur => { const ds = settings().drivers || []; const all = cur && !ds.includes(cur) ? [cur, ...ds] : ds; return [["", "Choisir…"], ...all.map(d => [d, d])]; };
 
 /* tâches à venir : échéances véhicule, interventions planifiées, réparations estimées */
@@ -58,7 +50,6 @@ function fleetTasks(horizon = 45) {
     if (+v.nextServiceKm && kmOf(v) && +v.nextServiceKm - kmOf(v) <= 1500) out.push({ date: today(), label: `Entretien dans ${fmtN.format(Math.max(0, Math.round(v.nextServiceKm - kmOf(v))))} km`, vid: v.id, kind: "km" });
   }
   for (const e of S.vehEvents.filter(e => e.status === "planifiee")) out.push({ date: e.date, label: (EV_TYPES[e.type] || e.type) + (e.description ? " · " + e.description : ""), vid: e.vehicleId, kind: "planif" });
-  for (const f of S.fines || []) { const n = fineNext(f); if (n && n.date <= lim && veh(f.vehicleId)) out.push({ date: n.date, label: `Amende ${f.pvNumber ? "PV " + f.pvNumber : ""} · ${n.label}${f.driver ? " · " + f.driver : ""}`, vid: f.vehicleId, kind: "amende", fineId: f.id }); }
   for (const f of S.faults.filter(f => f.status !== "reparee" && isActiveVeh(f.vehicleId))) out.push({ date: f.estDate || f.date, label: "Panne : " + f.description, vid: f.vehicleId, kind: "panne", est: !!f.estDate, sev: f.severity });
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -71,24 +62,22 @@ function taskRow(t) {
 const evCost = e => +e.cost || 0;
 const yearCost = (vid, y) => S.vehEvents.filter(e => e.vehicleId === vid && e.status !== "planifiee" && (e.date || "").startsWith(y)).reduce((a, e) => a + evCost(e), 0);
 
-/* onglets selon le rôle : garage et chauffeur ne voient que l'essentiel */
+/* onglets de la flotte */
 function fleetTabs(nf) {
   const nv = S.faults.filter(f => f.status === "attente").length;
-  const all = [["vehicules", "Véhicules"], ["chauffeurs", "Chauffeurs", (settings().drivers || []).length || ""], ["garages", ME && ME.role === "garage" ? "Mon garage" : "Garages", ME && ME.role === "garage" ? "" : (S.garages || []).length || ""], ["positions", "Positions"], ["trajets", ME && ME.role === "chauffeur" ? "Mes trajets" : "Trajets"], ["taches", "À faire", fleetTasks(+todoF().days || 60).length], ["pannes", "Pannes et défauts", nf, nf > 0 || (isOffice() && nv > 0)], ["documents", "Documents", fleetDocAlerts() || ""], ["pneus", "Pneus en stock", tireStockCount() || ""], ["amendes", ME && ME.role === "chauffeur" ? "Mes amendes" : "Amendes", fineActionCount() || ""], ["entretiens", "Entretiens & travaux"], ["stats", "Coûts"]];
-  const keep = ME && ME.role === "garage" ? ["vehicules", "garages", "pannes", "entretiens"] : ME && ME.role === "chauffeur" ? ["vehicules", "pannes", "trajets", "amendes"] : null;
-  return keep ? all.filter(t => keep.includes(t[0])) : all;
+  const all = [["vehicules", "Véhicules"], ["taches", "À faire", fleetTasks(+todoF().days || 60).length], ["pannes", "Pannes et défauts", nf, nf > 0 || (isOffice() && nv > 0)], ["documents", "Documents", fleetDocAlerts() || ""], ["pneus", "Pneus en stock", tireStockCount() || ""], ["entretiens", "Entretiens & travaux"], ["stats", "Coûts"]];
+  return all;
 }
 VIEWS.flotte = {
   render() {
     const tab = curTab("flotte", "vehicules");
     const nf = S.faults.filter(f => f.status !== "reparee" && isActiveVeh(f.vehicleId)).length;
     const nr = retiredVehicles().length;
-    return head("Flotte", ME && ME.role === "garage" ? plural(S.vehicles.filter(v => v.atMyGarage).length, "véhicule") + " de W.A.Y.S. dans votre garage" : plural(activeVehicles().length, "véhicule") + " en service" + (nr ? ` · ${nr} retiré${nr > 1 ? "s" : ""}` : ""), isOffice() ? `<button class="btn" data-a="wf-import" ${dis()}>⇪ Importer Webfleet (CSV)</button><button class="btn" data-a="dbx-import" ${dis()}>⇪ Importer documents (Dropbox)</button>` : "",
+    return head("Véhicules", plural(activeVehicles().length, "véhicule") + " en service" + (nr ? ` · ${nr} retiré${nr > 1 ? "s" : ""}` : ""), "",
       `<button class="btn btn-alert big" data-a="fault-form" ${dis()}>⚠ Signaler une panne</button>${isOffice() || (ME && ME.role === "terrain") ? `<button class="btn primary big" data-a="veh-form" ${dis()}>+ Ajouter un véhicule</button>` : ""}`) +
       tabs("flotte", fleetTabs(nf)) +
-      ({ vehicules: fleetVehicles, taches: fleetTodo, pannes: fleetFaults, documents: fleetDocs, entretiens: fleetEvents, stats: fleetStats, pneus: fleetTires, amendes: fleetFines, chauffeurs: () => driversCard(), positions: fleetPositions, trajets: fleetTrips, garages: () => typeof garagesView === "function" ? garagesView() : "" })[fleetTabs(nf).some(t => t[0] === tab) ? tab : "vehicules"]();
-  },
-  after() { if (curTab("flotte", "vehicules") === "positions") drawWfMap(); }
+      ({ vehicules: fleetVehicles, taches: fleetTodo, pannes: fleetFaults, documents: fleetDocs, entretiens: fleetEvents, stats: fleetStats, pneus: fleetTires })[fleetTabs(nf).some(t => t[0] === tab) ? tab : "vehicules"]();
+  }
 };
 /* sélecteur de véhicules compact (multi-choix) : puces des véhicules choisis + liste déroulante — reste lisible avec 100+ véhicules */
 function vehPicker(sel, action, counts) {
@@ -102,22 +91,10 @@ document.addEventListener("change", e => { const p = e.target.dataset && e.targe
 
 /* onglet Véhicules : recherche, filtre d'état, tri et affichage cartes / liste */
 const VST = [["bad", "Immobilisé", "red"], ["warn", "Pannes / atelier", "orange"], ["good", "Disponible", "green"], ["grey", "Hors service", "grey"]];
-const vehF = () => UI.vf || (UI.vf = { st: [], sort: "prio", view: (() => { try { return localStorage.getItem("ways-vview") || "cartes"; } catch (e) { return "cartes"; } })() });
+const vehF = () => UI.vf || (UI.vf = { st: [], sort: "prio", view: (() => { try { return localStorage.getItem("st-vview") || "cartes"; } catch (e) { return "cartes"; } })() });
 const stKey = v => vehState(v)[1] || "grey";
 const openF = vid => S.faults.filter(f => f.vehicleId === vid && f.status !== "reparee").length;
-/* véhicule au garage : déclaré et/ou détecté par GPS dans la zone d'un garage */
-function vGarChip(v) {
-  if (typeof garPresence !== "function" || !(S.garages || []).length) return "";
-  for (const g of S.garages) { const x = garPresence(g, v); if (x.declared || x.gps) return `<div class="small"><span class="chip ${x.declared && x.gps ? "good" : x.gps ? "info" : "orange"}" title="${x.declared && x.gps ? "Déclaré et confirmé par GPS" : x.gps ? "Détecté par GPS, non déclaré" : "Déclaré, GPS non confirmé"}">🔧 ${esc(g.name)}${x.gps ? " · GPS ✓" : ""}</span></div>`; }
-  return "";
-}
-/* garage : seulement les véhicules présents chez lui (les autres sont réduits à un résumé côté serveur) */
-function fleetVehicles() {
-  if (!(ME && ME.role === "garage")) return fleetVehiclesAll();
-  const keep = S.vehicles; S.vehicles = keep.filter(v => v.atMyGarage);
-  try { return `<div class="banner info">Les véhicules de W.A.Y.S. présents dans votre garage (déclarés ou détectés par GPS). Pour un autre véhicule, utilisez « ⚠ Signaler une panne » : le signalement sera validé par W.A.Y.S.</div>` + (S.vehicles.length ? fleetVehiclesAll() : `<div class="panel empty">Aucun véhicule de W.A.Y.S. n'est actuellement dans votre garage.</div>`); }
-  finally { S.vehicles = keep; }
-}
+function fleetVehicles() { return fleetVehiclesAll(); }
 function fleetVehiclesAll() {
   const ret = retiredVehicles().sort((a, b) => (b.retired.date || "").localeCompare(a.retired.date || ""));
   const retiredBlock = ret.length ? `<div class="retired-zone"><button class="retired-toggle" data-a="toggle-retired" aria-expanded="${UI.showRetired ? "true" : "false"}">
@@ -140,7 +117,7 @@ function fleetVehiclesAll() {
   const f = vehF(), q = (UI.q || "").toLowerCase().trim();
   const nextOf = {}; for (const t of fleetTasks(365)) if (!nextOf[t.vid]) nextOf[t.vid] = t;
   const yr = today().slice(0, 4);
-  const qOk = v => !q || [v.plate, fleetNo(v), v.model, v.driver, lastDrv(v)?.name, v.vin, v.year, v.fuel, v.webfleetId, tireSize(v.tires || {})].join(" ").toLowerCase().includes(q);
+  const qOk = v => !q || [v.plate, fleetNo(v), v.model, v.driver, lastDrv(v)?.name, v.vin, v.year, v.fuel, tireSize(v.tires || {})].join(" ").toLowerCase().includes(q);
   const base = activeVehicles().filter(qOk);
   const rows = base.filter(v => !f.st.length || f.st.includes(stKey(v)));
   const PR = { bad: 0, warn: 1, grey: 3, good: 2 };
@@ -154,7 +131,7 @@ function fleetVehiclesAll() {
   };
   rows.sort(sorters[f.sort] || sorters.prio);
   const toolbar = `<div class="panel pad vtool">
-    <input type="search" id="q" class="fsearch" placeholder="Plaque, identifiant, modèle, chauffeur, VIN…" value="${esc(UI.q)}" aria-label="Rechercher un véhicule">
+    <input type="search" id="q" class="fsearch" placeholder="Plaque, identifiant, modèle, utilisateur, VIN…" value="${esc(UI.q)}" aria-label="Rechercher un véhicule">
     <div class="fpills">${VST.map(([k, l, c]) => `<button class="fpill c-${c} ${f.st.includes(k) ? "on" : ""}" data-a="veh-f" data-st="${k}" aria-pressed="${f.st.includes(k)}">${l}<span class="n">${base.filter(v => stKey(v) === k).length}</span></button>`).join("")}
       ${f.st.length || q ? `<button class="linkbtn" data-a="veh-f" data-reset="1">Effacer</button>` : ""}</div>
     <div class="row-g"><select class="fsel" id="vf-sort" aria-label="Trier">${[["prio", "Tri : urgence d'abord"], ["echeance", "Tri : prochaine échéance"], ["id", "Tri : identifiant"], ["plate", "Tri : plaque"], ["km", "Tri : kilométrage"], ["cout", "Tri : coûts " + yr]].map(([k, l]) => `<option value="${k}" ${f.sort === k ? "selected" : ""}>${l}</option>`).join("")}</select>
@@ -163,7 +140,7 @@ function fleetVehiclesAll() {
   const listOf = rows => {
   let list;
   if (!rows.length) list = `<div class="panel empty">Aucun véhicule ne correspond à cette recherche.</div>`;
-  else if (f.view === "liste") list = `<div class="panel"><div class="tablewrap"><table class="vlist"><thead><tr><th>Véhicule</th><th>Modèle</th><th>État</th><th>Dernier chauffeur</th><th class="r">Kilométrage</th><th>Prochaine échéance</th><th>Documents</th><th class="r">Coûts ${yr}</th></tr></thead><tbody>
+  else if (f.view === "liste") list = `<div class="panel"><div class="tablewrap"><table class="vlist"><thead><tr><th>Véhicule</th><th>Modèle</th><th>État</th><th>Pris par</th><th class="r">Kilométrage</th><th>Prochaine échéance</th><th>Documents</th><th class="r">Coûts ${yr}</th></tr></thead><tbody>
     ${rows.map(v => { const n = nextOf[v.id]; return `<tr class="click vrow st-${stKey(v)}" data-a="veh-open" data-id="${v.id}">
       <td><div class="row-g nowrap">${openF(v.id) ? ADOT : ""}${noBadge(v, 1)}<span class="plate sm">${esc(v.plate)}</span></div></td><td class="small"><b>${esc(v.model)}</b> <span class="muted">${esc(v.year || "")}</span>${demoTag(v)}</td>
       <td>${vChip(v)}</td><td class="small nowrap">${lastDrvHtml(v, " · ")}</td>
@@ -173,8 +150,8 @@ function fleetVehiclesAll() {
   else list = `<div class="cards">${rows.map(v => {
     const next = nextOf[v.id];
     return `<button class="panel vcard st-${stKey(v)}" data-a="veh-open" data-id="${v.id}"><div class="row-sb"><span class="row-g">${openF(v.id) ? `<span title="${esc(plural(openF(v.id), "panne"))} en cours">${ADOT}</span>` : ""}<span class="plate">${esc(v.plate)}</span>${noBadge(v)}</span>${vChip(v)}</div>
-      <div class="vc-body"><div class="vc-main"><div><b>${esc(v.model)}</b> <span class="muted">${esc(v.year || "")}</span>${demoTag(v)}</div>${vGarChip(v)}
-      <div class="small"><span class="muted">Dernier chauffeur</span><br>${lastDrvHtml(v, " · ")}</div></div>${vehThumb(v)}</div>
+      <div class="vc-body"><div class="vc-main"><div><b>${esc(v.model)}</b> <span class="muted">${esc(v.year || "")}</span>${demoTag(v)}</div>
+      <div class="small"><span class="muted">Pris par</span><br>${lastDrvHtml(v, " · ")}</div></div>${vehThumb(v)}</div>
       <dl class="kv sm">
       <dt>Kilométrage</dt><dd class="num">${kmOf(v) ? fmtN.format(kmOf(v)) + " km" : "—"}</dd>
       <dt>Pneus</dt><dd>${v.tires && tireSize(v.tires) ? `<span class="mono small">${esc(tireSize(v.tires))}</span>${v.tires.state ? " " + tireStateChip(v.tires.state) : ""}` : `<span class="muted">—</span>`}</dd>
@@ -185,13 +162,13 @@ function fleetVehiclesAll() {
   return list; };
   const groups = VCAT.map(([k, l, h]) => [k, l, h, rows.filter(v => catOf(v) === k)]).filter(g => g[3].length);
   const list = !rows.length ? listOf(rows) : groups.map(([k, l, h, rs]) => `<section class="vcat"><div class="vcat-h"><h3>${l}</h3><span class="chip">${rs.length}</span><span class="muted small">${h}</span></div>${listOf(rs)}</section>`).join("");
-  return `${isLimited() ? "" : `<div class="banner info">WebFleet : positions, compteurs et trajets sont visibles dans les onglets Positions et Trajets, mis à jour par import CSV en attendant la liaison automatique (serveur ONE.COM). Renseignez l'identifiant WebFleet (n° d'objet) de chaque véhicule pour une correspondance fiable.</div>`}` + toolbar + count + list + tail;
+  return toolbar + count + list + tail;
 }
 ACTIONS["veh-f"] = el => {
   const f = vehF(), d = el.dataset;
   if (d.reset) { f.st = []; UI.q = ""; }
   else if (d.st) f.st = f.st.includes(d.st) ? f.st.filter(x => x !== d.st) : [...f.st, d.st];
-  else if (d.view) { f.view = d.view; try { localStorage.setItem("ways-vview", d.view); } catch (e) {} }
+  else if (d.view) { f.view = d.view; try { localStorage.setItem("st-vview", d.view); } catch (e) {} }
   UI.focusQ = false; render(true);
 };
 document.addEventListener("change", e => { if (e.target.id === "vf-sort") { vehF().sort = e.target.value; UI.focusQ = false; render(true); } });
@@ -210,7 +187,7 @@ function fleetTodo() {
   const pill = (attr, val, on, label, c, n) => `<button class="fpill ${on ? "on" : ""} ${c ? "c-" + c : ""}" data-a="todo-f" data-${attr}="${val}" aria-pressed="${on}">${label}<span class="n">${n}</span></button>`;
   const late = rows.filter(t => t.date < today()).length;
   return `<div class="panel pad stack todo-filters">
-    <div class="frow"><span class="flabel">Rechercher</span><input type="search" id="q" class="fsearch" placeholder="Panne, plaque, identifiant, chauffeur…" value="${esc(UI.q)}" aria-label="Rechercher une tâche"><span></span></div>
+    <div class="frow"><span class="flabel">Rechercher</span><input type="search" id="q" class="fsearch" placeholder="Panne, plaque, identifiant, personne…" value="${esc(UI.q)}" aria-label="Rechercher une tâche"><span></span></div>
     <div class="frow"><span class="flabel">Type de tâche</span><div class="fpills">${Object.entries(TASK_KINDS).map(([k, [l, c]]) => pill("kind", k, f.kinds.includes(k), l, c, cnt(k, null))).join("")}</div></div>
     <div class="frow"><span class="flabel">Véhicule</span>${vehPicker(f.veh, "todo-f", id => cnt(null, id))}</div>
     <div class="frow"><span class="flabel">Période</span><div class="fpills">${[[30, "30 jours"], [60, "60 jours"], [90, "90 jours"], [365, "1 an"]].map(([d, l]) => `<button class="fpill ${+f.days === d ? "on" : ""}" data-a="todo-f" data-days="${d}">${l}</button>`).join("")}</div>
@@ -231,17 +208,17 @@ ACTIONS["todo-f"] = el => {
 function fleetFaults() {
   const nv = S.faults.filter(f => f.status === "attente").length;
   const rows = S.faults.filter(f => UI.filter === "toutes" ? true : UI.filter === "tous" ? f.status !== "reparee" : f.status === UI.filter).sort((a, b) => ((b.status === "attente") - (a.status === "attente")) || (b.date || "").localeCompare(a.date || ""));
-  return `${nv && isOffice() ? `<div class="banner warn row-sb wrap"><span><b>${plural(nv, "signalement")} d'un garage en attente de validation</b> (véhicule qui n'était pas chez lui).</span><button class="btn sm" data-filter="attente">Voir</button></div>` : ""}<div class="panel">${searchBar("Rechercher…", [["tous", "En cours"], ...(nv ? [["attente", "À valider"]] : []), ["reparee", "Réparées"], ["toutes", "Toutes"]])}
+  return `<div class="panel">${searchBar("Rechercher…", [["tous", "En cours"], ...(nv ? [["attente", "À valider"]] : []), ["reparee", "Réparées"], ["toutes", "Toutes"]])}
     <div class="tablewrap"><table><thead><tr><th>Signalée le</th><th>Véhicule</th><th>Type</th><th>Description</th><th>Gravité</th><th>Par</th><th>Garage</th><th>Statut</th><th>Réparation estimée</th></tr></thead><tbody>
-    ${rows.filter(f => !UI.q || (f.description + vehLabel(f.vehicleId) + garageName(f.garageId)).toLowerCase().includes(UI.q.toLowerCase())).map(f => `<tr class="click" data-a="fault-open" data-id="${f.id}"><td class="num nowrap">${f.status !== "reparee" && isActiveVeh(f.vehicleId) ? ADOT : ""}${fmtDate(f.date)}</td><td>${esc(vehLabel(f.vehicleId))}</td><td class="small">${esc(FAULT_KIND[f.kind] || "Panne")}</td><td>${esc(f.description)}</td>
-      <td><span class="chip ${SEV[f.severity]?.[1] || ""}">${SEV[f.severity]?.[0].split(" ·")[0] || f.severity}</span></td><td>${esc(f.reporter || "—")}</td><td class="small">${esc(garageName(f.garageId) || "—")}</td><td><span class="chip ${(FAULT_ST[f.status] || FAULT_ST.ouverte)[1]}">${(FAULT_ST[f.status] || FAULT_ST.ouverte)[0]}</span></td>
+    ${rows.filter(f => !UI.q || (f.description + vehLabel(f.vehicleId)).toLowerCase().includes(UI.q.toLowerCase())).map(f => `<tr class="click" data-a="fault-open" data-id="${f.id}"><td class="num nowrap">${f.status !== "reparee" && isActiveVeh(f.vehicleId) ? ADOT : ""}${fmtDate(f.date)}</td><td>${esc(vehLabel(f.vehicleId))}</td><td class="small">${esc(FAULT_KIND[f.kind] || "Panne")}</td><td>${esc(f.description)}</td>
+      <td><span class="chip ${SEV[f.severity]?.[1] || ""}">${SEV[f.severity]?.[0].split(" ·")[0] || f.severity}</span></td><td>${esc(f.reporter || "—")}</td><td><span class="chip ${(FAULT_ST[f.status] || FAULT_ST.ouverte)[1]}">${(FAULT_ST[f.status] || FAULT_ST.ouverte)[0]}</span></td>
       <td>${f.status === "reparee" ? fmtDate(f.resolvedDate) : f.estDate ? dueChip(f.estDate, 7) : `<span class="muted">À planifier</span>`}</td></tr>`).join("")}
     </tbody></table>${rows.length ? "" : `<div class="empty">Aucune panne ici.</div>`}</div></div>`;
 }
 function fleetEvents() {
   const q = UI.q.toLowerCase();
   const rows = S.vehEvents.filter(e => !q || [e.description, vehLabel(e.vehicleId), e.supplier, EV_TYPES[e.type]].join(" ").toLowerCase().includes(q)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-  return `<div class="panel">${searchBar("Véhicule, garage, description…")}
+  return `<div class="panel">${searchBar("Véhicule, fournisseur, description…")}
     <div class="tablewrap"><table><thead><tr><th>Date</th><th>Véhicule</th><th>Type</th><th>Description</th><th>Garage</th><th class="r">Km</th><th class="r">Coût HT</th></tr></thead><tbody>
     ${rows.map(e => `<tr class="click" data-a="ev-form" data-id="${e.id}"><td class="num">${fmtDate(e.date)}${e.status === "planifiee" ? ` <span class="chip info">Planifié</span>` : ""}</td><td>${esc(vehLabel(e.vehicleId))}</td><td>${esc(EV_TYPES[e.type] || e.type)}</td>
       <td>${esc(e.description)}</td><td>${esc(e.supplier || "—")}</td><td class="r num">${e.km ? fmtN.format(e.km) : "—"}</td><td class="r num">${e.status === "planifiee" ? `<span class="muted">${e.cost ? "≈ " + eur(e.cost) : "—"}</span>` : eur(e.cost)}</td></tr>`).join("")}
@@ -323,18 +300,17 @@ async function openVehicle(id) {
       <span>${esc(RETIRE_REASONS[R.reason] || R.reason)}${R.reason === "vendu" && R.buyer ? " · acheteur : " + esc(R.buyer) : ""}${R.price ? " · prix : " + eur(R.price) : ""}${R.note ? " · " + esc(R.note) : ""}</span>
       <span class="small">La fiche est conservée pour l'historique (documents, interventions, coûts). Le véhicule n'apparaît plus dans les tâches, les signalements ni le tableau de bord.</span></div>` : ""}
     <div class="vm-top"><div class="vm-photo">${vehThumb(v, "lg")}${readOnly || R || !assets ? "" : `<div class="row-g wrap center"><label class="btn sm">${v.photo ? "Changer la photo" : "Ajouter une photo"}<input type="file" accept="image/*" data-vphoto="${v.id}" hidden></label>${v.photo ? `<button class="btn sm danger" data-a="vphoto-del" data-id="${v.id}">Supprimer</button>` : ""}</div>`}</div>
-    <div class="tiles mini grow"><div class="panel tile c-blue"><div class="lbl">Dernier chauffeur</div><div class="val sm">${esc(lastDrv(v)?.name || "—")}</div><div class="note">${lastDrv(v)?.at ? (lastDrv(v).src === "webfleet" ? "Webfleet · " : "") + fmtDate(lastDrv(v).at.slice(0, 10)) : ""}</div></div>
-      <div class="panel tile c-grey"><div class="lbl">Kilométrage</div><div class="val sm">${kmOf(v) ? fmtN.format(kmOf(v)) + " km" : "—"}</div>${kmFromWf(v) ? `<div class="note">compteur WebFleet · ${agoTxt(posOf(v.id).at)}</div>` : ""}${wfOdoNote(v)}</div>
+    <div class="tiles mini grow"><div class="panel tile c-blue"><div class="lbl">Pris par</div><div class="val sm">${esc(lastDrv(v)?.name || "—")}</div><div class="note">${lastDrv(v)?.at ? fmtDate(lastDrv(v).at.slice(0, 10)) : ""}</div></div>
+      <div class="panel tile c-grey"><div class="lbl">Kilométrage</div><div class="val sm">${kmOf(v) ? fmtN.format(kmOf(v)) + " km" : "—"}</div></div>
       <div class="panel tile c-orange"><div class="lbl">Coûts ${y}</div><div class="val sm">${eur0(yearCost(v.id, y))}</div></div>
-      ${vehWfTile(v)}</div></div>
-    <div class="row-g wrap">${readOnly || R ? "" : `<button class="btn" data-a="drive-form" data-id="${v.id}">Prise en charge</button><button class="btn" data-a="ev-form" data-veh="${v.id}">Ajouter une intervention</button><button class="btn" data-a="fault-form" data-veh="${v.id}">Signaler une panne</button><button class="btn" data-a="veh-form" data-id="${v.id}">Modifier la fiche</button>${canWfPush() && wfLinked(v) ? `<button class="btn" data-a="wf-veh-push" data-id="${v.id}" title="Immatriculation, année, puissance, cylindrée, carburant">Envoyer la fiche à WebFleet</button>` : ""}`}</div>
+      </div></div>
+    <div class="row-g wrap">${readOnly || R ? "" : `<button class="btn" data-a="drive-form" data-id="${v.id}">Prise en charge</button><button class="btn" data-a="ev-form" data-veh="${v.id}">Ajouter une intervention</button><button class="btn" data-a="fault-form" data-veh="${v.id}">Signaler une panne</button><button class="btn" data-a="veh-form" data-id="${v.id}">Modifier la fiche</button>`}</div>
     ${R ? "" : `<h3>Échéances</h3>`}<dl class="kv ${R ? "hidden" : ""}"><dt>Entretien</dt><dd>${dueChip(v.nextServiceDate)}${v.nextServiceKm ? ` · ou à ${fmtN.format(v.nextServiceKm)} km` : ""}</dd><dt>Contrôle technique</dt><dd>${dueChip(v.ctDate)}</dd><dt>Assurance</dt><dd>${dueChip(v.insuranceDate)}</dd>${v.beltNA ? `<dt>Distribution</dt><dd class="muted">Non applicable</dd>` : v.beltDate || v.beltKm || v.beltLastDate || v.beltLastKm ? `<dt>Distribution</dt><dd>${v.beltDate ? dueChip(v.beltDate) : ""}${v.beltKm ? `${v.beltDate ? " · ou" : ""} à ${fmtN.format(v.beltKm)} km` : ""}${v.beltLastDate || v.beltLastKm ? `<div class="muted small">Dernier remplacement : ${[v.beltLastDate ? fmtDate(v.beltLastDate) : "", v.beltLastKm ? fmtN.format(v.beltLastKm) + " km" : ""].filter(Boolean).join(" · ")}</div>` : ""}</dd>` : ""}</dl>
     ${v.todo || v.notes ? `<div class="vnotes">${v.todo ? `<div class="vnote warn"><b>Réparations à prévoir</b><div>${esc(v.todo).replace(/\n/g, "<br>")}</div></div>` : ""}${v.notes ? `<div class="vnote"><b>Commentaires</b><div>${esc(v.notes).replace(/\n/g, "<br>")}</div></div>` : ""}</div>` : ""}
     <div class="row-sb"><h3>Pneus montés</h3>${readOnly || R ? "" : `<button class="btn sm" data-a="vtire-form" data-id="${v.id}">${v.tires && tireSize(v.tires) ? "Modifier les pneus" : "+ Renseigner les pneus"}</button>`}</div>
     ${vehTiresHtml(v)}
     <div class="row-sb"><h3>Documents du véhicule</h3><span class="row-g">${/^https:\/\/www\.dropbox\.com\//.test(v.dropboxLink || "") ? `<a class="btn sm" href="${esc(v.dropboxLink)}" target="_blank" rel="noopener" title="Dossier Dropbox du véhicule (accès avec votre compte)">Dropbox ↗</a>` : ""}${v.docsLink && /^https?:\/\//.test(v.docsLink) ? `<a class="btn sm" href="${esc(v.docsLink)}" target="_blank" rel="noopener" title="Dossier partagé lié au QR code à bord">Dossier en ligne ↗</a>` : ""}</span>${readOnly ? "" : `<button class="btn sm" data-a="vdoc-form" data-veh="${v.id}">+ Ajouter un document</button>`}</div>
     ${vehDocsHtml(v)}
-    ${vehTripsHtml(v)}
     <h3>Pannes</h3>${fs.length ? `<div class="stack-s">${fs.map(f => `<div class="list-row click bordered ${f.status !== "reparee" && f.severity === "bloquante" ? "sev-bad" : ""}" data-a="fault-open" data-id="${f.id}"><div><div>${esc(f.description)}</div><div class="muted small">${fmtDate(f.date)} · ${esc(f.reporter || "")} · <span class="chip ${SEV[f.severity]?.[1]}">${SEV[f.severity]?.[0].split(" ·")[0]}</span></div></div>
       <div style="text-align:right"><span class="chip ${FAULT_ST[f.status][1]}">${FAULT_ST[f.status][0]}</span><div class="small muted">${f.status === "reparee" ? "le " + fmtDate(f.resolvedDate) : f.estDate ? "prévue " + fmtDate(f.estDate) : "date à fixer"}</div></div></div>`).join("")}</div>` : `<div class="muted">Aucune panne signalée.</div>`}
     <h3>Interventions</h3>${evs.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th class="r">Km</th><th class="r">Coût HT</th></tr></thead><tbody>${evs.map(e => `<tr class="click" data-a="ev-form" data-id="${e.id}"><td class="num">${fmtDate(e.date)}${e.status === "planifiee" ? ` <span class="chip info">Planifié</span>` : ""}</td><td>${esc(EV_TYPES[e.type] || e.type)}</td><td>${esc(e.description)}${e.supplier ? `<div class="muted small">${esc(e.supplier)}</div>` : ""}</td><td class="r num">${e.km ? fmtN.format(e.km) : "—"}</td><td class="r num">${eur(e.cost)}</td></tr>`).join("")}</tbody></table></div>` : `<div class="muted">Aucune intervention.</div>`}
@@ -346,27 +322,27 @@ async function openVehicle(id) {
 }
 ACTIONS["veh-form"] = el => {
   const v = veh(el.dataset.id) || { status: "actif", fuel: "Diesel" };
-  const kmOf0 = Math.round(kmOf(v) * 10) / 10;   // valeur proposée dans le champ (compteur WebFleet si plus récent)
+  const kmOf0 = Math.round(kmOf(v) * 10) / 10;   // valeur proposée dans le champ
   const isNew = !v.id;
   const m = modal(`${mHead(isNew ? "Nouveau véhicule" : "Modifier " + esc(v.plate))}<form><div class="body"><div class="fields">
-    <label class="f">Identifiant W.A.Y.S. *<input id="v-no" class="mono upper" autocapitalize="characters" maxlength="6" required value="${esc(fleetNo(v) || (isNew ? nextFleetNo() : ""))}" placeholder="000"></label>
+    <label class="f">Identifiant interne *<input id="v-no" class="mono upper" autocapitalize="characters" maxlength="6" required value="${esc(fleetNo(v) || (isNew ? nextFleetNo() : ""))}" placeholder="000"></label>
     ${field("v-cat", "Catégorie", catOf(v), { type: "select", options: VCAT.map(c => [c[0], c[1]]) })}
     ${field("v-plate", "Immatriculation", v.plate, { cls: "mono", ph: "1-ABC-123 (vide pour un engin non immatriculé)" })}${field("v-model", "Marque et modèle", v.model, { required: true, ph: "Renault Master" })}
     ${field("v-year", "Année", v.year, { type: "number" })}${field("v-fuel", "Carburant", v.fuel, { type: "select", options: [["Diesel", "Diesel"], ["Essence", "Essence"], ["Hybride", "Hybride"], ["Électrique", "Électrique"], ["Essence/LPG", "Essence / LPG"], ["CNG", "CNG"]] })}
-    ${field("v-vin", "N° de châssis (VIN)", v.vin, { cls: "mono" })}${field("v-km", kmFromWf(v) ? "Kilométrage actuel (WebFleet)" : "Kilométrage actuel", kmOf(v) ? Math.round(kmOf(v) * 10) / 10 : "", { type: "number", step: "0.1", min: 0 })}
+    ${field("v-vin", "N° de châssis (VIN)", v.vin, { cls: "mono" })}${field("v-km", "Kilométrage actuel", kmOf(v) ? Math.round(kmOf(v) * 10) / 10 : "", { type: "number", step: "0.1", min: 0 })}
     ${field("v-st", "État", v.status, { type: "select", options: [["actif", "En service"], ["atelier", "À l'atelier"], ["hors_service", "Hors service"]] })}
-    ${field("v-wf", "Identifiant WebFleet (n° d'objet)", v.webfleetId, { cls: "mono", ph: "vide = même n° que l'identifiant W.A.Y.S." })}
+    
     ${field("v-ns", "Prochain entretien (date)", v.nextServiceDate, { type: "date" })}${field("v-nk", "Prochain entretien (km)", v.nextServiceKm, { type: "number" })}
     ${field("v-ct", "Contrôle technique avant le", v.ctDate, { type: "date" })}${field("v-ins", "Échéance assurance", v.insuranceDate, { type: "date" })}
     ${field("v-cc", "Cylindrée (cc)", v.cc, { type: "number" })}${field("v-kw", "Puissance (kW)", v.kw, { type: "number" })}
-    ${field("v-euro", "Norme EURO", v.euro, { ph: "6b" })}${field("v-garage", "Garage habituel", v.garage, { ph: "Collard, Falco, MTGN…" })}
+    ${field("v-euro", "Norme EURO", v.euro, { ph: "6b" })}${field("v-garage", "Garage habituel", v.garage, { ph: "Garage ou loueur habituel" })}
     <label class="chk wide"><input type="checkbox" id="v-bna" ${v.beltNA ? "checked" : ""}> Courroie de distribution : non applicable (chaîne de distribution, véhicule électrique…)</label>
     <div class="belt-f fields wide" ${v.beltNA ? "hidden" : ""} style="grid-column:1/-1">${field("v-bld", "Dernier remplacement de la distribution (date)", v.beltLastDate, { type: "date" })}${field("v-blk", "Dernier remplacement (km)", v.beltLastKm, { type: "number" })}
     ${field("v-bd", "Distribution à remplacer (date)", v.beltDate, { type: "date" })}${field("v-bk", "Distribution à remplacer (km)", v.beltKm, { type: "number" })}</div>
     ${field("v-dbx", "Dossier Dropbox", v.dropboxLink, { ph: "https://www.dropbox.com/home/…", wide: true })}
     ${field("v-link", "Dossier en ligne (lien du QR code à bord)", v.docsLink, { ph: "https://…", wide: true })}
     ${field("v-todo", "Réparations à prévoir", v.todo, { type: "textarea", wide: true })}${field("v-notes", "Commentaires", v.notes, { type: "textarea", wide: true })}</div>
-    <div class="hint">Chaque identifiant ne peut servir qu'une seule fois, même après la vente, le retrait ou la suppression d'un véhicule. Il doit être identique au n° du véhicule dans WebFleet${v.webfleetId && fleetNo(v) && normFleetNo(v.webfleetId) !== fleetNo(v) ? ` <b style="color:var(--warn,#b54708)">(ici différent : WebFleet ${esc(v.webfleetId)} — Paramètres → Liaison WEBFLEET → « Aligner les fiches sur WebFleet »)</b>` : ""}.${isNew ? " Le prochain numéro libre est proposé." : ""}</div><div class="err" id="v-err"></div></div>
+    <div class="hint">Chaque identifiant ne peut servir qu'une seule fois, même après la vente, le retrait ou la suppression d'un véhicule. ${isNew ? " Le prochain numéro libre est proposé." : ""}</div><div class="err" id="v-err"></div></div>
     <footer>${isNew ? "" : `<div class="left"><button type="button" class="btn danger" data-a="veh-del" data-id="${v.id}" ${dis()}>Supprimer</button></div>`}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   const noIn = m.querySelector("#v-no"), err = m.querySelector("#v-err");
   const checkNo = () => {
@@ -387,12 +363,9 @@ ACTIONS["veh-form"] = el => {
     const plate = val("v-plate").toUpperCase(), dup = plate && S.vehicles.find(x => x.id !== v.id && !x.retired && x.plate === plate);
     if (!plate && val("v-cat") !== "chantier") { err.textContent = "L'immatriculation est obligatoire pour un véhicule routier."; return; }
     if (dup) { err.textContent = `La plaque ${plate} est déjà attribuée au véhicule ${fleetNo(dup) || ""} en service.`; return; }
-    const id = await save("vehicles", v.id, Object.assign(strip(v), { fleetNo: normFleetNo(noIn.value), cat: val("v-cat"), plate: val("v-plate").toUpperCase(), model: val("v-model"), year: val("v-year"), fuel: val("v-fuel"), vin: val("v-vin"), km: +val("v-km") || 0, status: val("v-st"), webfleetId: val("v-wf"), nextServiceDate: val("v-ns"), nextServiceKm: +val("v-nk") || 0, ctDate: val("v-ct"), insuranceDate: val("v-ins"), cc: +val("v-cc") || 0, kw: +val("v-kw") || 0, euro: val("v-euro"), garage: val("v-garage"), beltNA: m.querySelector("#v-bna").checked, beltLastDate: val("v-bld"), beltLastKm: +val("v-blk") || 0, beltDate: val("v-bd"), beltKm: +val("v-bk") || 0, todo: val("v-todo"), notes: val("v-notes"), docsLink: val("v-link"), dropboxLink: val("v-dbx") }));
+    const id = await save("vehicles", v.id, Object.assign(strip(v), { fleetNo: normFleetNo(noIn.value), cat: val("v-cat"), plate: val("v-plate").toUpperCase(), model: val("v-model"), year: val("v-year"), fuel: val("v-fuel"), vin: val("v-vin"), km: +val("v-km") || 0, status: val("v-st"), nextServiceDate: val("v-ns"), nextServiceKm: +val("v-nk") || 0, ctDate: val("v-ct"), insuranceDate: val("v-ins"), cc: +val("v-cc") || 0, kw: +val("v-kw") || 0, euro: val("v-euro"), garage: val("v-garage"), beltNA: m.querySelector("#v-bna").checked, beltLastDate: val("v-bld"), beltLastKm: +val("v-blk") || 0, beltDate: val("v-bd"), beltKm: +val("v-bk") || 0, todo: val("v-todo"), notes: val("v-notes"), docsLink: val("v-link"), dropboxLink: val("v-dbx") }));
     toast("Véhicule enregistré");
-    const nv = veh(id) || Object.assign({ id }, v, { km: +val("v-km") || 0 }), kmIn = +val("v-km") || 0;
-    /* compteur modifié et différent de WebFleet : proposer de corriger WebFleet (jamais automatique) */
-    if (canWfPush() && wfLinked(nv) && kmIn && wfOdo(nv) && Math.abs(kmIn - wfOdo(nv)) >= 1 && Math.abs(kmIn - kmOf0) >= 0.05) wfOdoAsk(Object.assign({}, nv, { km: kmIn }), kmIn, () => openVehicle(id));
-    else openVehicle(id);
+    openVehicle(id);
   };
 };
 ACTIONS["veh-del"] = el => {
@@ -405,7 +378,7 @@ ACTIONS["veh-del"] = el => {
 ACTIONS["drive-form"] = el => {
   const v = veh(el.dataset.id);
   const m = modal(`${mHead("Prise en charge · " + esc(v.plate))}<form><div class="body"><div class="fields">
-    ${field("dr-name", "Chauffeur", "", { type: (settings().drivers || []).length ? "select" : "text", options: driverOptions(), required: true })}
+    ${field("dr-name", "Pris par", "", { type: (settings().drivers || []).length ? "select" : "text", options: driverOptions(), required: true })}
     ${field("dr-date", "Date", today(), { type: "date" })}${field("dr-km", "Kilométrage au compteur", Math.round(kmOf(v)) || "", { type: "number", min: 0 })}</div>
     ${field("dr-note", "Remarque", "", { wide: true })}<div class="err" id="dr-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></footer></form>`, "sm");
@@ -423,18 +396,18 @@ ACTIONS["ev-form"] = el => {
   const isNew = !e0.id;
   const open = S.faults.filter(f => f.status !== "reparee" && (!e0.vehicleId || f.vehicleId === e0.vehicleId));
   const m = modal(`${mHead(isNew ? "Nouvelle intervention" : "Intervention")}<form><div class="body"><div class="fields">
-    ${field("e-veh", "Véhicule", e0.vehicleId, { type: "select", options: [["", "Choisir…"], ...S.vehicles.filter(v => (!v.retired || v.id === e0.vehicleId) && (!isLimited() || v.atMyGarage)).map(v => [v.id, v.plate + " · " + v.model])], required: true })}
+    ${field("e-veh", "Véhicule", e0.vehicleId, { type: "select", options: [["", "Choisir…"], ...S.vehicles.filter(v => (!v.retired || v.id === e0.vehicleId)).map(v => [v.id, v.plate + " · " + v.model])], required: true })}
     ${field("e-type", "Type", e0.type, { type: "select", options: Object.entries(EV_TYPES) })}
     ${field("e-st", "Statut", e0.status, { type: "select", options: [["realisee", "Réalisée"], ["planifiee", "Planifiée"]] })}
     ${field("e-date", "Date (réalisée ou prévue)", e0.date, { type: "date", required: true })}${field("e-km", "Kilométrage", e0.km, { type: "number" })}
-    ${field("e-cost", "Coût HT (€)", e0.cost, { type: "number", step: "0.01" })}${isOffice() && (S.garages || []).length ? field("e-gar", "Garage", e0.garageId || "", { type: "select", options: [["", "— autre / aucun —"], ...(S.garages || []).map(g => [g.id, g.name])] }) : ""}${field("e-sup", "Garage / fournisseur", e0.supplier || (ME && ME.role === "garage" ? garageName((S.garages || [])[0]?.id) : ""))}${field("e-ref", "N° de facture fournisseur", e0.invoiceRef, { cls: "mono" })}</div>
+    ${field("e-cost", "Coût HT (€)", e0.cost, { type: "number", step: "0.01" })}${field("e-sup", "Garage / fournisseur", e0.supplier)}${field("e-ref", "N° de facture fournisseur", e0.invoiceRef, { cls: "mono" })}</div>
     ${field("e-desc", "Travaux effectués / à effectuer", e0.description, { type: "textarea", wide: true, required: true })}
     ${open.length ? field("e-fault", "Cette intervention répare la panne…", e0.faultId, { type: "select", options: [["", "Aucune"], ...open.map(f => [f.id, vehLabel(f.vehicleId) + " · " + f.description])] }) : ""}
     <label class="chk"><input type="checkbox" id="e-next" ${isNew && e0.type === "entretien" ? "checked" : ""}> Après un entretien réalisé : reporter la prochaine échéance (+12 mois, +30 000 km)</label>${isNew ? "" : histBox("vehEvents", e0.id)}</div>
     <footer>${isNew ? "" : `<div class="left"><button type="button" class="btn danger" data-a="ev-del" data-id="${e0.id}" ${dis()}>Supprimer</button></div>`}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    const data = Object.assign(strip(e0), { vehicleId: val("e-veh"), type: val("e-type"), status: val("e-st"), date: val("e-date"), km: +val("e-km") || 0, cost: +val("e-cost") || 0, supplier: val("e-sup"), invoiceRef: val("e-ref"), description: val("e-desc"), faultId: val("e-fault") }, isOffice() && document.getElementById("e-gar") ? { garageId: val("e-gar"), supplier: val("e-sup") || garageName(val("e-gar")) } : {});
+    const data = Object.assign(strip(e0), { vehicleId: val("e-veh"), type: val("e-type"), status: val("e-st"), date: val("e-date"), km: +val("e-km") || 0, cost: +val("e-cost") || 0, supplier: val("e-sup"), invoiceRef: val("e-ref"), description: val("e-desc"), faultId: val("e-fault") });
     await save("vehEvents", e0.id, data);
     const v = veh(data.vehicleId);
     if (data.km && v && data.km > (+v.km || 0) && data.status === "realisee") await patch("vehicles", v.id, { km: data.km });
@@ -457,7 +430,6 @@ function faultFields(vid) {
     ${field("f-rep", "Votre nom", "", ds.length ? { type: "select", options: driverOptions(), required: true } : { required: true })}
     ${field("f-km", "Kilométrage au compteur", "", { type: "number", min: 0 })}
     ${field("f-sev", "Gravité", "mineure", { type: "select", options: Object.entries(SEV).map(([k, v]) => [k, v[0]]) })}${field("f-kind", "Type", "panne", { type: "select", options: Object.entries(FAULT_KIND).filter(([k]) => k !== "tache" || isOffice()) })}</div>
-    ${ME && ME.role === "garage" ? `<div class="muted small">Un véhicule qui n'est pas dans votre garage : le signalement est enregistré « En attente » et sera validé par W.A.Y.S.</div>` : ""}
     ${field("f-desc", "Qu'avez-vous constaté ?", "", { type: "textarea", wide: true, required: true, ph: "Bruit au freinage, voyant moteur allumé, pneu avant droit usé…" })}
     <label class="f">Photo (facultatif)<input type="file" id="f-photo" accept="image/*" capture="environment"></label>
     <div class="err" id="f-err"></div></div>`;
@@ -476,8 +448,8 @@ function wireFault(form, after) {
       }
       const vid = val("f-veh"), km = +val("f-km") || 0;
       await save("faults", null, { vehicleId: vid, reporter: val("f-rep"), date: today(), km, severity: val("f-sev"), kind: val("f-kind") || "panne", description: val("f-desc"), status: "ouverte", estDate: "", photo, at: new Date().toISOString() });
-      const v = veh(vid); if (km && v && km > (+v.km || 0) && (!isLimited() || v.atMyGarage)) await patch("vehicles", vid, { km });
-      toast(ME && ME.role === "garage" && v && !v.atMyGarage ? "Signalement envoyé : en attente de validation par W.A.Y.S." : "Panne signalée, merci"); after(vid);
+      const v = veh(vid); if (km && v && km > (+v.km || 0)) await patch("vehicles", vid, { km });
+      toast("Panne signalée, merci"); after(vid);
     } catch { btn.disabled = false; }
   };
 }
@@ -486,15 +458,14 @@ ACTIONS["fault-open"] = el => {
   const m = modal(`${mHead("Panne · " + esc(vehLabel(f.vehicleId)))}<form><div class="body">
     <dl class="kv"><dt>Signalée le</dt><dd>${fmtDate(f.date)} par ${esc(f.reporter || "—")}</dd><dt>Kilométrage</dt><dd>${f.km ? fmtN.format(f.km) + " km" : "—"}</dd><dt>Gravité</dt><dd><span class="chip ${SEV[f.severity]?.[1]}">${SEV[f.severity]?.[0]}</span></dd></dl>
     <div class="quote">${esc(f.description)}</div>${f.photo ? `<img class="photo" src="${esc(blobUrl(f.photo))}" alt="Photo jointe au signalement">` : ""}
-    ${f.status === "attente" ? `<div class="banner warn">Signalé par un garage pour un véhicule qui n'était pas chez lui : <b>en attente de validation</b>.${isOffice() ? ` <button type="button" class="btn sm" data-a="fault-validate" data-id="${f.id}" ${dis()}>Valider</button>` : ""}</div>` : ""}
+    ${f.status === "attente" ? `<div class="banner warn">Signalement <b>en attente de validation</b>.${isOffice() ? ` <button type="button" class="btn sm" data-a="fault-validate" data-id="${f.id}" ${dis()}>Valider</button>` : ""}</div>` : ""}
     <div class="fields">${field("fx-st", "Statut", f.status, { type: "select", options: Object.entries(FAULT_ST).filter(([k]) => k !== "attente" || f.status === "attente").map(([k, v]) => [k, v[0]]) })}${field("fx-kind", "Type", f.kind || "panne", { type: "select", options: Object.entries(FAULT_KIND) })}
-    ${isOffice() ? field("fx-gar", "Attribuée au garage", f.garageId || "", { type: "select", options: [["", "— aucun —"], ...(S.garages || []).map(g => [g.id, g.name])] }) : f.garageId ? `<label class="f">Garage<input value="${esc(garageName(f.garageId))}" readonly></label>` : ""}
     ${field("fx-est", "Date de réparation estimée", f.estDate, { type: "date" })}${field("fx-sev", "Gravité", f.severity, { type: "select", options: Object.entries(SEV).map(([k, v]) => [k, v[0]]) })}</div>
     ${field("fx-note", "Diagnostic / commentaire atelier", f.note, { type: "textarea", wide: true })}</div>${histBox("faults", f.id)}
     <footer><div class="left"><button type="button" class="btn" data-a="veh-open" data-id="${f.vehicleId}">Voir le véhicule</button>${isOffice() ? `<button type="button" class="btn danger" data-a="fault-del" data-id="${f.id}" ${dis()}>Supprimer</button>` : ""}</div><button type="button" class="btn" data-close>Fermer</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`);
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault(); const st = val("fx-st");
-    await patch("faults", f.id, Object.assign({ status: st, kind: val("fx-kind"), estDate: val("fx-est"), severity: val("fx-sev"), note: val("fx-note"), resolvedDate: st === "reparee" ? (f.resolvedDate || today()) : "" }, isOffice() ? { garageId: val("fx-gar") } : {}));
+    await patch("faults", f.id, Object.assign({ status: st, kind: val("fx-kind"), estDate: val("fx-est"), severity: val("fx-sev"), note: val("fx-note"), resolvedDate: st === "reparee" ? (f.resolvedDate || today()) : "" }));
     closeModal(); toast("Panne mise à jour");
   };
 };
@@ -508,7 +479,7 @@ ACTIONS["fault-del"] = el => {
     async () => { await remove("faults", f.id); closeModal(); toast("Panne supprimée"); }, fixed ? "Supprimer" : "Supprimer sans réparation");
 };
 
-/* ---------- page « Signaler une panne » (mobile, pour les chauffeurs) ---------- */
+/* ---------- page « Signaler une panne » (mobile) ---------- */
 VIEWS.signaler = {
   static: true,
   render() {
@@ -688,7 +659,7 @@ ACTIONS["veh-unarchive"] = el => {
 ACTIONS["veh-purge"] = el => {
   const v = veh(el.dataset.id); if (!v || !v.archived) return;
   const key = fleetNo(v) || v.plate || "SUPPRIMER";
-  const rel = { vehEvents: S.vehEvents.filter(e => e.vehicleId === v.id), faults: S.faults.filter(f => f.vehicleId === v.id), driverLogs: S.driverLogs.filter(l => l.vehicleId === v.id), fines: (S.fines || []).filter(f => f.vehicleId === v.id), trips: (S.trips || []).filter(t => t.vehicleId === v.id) };
+  const rel = { vehEvents: S.vehEvents.filter(e => e.vehicleId === v.id), faults: S.faults.filter(f => f.vehicleId === v.id), driverLogs: S.driverLogs.filter(l => l.vehicleId === v.id) };
   const n = Object.values(rel).reduce((a, r) => a + r.length, 0);
   const m = modal(`${mHead("Supprimer définitivement")}<div class="body stack-s">
     <div class="banner bad"><b>Action irréversible.</b> La fiche de <b>${esc(vLabel(v))}</b> sera effacée, avec ${plural((v.docs || []).length, "document")} et ${plural(n, "élément lié", "éléments liés")} (interventions, pannes, prises en charge, amendes, trajets).</div>
@@ -944,4 +915,3 @@ ACTIONS["tire-form"] = el => {
 };
 ACTIONS["tire-del"] = el => confirmBox("Supprimer cette référence de pneus du stock ?", () => remove("tires", el.dataset.id));
 
-/* amendes : voir js/fines.js */

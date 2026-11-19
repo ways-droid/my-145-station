@@ -1,7 +1,7 @@
 "use strict";
 /* ======================= ÉTALONNAGE ======================= */
 /* colonnes de l'atelier, dans l'ordre (codes stables : recu, en_cours et a_livrer existaient déjà) */
-/* NewTool → Picked → Lab → Calibrated → Dropped → Done (noms repris du tableau habituel de W.A.Y.S.) */
+/* NewTool → Picked → Lab → Calibrated → Dropped → Done */
 const WORK_COLS = [
   ["recu", "NewTool", "blue"], ["picked", "Picked", "yellow"], ["labo", "Lab", "orange"], ["a_livrer", "Calibrated", "green"], ["dropped", "Dropped", "red"], ["done", "Done", "grey"]];
 /* anciens statuts rangés dans la colonne la plus proche */
@@ -36,7 +36,7 @@ function toolRow(t) {
     <td>${esc(clientName(t.clientId))}</td><td>${tChip(t.status)}${t.status === "labo" && t.job?.labId ? `<div class="muted small">${esc(labName(t.job.labId))}</div>` : ""}</td><td>${ac ? `<span class="chip good">${esc(ac.number || "Actif")}</span>` : `<span class="muted">Aucun actif</span>`}</td><td>${atClient(t) ? dueChip(t.nextDue) : `<span class="num muted">${fmtDate(t.nextDue)}</span>`}</td></tr>`;
 }
 const toolHead = `<thead><tr><th>N° de série</th><th>Outil</th><th>Client</th><th>Statut</th><th>Certificat</th><th>Prochain étalonnage</th></tr></thead>`;
-const doneOpen = () => { try { return localStorage.getItem("ways-done-open") === "1"; } catch (e) { return false; } };
+const doneOpen = () => { try { return localStorage.getItem("st-done-open") === "1"; } catch (e) { return false; } };
 const labName = id => (S.labs || []).find(l => l.id === id)?.name || "";
 function kcard(t) {
   const since = t.job?.movedAt || t.job?.receivedDate, days = since ? daysBetween(since, today()) : 0;
@@ -59,7 +59,7 @@ function calibWorkshop() {
       <div class="kbody">${ts.map(kcard).join("") || `<div class="muted small kempty">Rien ici.</div>`}</div></div>`;
   }).join("")}</div>`;
 }
-ACTIONS["done-toggle"] = () => { try { localStorage.setItem("ways-done-open", doneOpen() ? "0" : "1"); } catch (e) {} render(true); };
+ACTIONS["done-toggle"] = () => { try { localStorage.setItem("st-done-open", doneOpen() ? "0" : "1"); } catch (e) {} render(true); };
 /* glisser-déposer (délégué : survit aux re-rendus) */
 let dragId = null;
 document.addEventListener("dragstart", e => { const c = e.target.closest && e.target.closest("[data-drag]"); if (!c || readOnly) return; dragId = c.dataset.drag; e.dataTransfer.effectAllowed = "move"; try { e.dataTransfer.setData("text/plain", dragId); } catch (x) {} c.classList.add("dragging"); });
@@ -180,11 +180,10 @@ async function openTool(id) {
     : t.status === "recu" ? `<button class="btn" data-a="tool-st" data-st="picked">Picked</button><button class="btn primary" data-a="tool-st" data-st="labo">Envoyer au labo</button>`
     : `<button class="btn" data-a="tool-done">Étalonné en interne</button><button class="btn primary" data-a="tool-st" data-st="labo">Envoyer au labo</button>`;
   const inShopD = inShop || t.status === "dropped";
-  const so = t.job?.soId ? S.docs.find(d => d.id === t.job.soId) : null;
   const labs = (S.labs || []).slice().sort((a, b) => a.name.localeCompare(b.name));
   const m = modal(`${mHead(`<span class="mono">${esc(t.serial)}</span> ${esc(t.name)} ${tChip(t.status)}`)}<div class="body">
     ${inShopD ? `<div class="panel pad jobbox"><div class="row-sb wrap"><b>Dossier en cours</b>${readOnly ? "" : `<label class="row-g small">Déplacer vers <select id="tm-move" class="fsel">${WORK_COLS.map(([k, l]) => `<option value="${k}" ${k === colOf(t) ? "selected" : ""}>${l}</option>`).join("")}</select></label>`}</div>
-      <dl class="kv sm"><dt>Sales Order (devis)</dt><dd>${so && allowed("devis") ? `<button class="linkbtn mono" data-a="doc-open" data-id="${so.id}">${esc(so.number)}</button>` : so ? `<span class="mono">${esc(so.number)}</span>` : t.job?.so ? `<span class="mono">${esc(t.job.so)}</span>` : `<span class="muted">—</span>`}</dd>
+      <dl class="kv sm"><dt>Bon de commande</dt><dd>${t.job?.so ? `<span class="mono">${esc(t.job.so)}</span>` : `<span class="muted">—</span>`}</dd>
       <dt>Repair Order (RO)</dt><dd class="mono">${esc(t.job?.ro || "—")}</dd>
       <dt>Laboratoire</dt><dd>${readOnly ? esc(labName(t.job?.labId) || "—") : `<select id="tm-lab" class="fsel"><option value="">Atelier interne / pas encore choisi</option>${labs.map(l => `<option value="${l.id}" ${l.id === (t.job?.labId || t.defaultLabId) ? "selected" : ""}>${esc(l.name)}</option>`).join("")}</select>${!t.job?.labId && t.defaultLabId ? `<div class="hint">Présélectionné : dernier labo utilisé pour cet outil.</div>` : ""}`}</dd>
       ${t.job?.receivedDate ? `<dt>En atelier depuis</dt><dd>${fmtDate(t.job.receivedDate)}</dd>` : ""}</dl></div>` : ""}
@@ -231,7 +230,7 @@ ACTIONS["tool-done"] = () => {
   const t = curTool();
   const m = modal(`${mHead("Terminer l'étalonnage · " + esc(t.serial))}<form><div class="body"><div class="fields">
     ${field("c-date", "Date d'étalonnage", today(), { type: "date", required: true })}${field("c-res", "Résultat", "conforme", { type: "select", options: Object.entries(T_RESULT).map(([k, v]) => [k, v[0]]) })}
-    ${field("c-no", "N° de certificat", "", { cls: "mono", required: true })}${field("c-lab", "Réalisé par", labName(t.job?.labId) || "Atelier W.A.Y.S.", { ph: "Atelier interne ou laboratoire externe" })}
+    ${field("c-no", "N° de certificat", "", { cls: "mono", required: true })}${field("c-lab", "Réalisé par", labName(t.job?.labId) || "Atelier interne", { ph: "Atelier interne ou laboratoire externe" })}
     ${field("c-int", "Périodicité (mois)", t.intervalMonths || 12, { type: "number", min: 1 })}${field("c-next", "Prochain étalonnage", addMonths(today(), +t.intervalMonths || 12), { type: "date" })}</div>
     ${assets ? `<label class="f">Certificat (PDF ou photo)<input type="file" id="c-file" accept="application/pdf,image/*"></label>` : `<div class="hint">L'ajout de fichiers est réservé aux éditeurs : le certificat pourra être joint plus tard.</div>`}
     ${field("c-note", "Remarques (valeurs relevées, ajustages…)", "", { type: "textarea", wide: true })}<div class="err" id="c-err"></div></div>
@@ -259,7 +258,7 @@ ACTIONS["tool-deliver"] = () => {
   const m = modal(`${mHead("Livraison au client · " + esc(clientName(t.clientId)))}<form><div class="body">
     <div class="checklist">${ready.map(x => `<label class="chk"><input type="checkbox" value="${x.id}" checked> <span class="mono"><b>${esc(x.serial)}</b></span> ${esc(x.name)} <span class="muted">· ${x.calPrice ? eur(x.calPrice) : "prix non défini"}</span></label>`).join("")}</div>
     <div class="fields">${field("dl-date", "Date de livraison", today(), { type: "date" })}</div>
-    <label class="chk"><input type="checkbox" id="dl-inv" checked> Créer une facture brouillon pour les outils cochés</label><div class="err" id="dl-err"></div></div>
+    <div class="err" id="dl-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Valider la livraison</button></footer></form>`);
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
@@ -267,14 +266,8 @@ ACTIONS["tool-deliver"] = () => {
     if (!ids.length) { m.querySelector("#dl-err").textContent = "Cochez au moins un outil."; return; }
     m.querySelector("button.primary").disabled = true;
     const sel = ids.map(id => S.tools.find(x => x.id === id));
-    let invId = "";
-    if (m.querySelector("#dl-inv").checked) {
-      const lines = sel.map(x => ({ productId: "", cat: "etalonnage", label: `Étalonnage ${x.name}${x.brand ? " " + x.brand : ""} · S/N ${x.serial}${x.job?.certNo ? " · certificat " + x.job.certNo : ""}`, qty: 1, price: +x.calPrice || 0, vat: 21 }));
-      invId = await createInvoice(t.clientId, lines, `Étalonnage d'outils livrés le ${fmtDate(date)}.`, { source: "etalonnage" });
-    }
-    for (const x of sel) await patch("tools", x.id, { status: "dropped", job: Object.assign({}, x.job || {}, { delivered: date, invoiceId: invId, movedAt: date }) });
-    closeModal(); toast(`${plural(sel.length, "outil")} livré${sel.length > 1 ? "s" : ""}${invId ? ", facture brouillon créée" : ""}`);
-    if (invId && allowed("factures")) setTimeout(() => openDoc(invId), 100);
+    for (const x of sel) await patch("tools", x.id, { status: "dropped", job: Object.assign({}, x.job || {}, { delivered: date, movedAt: date }) });
+    closeModal(); toast(`${plural(sel.length, "outil")} livré${sel.length > 1 ? "s" : ""}`);
   };
 };
 ACTIONS["tool-form"] = el => {

@@ -1,0 +1,26 @@
+# Contrôles automatiques de my-145-station (pas de déploiement).
+#
+# Le déploiement sera ajouté quand le serveur de my-145-station et ses secrets existeront.
+# config.php n'est jamais versionné.
+
+name: Contrôles
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Contrôle PHP
+        run: for f in api/*.php; do php -l "$f"; done
+
+      - name: Contrôle JavaScript
+        run: for f in js/*.js client/*.js; do node --check "$f"; done
+
+      - name: Test de l'API
+        run: bash test/test.sh > /dev/null

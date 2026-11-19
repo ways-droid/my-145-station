@@ -25,11 +25,11 @@ const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble de
 const AI_HIDDEN = ['settings', 'userPrefs'];
 const AI_NAME = 'Axel';
 // collections qu'Axel peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
-const AI_WRITABLE = ['clients', 'products', 'vehicles', 'vehEvents', 'faults', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
+const AI_WRITABLE = ['clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
     'clients' => 'clients (compagnies aériennes servies par la station)', 'products' => 'articles et prix (tarifs des Charge Sheets)',
-    'vehicles' => 'véhicules', 'vehEvents' => 'entretiens et événements véhicules', 'faults' => 'pannes signalées sur les véhicules',
+    'vehicles' => 'véhicules', 'vehEvents' => 'entretiens et événements véhicules', 'faults' => 'pannes signalées sur les véhicules', 'driverLogs' => 'prises en charge de véhicules', 'tires' => 'pneus',
     'tools' => 'outillage de la station (étalonnage)', 'labs' => "laboratoires d'étalonnage", 'adminDocs' => 'documents administratifs', 'adminFolders' => 'dossiers administratifs',
     'links' => 'liens utiles',
     'notes' => "notes (title, body, labels, color, team = note d'équipe sinon note personnelle de la personne qui te parle, links = liens vers des fiches {coll, id, label}, files = pièces jointes)",

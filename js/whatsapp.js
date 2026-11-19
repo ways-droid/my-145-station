@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= WhatsApp (Paramètres) =======================
-   Numéro W.A.Y.S. dédié à l'équipe, relié à l'API Cloud de Meta (API seule) : l'ERP et Axel le surveillent.
+   Numéro de la station dédié à l'équipe, relié à l'API Cloud de Meta (API seule) : l'outil et Axel le surveillent.
    Voir api/whatsapp.php. Identifiants saisis ici, gardés sur le serveur, jamais renvoyés. */
 let WA = null, waStarted = false;
 function waStart() {   // filet de sécurité : messages reçus mais pas encore traités (normalement traités dès réception)
@@ -17,8 +17,8 @@ async function loadWa() {
   try { WA = await API.call("GET", "whatsapp/status"); } catch (e) { box.innerHTML = `<div class="err">${esc(tr(e.message))}</div>`; return; }
   const s = WA, copy = (v, label) => `<div class="row-g"><code class="mono small" style="user-select:all;word-break:break-all">${esc(v || "")}</code><button class="btn sm" data-a="wa-copy" data-v="${esc(v || "")}">${esc(tr(label || "Copier"))}</button></div>`;
   const steps = `<ol class="small stack-s" style="margin:0;padding-left:18px">
-      <li>Sur <b>developers.facebook.com</b> → My Apps → <b>Create app</b>, cas d'usage « Connect with customers through WhatsApp », relié au portefeuille Meta Business de W.A.Y.S.</li>
-      <li>WhatsApp → <b>API Setup</b> → <b>Add phone number</b> : le numéro de la SIM dédiée (jamais utilisée sur WhatsApp), nom affiché « W.A.Y.S. », code reçu par SMS (mettez la SIM dans un téléphone le temps de la vérification).</li>
+      <li>Sur <b>developers.facebook.com</b> → My Apps → <b>Create app</b>, cas d'usage « Connect with customers through WhatsApp », relié au portefeuille Meta Business de l'organisation</li>
+      <li>WhatsApp → <b>API Setup</b> → <b>Add phone number</b> : le numéro de la SIM dédiée (jamais utilisée sur WhatsApp), nom affiché : celui de l'organisation, code reçu par SMS (mettez la SIM dans un téléphone le temps de la vérification).</li>
       <li>Copiez le <b>Phone number ID</b> et le <b>WhatsApp Business Account ID</b>.</li>
       <li>Business settings → <b>System users</b> → ajoutez un utilisateur système administrateur, donnez-lui l'app et le compte WhatsApp, puis <b>Generate token</b> : permissions <span class="mono">whatsapp_business_messaging</span> et <span class="mono">whatsapp_business_management</span>, expiration « Never ».</li>
       <li>App settings → Basic → <b>App secret</b> (« Show »).</li>
@@ -26,14 +26,12 @@ async function loadWa() {
       <li>WhatsApp → <b>Configuration</b> → Webhook : Callback URL ${copy(s.webhook)} Verify token ${copy(s.verify)} puis « Verify and save » et abonnez le champ <b>messages</b>.</li>
       <li>Ajoutez un moyen de paiement au compte WhatsApp (au-delà des messages gratuits) et passez l'app en mode <b>Live</b>.</li></ol>`;
   if (!s.configured) {
-    box.innerHTML = `<div class="stack-s"><div>Un numéro WhatsApp de W.A.Y.S. réservé à l'équipe (pour commencer) : chauffeurs et collègues écrivent à Axel comme à un collègue — questions, photos de pannes, documents. Axel répond avec les droits de la personne, et la conversation est la même que dans son panneau Axel de l'ERP.</div>
+    box.innerHTML = `<div class="stack-s"><div>Un numéro WhatsApp de la station réservé à l'équipe : les collègues écrivent à Axel comme à un collègue — questions, photos, documents. Axel répond avec les droits de la personne, et la conversation est la même que dans son panneau Axel.</div>
       ${steps}${s.error ? `<div class="banner warn">${esc(s.error)}</div>` : ""}<div><button class="btn primary" data-a="wa-form">Saisir les identifiants Meta</button></div></div>`;
     return;
   }
-  const n = s.number || {}, drivers = (S.drivers || []).filter(d => d.name).sort((a, b) => a.name.localeCompare(b.name));
-  const people = [...(s.users || []).map(u => ({ kind: "user", ref: u.id, name: u.name, sub: ROLE_LBL[u.role] || u.role })),
-    ...drivers.map(d => ({ kind: "driver", ref: d.id, name: d.name, sub: "Chauffeur" }))];
-  const autoN = s.autoDrivers ? drivers.filter(d => d.phone || d.phonePrivate).length : 0;
+  const n = s.number || {};
+  const people = [...(s.users || []).map(u => ({ kind: "user", ref: u.id, name: u.name, sub: ROLE_LBL[u.role] || u.role }))];
   box.innerHTML = `<div class="stack">
     <dl class="kv"><dt>Numéro</dt><dd>${n.display ? `<b>${esc(n.display)}</b>${n.name ? " · " + esc(n.name) : ""}${n.quality ? ` · qualité <span class="chip ${n.quality === "GREEN" ? "good" : n.quality === "RED" ? "bad" : "warn"}">${esc(n.quality)}</span>` : ""}` : `<span class="muted">pas encore testé</span>`}</dd>
       <dt>Inscription API</dt><dd>${s.registered ? `<span class="chip good">enregistré</span> <span class="muted small">(code PIN gardé sur le serveur)</span>` : `<span class="chip warn">à faire</span>`}</dd>
@@ -46,13 +44,12 @@ async function loadWa() {
     <details><summary class="small">Procédure Meta (rappel)</summary>${steps}</details>
 
     <h4 class="np" style="margin-top:6px">Qui peut écrire à Axel</h4>
-    <label class="chk line"><input type="checkbox" id="wa-auto" ${s.autoDrivers ? "checked" : ""}> Les chauffeurs dont le GSM est dans la fiche chauffeur <span class="muted small">(${autoN} actuellement ; Axel leur répond avec les droits « Terrain »)</span></label>
-    <div class="small muted">Autres membres de l'équipe : associez leur numéro à leur compte ERP (Axel répond avec leurs droits, et la conversation apparaît dans leur panneau Axel) ou à une fiche chauffeur.</div>
+    <div class="small muted">Associez le numéro de chaque membre de l'équipe à son compte (Axel répond avec ses droits, et la conversation apparaît dans son panneau Axel).</div>
     <div id="wa-contacts" class="stack-s">${(s.contacts || []).map((c, i) => waContactRow(c, people, i)).join("")}</div>
     <div class="row-g"><button class="btn sm" data-a="wa-c-add">Ajouter un numéro</button><button class="btn sm primary" data-a="wa-c-save">Enregistrer la liste</button></div>
 
     <h4 class="np" style="margin-top:6px">Messages à l'équipe (via Axel)</h4>
-    <div class="small">On peut demander à Axel d'envoyer un message WhatsApp à un membre de l'équipe (« dis à Marc que… ») ; il montre le texte et attend un « oui » avant d'envoyer. WhatsApp n'accepte un texte libre que si la personne a écrit au numéro W.A.Y.S. dans les 24 dernières heures ; sinon, il faut un modèle de message approuvé par Meta.</div>
+    <div class="small">On peut demander à Axel d'envoyer un message WhatsApp à un membre de l'équipe (« dis à Marc que… ») ; il montre le texte et attend un « oui » avant d'envoyer. WhatsApp n'accepte un texte libre que si la personne a écrit au numéro de la station dans les 24 dernières heures ; sinon, il faut un modèle de message approuvé par Meta.</div>
     ${(() => { const t = s.tpl || {}, st = t.status || ""; const chip = st === "APPROVED" ? `<span class="chip good">approuvé</span>` : st === "PENDING" ? `<span class="chip warn">en cours d'examen chez Meta</span>` : st === "REJECTED" ? `<span class="chip bad">refusé${t.error ? " : " + esc(t.error) : ""}</span>` : st ? `<span class="chip">${esc(st)}</span>` : `<span class="chip">pas encore créé</span>`;
       return `<div class="small">Modèle « <span class="mono">${esc(t.name || "message_equipe")}</span> » (${esc(t.lang || "fr")}) : ${chip}</div><pre class="small" style="white-space:pre-wrap;margin:0;padding:8px 10px;background:var(--bg);border-radius:8px">${esc(s.tplBody || "")}</pre>
       <div class="row-g">${st === "APPROVED" ? "" : `<button class="btn sm primary" data-a="wa-tpl" data-create="1">Créer le modèle chez Meta</button>`}<button class="btn sm" data-a="wa-tpl">Vérifier l'état</button></div>${t.error && st !== "REJECTED" ? `<div class="small txt-bad">${esc(t.error)}</div>` : ""}`; })()}
@@ -77,7 +74,7 @@ ACTIONS["wa-c-save"] = async () => {
   const box = document.getElementById("wa-box"), rows = [...document.querySelectorAll("#wa-contacts .wa-c")];
   const contacts = rows.map(r => { const who = r.querySelector("[data-f=who]").value, [kind, ...ref] = who.split(":"); const p = (box._people || []).find(x => x.kind === kind && x.ref === ref.join(":"));
     return { num: r.querySelector("[data-f=num]").value, kind, ref: ref.join(":"), name: p ? p.name : "" }; }).filter(c => c.num.trim() && c.kind);
-  try { await API.call("POST", "whatsapp/contacts", { contacts }); await API.call("POST", "whatsapp/config", { autoDrivers: document.getElementById("wa-auto").checked }); toast("Numéros de l'équipe enregistrés"); loadWa(); }
+  try { await API.call("POST", "whatsapp/contacts", { contacts }); toast("Numéros de l'équipe enregistrés"); loadWa(); }
   catch (e) { toast(tr(e.message)); }
 };
 ACTIONS["wa-tpl"] = async el => {
@@ -85,7 +82,7 @@ ACTIONS["wa-tpl"] = async el => {
   catch (e) { toast(tr(e.message)); }
 };
 ACTIONS["wa-u-save"] = async () => {
-  try { await API.call("POST", "whatsapp/config", { unknownReply: document.getElementById("wa-ur").checked, unknownTxt: document.getElementById("wa-ut").value, autoDrivers: document.getElementById("wa-auto").checked }); toast("Enregistré"); loadWa(); }
+  try { await API.call("POST", "whatsapp/config", { unknownReply: document.getElementById("wa-ur").checked, unknownTxt: document.getElementById("wa-ut").value }); toast("Enregistré"); loadWa(); }
   catch (e) { toast(tr(e.message)); }
 };
 ACTIONS["wa-form"] = () => {
@@ -95,8 +92,8 @@ ACTIONS["wa-form"] = () => {
     ${field("wf-token", "Jeton permanent (utilisateur système)", "", { type: "password", required: !s.tokenHint, ph: s.tokenHint ? "inchangé (" + s.tokenHint + ")" : "" })}
     ${field("wf-secret", "App secret", "", { type: "password", required: !s.secretSet, ph: s.secretSet ? "inchangé" : "" })}
     ${field("wf-ver", "Version de l'API Graph", s.ver || "v23.0", { cls: "mono" })}
-    ${field("wf-pin", "Code PIN à 6 chiffres (seulement si vous l'avez déjà choisi chez Meta)", "", { type: "password", ph: s.registered ? "inchangé" : "laisser vide : l'ERP en choisit un" })}</div>
-    <div class="hint">Gardés sur le serveur ways.support uniquement, jamais réaffichés.</div><div class="err" id="wf-err"></div></div>
+    ${field("wf-pin", "Code PIN à 6 chiffres (seulement si vous l'avez déjà choisi chez Meta)", "", { type: "password", ph: s.registered ? "inchangé" : "laisser vide : l'outil en choisit un" })}</div>
+    <div class="hint">Gardés sur le serveur uniquement, jamais réaffichés.</div><div class="err" id="wf-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></footer></form>`);
   ["wf-token", "wf-secret", "wf-pin"].forEach(id => m.querySelector("#" + id).setAttribute("autocomplete", "new-password"));
   m.querySelector("form").onsubmit = async e => { e.preventDefault();
@@ -104,9 +101,9 @@ ACTIONS["wa-form"] = () => {
       closeModal(); await loadWa(); if (WA && WA.configured) ACTIONS["wa-test"](); }
     catch (x) { m.querySelector("#wf-err").textContent = tr(x.message); } };
 };
-ACTIONS["wa-test"] = async () => { try { await API.call("POST", "whatsapp/test", {}); toast("Connexion WhatsApp OK"); } catch (e) { alertBox ? alertBox(tr(e.message)) : toast(tr(e.message)); } loadWa(); };
-ACTIONS["wa-register"] = () => confirmBox("Enregistrer le numéro sur l'API WhatsApp ? L'ERP choisit un code PIN à 6 chiffres (vérification en deux étapes) et le garde sur le serveur. Ce numéro ne pourra plus être utilisé dans l'application WhatsApp.", async () => {
-  try { await API.call("POST", "whatsapp/register", {}); toast("Numéro enregistré : Axel peut recevoir les messages"); } catch (e) { alertBox ? alertBox(tr(e.message)) : toast(tr(e.message)); } loadWa(); }, "Enregistrer");
+ACTIONS["wa-test"] = async () => { try { await API.call("POST", "whatsapp/test", {}); toast("Connexion WhatsApp OK"); } catch (e) { toast(tr(e.message)); } loadWa(); };
+ACTIONS["wa-register"] = () => confirmBox("Enregistrer le numéro sur l'API WhatsApp ? L'outil choisit un code PIN à 6 chiffres (vérification en deux étapes) et le garde sur le serveur. Ce numéro ne pourra plus être utilisé dans l'application WhatsApp.", async () => {
+  try { await API.call("POST", "whatsapp/register", {}); toast("Numéro enregistré : Axel peut recevoir les messages"); } catch (e) { toast(tr(e.message)); } loadWa(); }, "Enregistrer");
 ACTIONS["wa-send-test"] = () => {
   const m = modal(`${mHead("Message test")}<form><div class="body stack-s">${field("wt-to", "Numéro WhatsApp", "", { required: true, ph: "0470 12 34 56", autofocus: true })}
     <div class="hint">La personne doit avoir écrit à ce numéro dans les dernières 24 h (règle de WhatsApp pour les messages libres) : écrivez-lui d'abord « test » depuis votre téléphone.</div><div class="err" id="wt-err"></div></div>

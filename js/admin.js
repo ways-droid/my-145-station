@@ -2,8 +2,8 @@
 /* Onglet Gestion Documents : bibliothèque des documents utilisés régulièrement (formulaires vierges, modèles…)
    Collection « adminDocs » : { title, category, issuer, description, file, mime, fileName, size, version, pinned, uploadedAt, updatedAt, prev[] } */
 
-const ADOC_CATS = ["Liege Airport", "Douane", "Sécurité & badges", "Ressources humaines", "Assurances", "Qualité", "Modèles W.A.Y.S.", "Autre"];
-const adocF = () => UI.adocF || (UI.adocF = { cat: "", folder: "", view: (() => { try { return localStorage.getItem("ways-adoc-view") || "cartes"; } catch (e) { return "cartes"; } })() });
+const ADOC_CATS = ["Autorité (CAA)", "Aéroport", "Sécurité & badges", "Ressources humaines", "Assurances", "Qualité", "Modèles", "Autre"];
+const adocF = () => UI.adocF || (UI.adocF = { cat: "", folder: "", view: (() => { try { return localStorage.getItem("st-adoc-view") || "cartes"; } catch (e) { return "cartes"; } })() });
 const fileKind = d => {
   const m = d.mime || "", n = (d.fileName || "").toLowerCase();
   if (m === "application/pdf" || n.endsWith(".pdf")) return "pdf";
@@ -88,7 +88,7 @@ VIEWS.admin = {
   render() {
     const tab = curTab("admin", "documents");
     const n = (S.adminDocs || []).length, nn = typeof notesAll === "function" ? notesAll().length : 0;
-    return head("Administration", tab === "notes" ? "Notes personnelles et notes d'équipe, avec pièces jointes et liens vers l'ERP" : "Documents et formulaires de l'entreprise, disponibles à tout moment",
+    return head("Administration", tab === "notes" ? "Notes personnelles et notes d'équipe, avec pièces jointes et liens vers les fiches" : "Documents et formulaires de l'entreprise, disponibles à tout moment",
         readOnly ? "" : tab === "notes" ? `<button class="btn primary" data-a="note-form">+ Nouvelle note</button>` : `<button class="btn" data-a="folder-form">Nouveau dossier</button>${assets ? `<button class="btn primary" data-a="adoc-add">Ajouter des documents</button>` : ""}`) +
       tabs("admin", [["documents", "Gestion Documents", n || ""], ["notes", "Notes", nn || ""]]) +
       (readOnly || !assets ? "" : `<input type="file" id="adoc-files" multiple hidden accept=".pdf,.doc,.docx,.xls,.xlsx,.odt,.ods,.csv,.rtf,image/*">`) +
@@ -182,7 +182,7 @@ VIEWS.admin.after = () => {
 };
 ACTIONS["adoc-f"] = el => {
   const f = adocF(), d = el.dataset;
-  if (d.view) { f.view = d.view; try { localStorage.setItem("ways-adoc-view", d.view); } catch (e) {} } else f.cat = d.cat || "";
+  if (d.view) { f.view = d.view; try { localStorage.setItem("st-adoc-view", d.view); } catch (e) {} } else f.cat = d.cat || "";
   UI.focusQ = false; render(true);
 };
 ACTIONS["adoc-add"] = () => document.getElementById("adoc-files")?.click();
@@ -301,7 +301,7 @@ ACTIONS["folder-form"] = el => {
   const x = (S.adminFolders || []).find(f => f.id === el.dataset.id) || {};
   const n = x.id ? docsIn(x.id).length : 0;
   const m = modal(`${mHead(x.id ? "Renommer le dossier" : "Nouveau dossier")}<form><div class="body">
-    ${field("fo-name", "Nom du dossier", x.name, { required: true, ph: "Liege Airport, SPF Finances, Securitas…" })}
+    ${field("fo-name", "Nom du dossier", x.name, { required: true, ph: "Autorité, aéroport, client…" })}
     ${x.id ? `<div class="hint">${plural(n, "document")} dans ce dossier : ${n > 1 ? "ils restent" : "il reste"} rangé${n > 1 ? "s" : ""} dedans sous le nouveau nom.</div>` : ""}<div class="err" id="fo-err"></div></div>
     <footer>${x.id ? `<div class="left"><button type="button" class="btn danger" data-a="folder-del" data-id="${x.id}">Supprimer le dossier</button></div>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary">${x.id ? "Renommer" : "Créer"}</button></footer></form>`);
   setTimeout(() => { const i = m.querySelector("#fo-name"); i.focus(); i.select(); }, 30);

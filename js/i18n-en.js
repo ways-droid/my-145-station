@@ -1,11 +1,11 @@
 "use strict";
-/* Dictionnaire français → anglais de l'interface W.A.Y.S. */
+/* Dictionnaire français → anglais de l'interface my-145-station */
 Object.assign(EN, {
   // ---- navigation & général
   "Tableau de bord": "Dashboard", "Opérations": "Operations", "Ventes": "Sales", "Gaz": "Gas", "Flotte": "Fleet", "Étalonnage": "Calibration",
   "Signaler une panne": "Report a fault", "Factures": "Invoices", "Devis": "Quotes", "Clients": "Customers", "Produits & prix": "Products & prices",
   "Paramètres": "Settings", "Données partagées et enregistrées": "Shared and saved data", "Lecture seule": "Read-only", "Connexion…": "Connecting…",
-  "Aperçu : rien n'est enregistré": "Preview: nothing is saved", "Logo W.A.Y.S.": "W.A.Y.S. logo",
+  "Aperçu : rien n'est enregistré": "Preview: nothing is saved", "Logo my-145-station": "my-145-station logo",
   "Aperçu hors ligne : la base de données n'est pas disponible ici, les modifications ne seront pas enregistrées.": "Offline preview: the database is not available here, changes will not be saved.",
   "L'accès aux données a été retiré pour cette session.": "Access to the data has been withdrawn for this session.",
   "Les données ne sont pas encore joignables. Ce qui s'affiche peut être incomplet.": "The data cannot be reached yet. What is shown may be incomplete.",
@@ -146,7 +146,7 @@ Object.assign(EN, {
   "Interventions": "Jobs", "Aucune intervention.": "No jobs.", "Aucune panne signalée.": "No faults reported.", "Dernières prises en charge": "Latest check-outs", "Aucune.": "None.",
   "Carburant": "Fuel", "Année": "Year", "VIN": "VIN", "Ajouter une photo": "Add a photo", "Changer la photo": "Change photo", "Photo du véhicule": "Vehicle photo",
   "Retirer de la flotte…": "Remove from fleet…", "Retirer de la flotte": "Remove from fleet", "Remettre en service": "Return to service",
-  "Nouveau véhicule": "New vehicle", "Identifiant W.A.Y.S. *": "W.A.Y.S. ID *", "Identifiant W.A.Y.S.": "W.A.Y.S. ID", "Immatriculation *": "Registration *",
+  "Nouveau véhicule": "New vehicle", "Identifiant interne *": "Internal ID *", "Identifiant interne": "Internal ID", "Immatriculation *": "Registration *",
   "Marque et modèle *": "Make and model *", "Marque et modèle": "Make and model", "Renault Master": "Renault Master", "N° de châssis (VIN)": "Chassis no. (VIN)",
   "Kilométrage actuel": "Current mileage", "État": "Condition", "En service": "In service", "Identifiant WebFleet (pour la future liaison)": "WebFleet ID (for the future link)",
   "Prochain entretien (date)": "Next service (date)", "Prochain entretien (km)": "Next service (km)", "Contrôle technique avant le": "Roadworthiness test before",
@@ -186,7 +186,7 @@ Object.assign(EN, {
   "Versions précédentes": "Previous versions", "Dossier en ligne (lien du QR code à bord)": "Online folder (on-board QR code link)", "Dossier en ligne ↗": "Online folder ↗", "Pour l'assurance et le contrôle technique, la date d'expiration met aussi à jour les échéances du véhicule. Remplacer le fichier garde l'ancien dans les versions précédentes.": "For insurance and roadworthiness tests, the expiry date also updates the vehicle's due dates. Replacing the file keeps the old one under previous versions.",
   "Dossier Dropbox": "Dropbox folder", "Dropbox ↗": "Dropbox ↗", "DOC": "DOC",
   "⇪ Importer documents (Dropbox)": "⇪ Import documents (Dropbox)", "Importer les documents des véhicules (Dropbox)": "Import vehicle documents (Dropbox)", "Choisir le ZIP": "Choose the ZIP", "ou le déposer ici · un dossier entier est aussi accepté": "or drop it here · a whole folder also works", "Choisir un dossier plutôt qu'un ZIP": "Choose a folder instead of a ZIP", "Inclure les documents expirés (rangés dans « Anciens documents »)": "Include expired documents (filed under “Old documents”)", "Utiliser une photo du dossier « Photo » si la fiche n'en a pas": "Use a picture from the “Photo” folder if the record has none", "Expirés": "Expired", "Photos": "Photos", "Lecture du contenu…": "Reading content…", "Import terminé": "Import finished", "rien de nouveau": "nothing new", "Car-Pass": "Car-Pass", "Car Kit (équipement de bord)": "Car Kit (on-board equipment)", "Importé de Dropbox": "Imported from Dropbox",
-  "Saisissez la clé d'accès de ce serveur (fournie par la page d'installation). Elle reste enregistrée dans ce navigateur.": "Enter this server's access key (given by the installation page). It stays saved in this browser.", "Clé d'accès": "Access key", "Se connecter": "Sign in", "Clé d'accès refusée.": "Access key refused.", "Le serveur ne répond pas. Vérifiez la connexion puis réessayez.": "The server is not responding. Check the connection and try again.", "Se déconnecter": "Sign out", "Se déconnecter de ce navigateur": "Sign out of this browser", "Serveur ways.support": "ways.support server", "1 · Données": "1 · Data", "2 · Fichiers joints": "2 · Attached files", "Données enregistrées sur ways.support": "Data stored on ways.support", "Serveur injoignable · nouvel essai…": "Server unreachable · retrying…", "Données importées": "Data imported", "Fichiers importés": "Files imported", "Import des données…": "Importing data…", "Envoi des fichiers…": "Uploading files…", "importés": "imported", "envoyés": "uploaded", "déjà présents": "already there", "échecs": "failed", "Étape suivante : le ZIP des fichiers joints.": "Next step: the attached-files ZIP.", "Ce fichier n'est pas un export JSON de l'ERP.": "This file is not an ERP JSON export.", "Aucun fichier reconnu dans ce ZIP.": "No file recognised in this ZIP.", "Le ZIP n'a pas pu être lu.": "The ZIP could not be read.", "Connexion au serveur impossible.": "Cannot connect to the server.",
+  "Saisissez la clé d'accès de ce serveur (fournie par la page d'installation). Elle reste enregistrée dans ce navigateur.": "Enter this server's access key (given by the installation page). It stays saved in this browser.", "Clé d'accès": "Access key", "Se connecter": "Sign in", "Clé d'accès refusée.": "Access key refused.", "Le serveur ne répond pas. Vérifiez la connexion puis réessayez.": "The server is not responding. Check the connection and try again.", "Se déconnecter": "Sign out", "Se déconnecter de ce navigateur": "Sign out of this browser", "Serveur": "Server", "1 · Données": "1 · Data", "2 · Fichiers joints": "2 · Attached files", "Données enregistrées sur le serveur": "Data stored on the server", "Serveur injoignable · nouvel essai…": "Server unreachable · retrying…", "Données importées": "Data imported", "Fichiers importés": "Files imported", "Import des données…": "Importing data…", "Envoi des fichiers…": "Uploading files…", "importés": "imported", "envoyés": "uploaded", "déjà présents": "already there", "échecs": "failed", "Étape suivante : le ZIP des fichiers joints.": "Next step: the attached-files ZIP.", "Ce fichier n'est pas un export JSON de l'ERP.": "This file is not an ERP JSON export.", "Aucun fichier reconnu dans ce ZIP.": "No file recognised in this ZIP.", "Le ZIP n'a pas pu être lu.": "The ZIP could not be read.", "Connexion au serveur impossible.": "Cannot connect to the server.",
   "Pour reprendre les données de l'ancienne version (claude.ai), déposez dans l'ordre les deux fichiers exportés depuis celle-ci. Un import peut être relancé sans créer de doublons.": "To bring over the data from the previous version (claude.ai), drop the two files exported from it, in order. An import can be rerun without creating duplicates.",
   "Supprimer la bouteille": "Delete cylinder", "Bouteille supprimée": "Cylinder deleted",
   "Supprimer l'emplacement": "Delete location", "Modifier l'emplacement": "Edit location", "En attente de redistribution": "Awaiting redistribution", "En attente": "Pending", "Redistribuer": "Redistribute", "Redistribuer le stock en attente": "Redistribute pending stock", "Nouvel emplacement": "New location", "Tout cocher": "Select all", "Tout décocher": "Clear all", "Déplacer la sélection": "Move selection", "Cochez au moins une bouteille.": "Tick at least one cylinder.", "Le stock en attente est vide.": "Pending stock is empty.", "Créez d'abord un emplacement de destination.": "Create a destination location first.", "Emplacement supprimé": "Location deleted", "Supprimer la livraison": "Delete delivery", "Changement d'emplacement": "Location change", "Annulation de livraison": "Delivery cancelled", "Aucune bouteille n'y est stockée.": "No cylinders are stored there.",
@@ -249,7 +249,7 @@ Object.assign(EN, {
   "Envoi du fichier…": "Uploading file…", "Fichier ajouté": "File added", "Envoi impossible pour l'instant.": "Upload not possible right now.",
   "Fichier trop lourd (20 Mo maximum).": "File too large (20 MB maximum).", "Format non accepté : utilisez une photo ou un PDF.": "Format not accepted: use a photo or a PDF.",
   "Format non accepté : utilisez un PDF ou une photo.": "Format not accepted: use a PDF or a photo.", "Date d'étalonnage": "Calibration date", "Résultat": "Result",
-  "N° de certificat": "Certificate no.", "Réalisé par": "Done by", "Atelier W.A.Y.S.": "W.A.Y.S. workshop", "Atelier interne ou laboratoire externe": "In-house workshop or external lab",
+  "N° de certificat": "Certificate no.", "Réalisé par": "Done by", "Atelier interne": "In-house workshop", "Atelier interne ou laboratoire externe": "In-house workshop or external lab",
   "Périodicité (mois)": "Interval (months)", "Certificat (PDF ou photo)": "Certificate (PDF or photo)", "Remarques (valeurs relevées, ajustages…)": "Remarks (readings, adjustments…)",
   "L'ajout de fichiers est réservé aux éditeurs : le certificat pourra être joint plus tard.": "Adding files is reserved for editors: the certificate can be attached later.",
   "Le fichier n'a pas pu être envoyé. Réessayez ou enregistrez sans fichier.": "The file could not be uploaded. Try again or save without a file.",
@@ -500,7 +500,7 @@ EN["Glissez-déposez les cartes d'une colonne à l'autre. Dropped : rendu au cli
 Object.assign(EN, {
   "Amendes": "Fines", "Amende": "Fine", "Excès de vitesse": "Speeding", "Stationnement": "Parking", "Feu rouge": "Red light", "GSM au volant": "Phone while driving", "Ceinture": "Seat belt",
   "Zone basse émission (LEZ)": "Low emission zone (LEZ)", "Péage / Viapass": "Toll / Viapass", "Autre infraction": "Other offence", "Police": "Police", "Communal": "Municipal",
-  "W.A.Y.S. (pas de refacturation)": "W.A.Y.S. (not recharged)", "Chauffeur (remboursement)": "Driver (reimbursement)", "Personne (classée / annulée)": "Nobody (dismissed / cancelled)",
+  "Chauffeur (remboursement)": "Driver (reimbursement)", "Personne (classée / annulée)": "Nobody (dismissed / cancelled)",
   "Contestée": "Contested", "Conducteur à désigner": "Driver to be identified", "À payer": "To pay", "Remboursement attendu": "Reimbursement pending", "Réglée": "Settled",
   "désigner le conducteur": "identify the driver", "remboursement du chauffeur": "driver reimbursement", "suivre la contestation": "follow up the appeal", "l'amende": "the fine",
   "Reçue": "Received", "Conducteur désigné": "Driver identified", "Contestation": "Appeal", "Payée": "Paid", "Remboursée": "Reimbursed",
@@ -520,10 +520,8 @@ Object.assign(EN, {
 rule(/^(\d+) amendes?( sur (\d+))?$/, (m, n, x, t) => `${n} fine${+n === 1 ? "" : "s"}${t ? " of " + t : ""}`);
 rule(/^payer (.+)$/, "pay $1");
 rule(/^Amende (.*) · (.+)$/, (m, a, b) => `Fine ${a.replace(/^PV /, "ticket ")} · ${tr(b, "en")}`);
-rule(/^(\d{4}) : (\d+) amendes? · (.+) au total · (.+) à charge de W\.A\.Y\.S\.$/, (m, y, n, t, c) => `${y}: ${n} fine${+n === 1 ? "" : "s"} · ${t} in total · ${c} borne by W.A.Y.S.`);
 rule(/^à récupérer auprès des chauffeurs$/, "to recover from drivers");
-rule(/^(\d{4}) : (\d+) amendes? · (.+) au total · (.+) à charge de W\.A\.Y\.S\.( ·)?$/, (m, y, n, t, c, d) => `${y}: ${n} fine${+n === 1 ? "" : "s"} · ${t} in total · ${c} borne by W.A.Y.S.${d || ""}`);
-rule(/^(.+) au total$/, "$1 in total"); rule(/^(.+) à charge de W\.A\.Y\.S\.$/, "$1 borne by W.A.Y.S."); rule(/^(\d{4}) :$/, "$1:");
+rule(/^(\d{4}) :$/, "$1:");
 /* administration */
 Object.assign(EN, {
   "Administration": "Administration", "Gestion Documents": "Document management", "Documents et formulaires de l'entreprise, disponibles à tout moment": "Company documents and forms, available at any time",
@@ -532,7 +530,7 @@ Object.assign(EN, {
   "Télécharger": "Download", "Imprimer": "Print", "Modifier": "Edit", "Aperçu": "Preview", "Épinglé": "Pinned", "★ Épinglés": "★ Pinned", "Sans catégorie": "Uncategorised",
   "Document": "Document", "Catégorie": "Category", "Type": "Type", "Mis à jour": "Updated", "Fichier": "File", "Image": "Image",
   "Aucun document ne correspond à cette recherche.": "No document matches this search.", "Douane": "Customs", "Sécurité & badges": "Security & badges", "Ressources humaines": "Human resources",
-  "Assurances": "Insurance", "Qualité": "Quality", "Modèles W.A.Y.S.": "W.A.Y.S. templates", "Autre": "Other",
+  "Assurances": "Insurance", "Qualité": "Quality", "Modèles": "Templates", "Autorité (CAA)": "Authority (CAA)", "Aéroport": "Airport", "Autre": "Other",
   "Classer le document": "File the document", "Catégorie (pour tous)": "Category (for all)", "Organisme": "Organisation", "Nom de chaque document": "Name of each document",
   "Liege Airport, Douane…": "Liege Airport, Customs…", "Liege Airport, SPF Finances…": "Liege Airport, FPS Finance…", "Modifier le document": "Edit document", "Nom du document": "Document name",
   "Version / édition": "Version / edition", "2026-03, rév. 4…": "2026-03, rev. 4…", "Épingler en haut de la liste": "Pin to the top of the list",
@@ -649,7 +647,7 @@ EN["⇪ Importer Webfleet (CSV)"] = "⇪ Import Webfleet (CSV)";
 Object.assign(EN, { "Liste des véhicules (créer / compléter les fiches)": "Vehicle list (create / complete records)", "Nom de l'objet WebFleet": "WebFleet object name", "Immatriculation": "Registration",
   "Marque / modèle / description": "Make / model / description", "Carburant": "Fuel", "Créer une fiche pour chaque véhicule absent de l'ERP": "Create a record for each vehicle not yet in the ERP",
   "Choisissez au moins la colonne du nom de l'objet, du n° d'objet ou de l'immatriculation.": "Choose at least the object name, object number or registration column.",
-  "Fiches existantes : l'identifiant WebFleet est ajouté et le kilométrage mis à jour s'il est plus élevé. Nouvelles fiches : un identifiant W.A.Y.S. libre leur est attribué ; complétez ensuite les documents, pneus et échéances.": "Existing records: the WebFleet ID is added and mileage updated if higher. New records get a free W.A.Y.S. ID; then complete documents, tyres and due dates.",
+  "Fiches existantes : l'identifiant WebFleet est ajouté et le kilométrage mis à jour s'il est plus élevé. Nouvelles fiches : un identifiant libre leur est attribué ; complétez ensuite les documents, pneus et échéances.": "Existing records: the WebFleet ID is added and mileage updated if higher. New records get a free internal ID; then complete documents, tyres and due dates.",
   "Action": "Action", "Identifiant": "ID", "Plaque": "Plate", "Modèle": "Model", "N° d'objet": "Object no.", "Compléter": "Complete", "Créer": "Create", "Ignorer": "Skip", "auto": "auto",
   "Supprimer seulement les véhicules d'exemple": "Delete only the sample vehicles", "Supprimer les véhicules d'exemple": "Delete the sample vehicles" });
 rule(/^(\d+) véhicules? déjà dans l'ERP → fiche complétée$/, (m, n) => `${n} vehicle${+n === 1 ? "" : "s"} already in the ERP → record completed`);
@@ -661,7 +659,7 @@ rule(/^(\d+) véhicules? d'exemple supprimés?$/, (m, n) => `${n} sample vehicle
 rule(/^Supprimer définitivement les (\d+) véhicules d'exemple, avec leurs pannes, entretiens, amendes, positions et trajets d'exemple \? .*$/, "Permanently delete the $1 sample vehicles, with their sample faults, services, fines, positions and trips? Your own vehicles and the other sample data (gas, customers, invoices, tools) are kept.");
 Object.assign(EN, { "Importer un export Webfleet (CSV ou Excel)": "Import a Webfleet export (CSV or Excel)", "Choisir le fichier (CSV ou Excel)": "Choose the file (CSV or Excel)", "fichier Excel": "Excel file",
   "Dans Webfleet, exportez (CSV ou Excel) la": "In Webfleet, export (CSV or Excel) the", "liste des véhicules": "vehicle list", ", la": ", the", "vue des dernières positions": "last positions view", "ou le": "or the",
-  "Reprendre l'identifiant WebFleet (004, 015… en tête du nom, sinon le n° d'objet) comme identifiant W.A.Y.S. quand il est libre": "Use the WebFleet ID (004, 015… at the start of the name, otherwise the object no.) as W.A.Y.S. ID when free",
+  "Reprendre l'identifiant WebFleet (004, 015… en tête du nom, sinon le n° d'objet) comme identifiant interne quand il est libre": "Use the WebFleet ID (004, 015… at the start of the name, otherwise the object no.) as internal ID when free",
   "Enregistrer aussi la dernière position (adresse, état, dernière mise à jour)": "Also save the last position (address, state, last update)", "Placer les adresses sur la carte (géocodage OpenStreetMap, ≈ 1 seconde par véhicule)": "Place addresses on the map (OpenStreetMap geocoding, ≈ 1 second per vehicle)",
   "Dernière position (adresse)": "Last position (address)", "Dernière mise à jour": "Last update", "Statut WebFleet": "WebFleet status", "à compléter": "to complete" });
 rule(/^Localisation des adresses… (.+)$/, "Locating addresses… $1");
@@ -679,8 +677,6 @@ Object.assign(EN, {
   "pas encore synchronisées": "not synced yet", "pas encore synchronisés": "not synced yet", "Dernière erreur :": "Last error:",
   "(toutes les 15 min, 30 derniers jours au premier passage)": "(every 15 min, last 30 days on first run)",
   "La synchronisation tourne tant qu'au moins une personne a l'ERP ouvert ; à la réouverture, les trajets manqués sont rattrapés.": "Sync runs while at least one person has the ERP open; missed trips are caught up when it is reopened.",
-  "Positions, compteurs et trajets arrivent automatiquement depuis Webfleet. Les identifiants restent sur le serveur ways.support : ils ne sont jamais renvoyés au navigateur.": "Positions, odometers and trips arrive automatically from Webfleet. Credentials stay on the ways.support server and are never sent back to the browser.",
-  "Enregistrés sur le serveur ways.support uniquement ; laissez un champ vide pour garder la valeur actuelle.": "Stored on the ways.support server only; leave a field empty to keep the current value.",
   "Aucun trajet reçu de Webfleet pour l'instant.": "No trips received from Webfleet yet.", "Le serveur ne répond pas.": "The server is not responding.",
   "Vérifiez le compte, l'utilisateur, son mot de passe, la clé API et que l'utilisateur a bien l'accès WEBFLEET.connect.": "Check the account, user, password, API key and that the user has WEBFLEET.connect access.",
   "inchangé": "unchanged", "inchangée": "unchanged"
@@ -717,3 +713,20 @@ Object.assign(EN, { "Mouvements": "Transactions", "Fichiers CODA": "CODA files",
   "État": "Status", "Valides": "Valid", "Annulés": "Cancelled", "Télécharger": "Download", "Annuler le fichier": "Cancel the file" });
 Object.assign(EN, { "Nom et couleur du compte": "Account name and colour", "Nom affiché en grand (facultatif)": "Large display name (optional)", "Couleur": "Colour",
   "Rechercher une facture, un client ou un montant…": "Search an invoice, customer or amount…", "Rechercher une contrepartie, une communication, un n° de facture, un montant…": "Search a counterparty, reference, invoice number, amount…" });
+/* ---- my-145-station ---- */
+Object.assign(EN, {
+  "Station": "Station", "Véhicules": "Vehicles", "Outillage": "Tooling", "Articles et prix": "Items and prices", "Management": "Management",
+  "Nom de la compagnie": "Airline name", "Code court (Charge Sheet)": "Short code (Charge Sheet)", "Préfixes d'immatriculation": "Registration prefixes",
+  "Immatriculations": "Registrations", "Code": "Code", "Tarifs": "Rates", "Rechercher un nom, un code, une immatriculation…": "Search a name, code or registration…",
+  "Tarif général": "General rate", "Type d'avion": "Aircraft type", "Forfait": "Package", "Heures": "Hours", "Matériel / équipement": "Material / equipment",
+  "Libellé (tel qu'il apparaît sur la Charge Sheet)": "Label (as shown on the Charge Sheet)", "Devise": "Currency", "Prix": "Price",
+  "Rechercher une référence, un libellé, un type d'avion…": "Search a reference, label or aircraft type…",
+  "Tarifs utilisés pour préparer les Charge Sheets. Modifiez un prix directement dans le tableau : il est enregistré dès que vous quittez la case.": "Rates used to prepare Charge Sheets. Edit a price directly in the table: it is saved as soon as you leave the field.",
+  "Organisation, station, utilisateurs et services reliés": "Organisation, station, users and linked services", "Organisation": "Organisation",
+  "Nom de l'organisation (Part 145)": "Organisation name (Part 145)", "N° d'agrément Part 145": "Part 145 approval no.",
+  "Code de la station (IATA)": "Station code (IATA)", "Nom de la station": "Station name", "Fuseau horaire de la station": "Station time zone",
+  "Pris par": "Taken by", "Import d'une sauvegarde": "Import a backup", "Sauvegarde": "Backup",
+  "Quels véhicules ont une échéance ce mois-ci ?": "Which vehicles have a due date this month?", "Quels outils arrivent à échéance d'étalonnage ?": "Which tools are due for calibration?",
+  "Quelles pannes de véhicules sont encore ouvertes ?": "Which vehicle faults are still open?", "Liste les tarifs du client MT": "List the rates for customer MT", "Résume mes notes de la semaine": "Summarise my notes from this week",
+  "État des véhicules": "Vehicle status", "Voir les véhicules": "View vehicles", "Bon de commande": "Purchase order", "Continuer": "Continue"
+});
