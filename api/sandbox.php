@@ -71,7 +71,8 @@ function sbx_guard($route, $parts, $method) {
     if ($route === 'assistant' && in_array($act, ['config', 'test'], true)) fail(409, $msg);
     if ($route === 'whatsapp' && $act !== 'status') fail(409, $msg);
     if ($route === 'fr24' && $act === 'config') fail(409, $msg);
-    if ($route === 'notion') fail(409, $msg);   // écrirait dans Notion
+    if ($route === 'notion') fail(409, $msg);
+    if ($route === 'onedrive' && $act !== 'list') fail(409, $msg);   // écrirait dans Notion
     if ($route === 'dropbox') { if ($act === 'tick') out(['ok' => true, 'skipped' => true, 'sandbox' => true]); if (!in_array($act, ['list', 'search', 'link', 'new', 'new-ack'], true)) fail(409, $msg); }
     if ($route === 'auth' && ($act === 'users' || $act === 'smtp' || $act === 'test-mail')) fail(409, $msg);
     if ($route === 'import') fail(409, $msg);

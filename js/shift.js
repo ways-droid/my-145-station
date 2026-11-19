@@ -36,7 +36,7 @@ function visitCheck(v) {
 const hoClosed = h => !!(h && h.in && h.in.at);
 
 VIEWS.shift = {
-  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) render(true); }); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); },
+  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) render(true); }); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
   render() {
     if (!UI.shift) UI.shift = currentShift();
     const [date, sh] = UI.shift, id = hoId(date, sh), h = hoDoc(id) || {}, cur = currentShift(), isCur = cur[0] === date && cur[1] === sh;
@@ -87,7 +87,7 @@ function shiftVisits(id) {
   const rows = hoItems(id, "visit"), ed = hoEd(id);
   return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && rows.length ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
     rows.length ? `<div class="tablewrap"><table><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
-      return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}</div>${ck.ok ? "" : `<span class="chip sm bad">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
+      return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm bad">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
         <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${fr24Line(v)}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small pre">${esc(v.planned || "")}</td><td class="small pre">${esc(v.done || "")}</td><td class="mono small">${esc(v.mhrs || "")}</td><td class="mono small">${esc(v.atl || "")}</td></tr>`; }).join("")}</tbody></table></div>`
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`);
@@ -111,11 +111,12 @@ ACTIONS["visit-form"] = el => {
     ${others.length ? `<label class="f">Ajouter quelqu'un qui n'est pas au roster de ce shift<select id="vi-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}
     ${field("vi-plan", "Travail prévu", v.planned, { type: "textarea" })}${field("vi-done", "Travail fait", v.done, { type: "textarea" })}${field("vi-notes", "Notes", v.notes, { type: "textarea" })}
     <label class="chk"><input type="checkbox" id="vi-open" ${v.open ? "checked" : ""}> Travail non terminé : à reprendre par le shift suivant</label>
-    <div class="err" id="vi-warn"></div></div>
+    <div class="err" id="vi-warn"></div>${v.id ? odScansHtml(v) : ""}</div>
     <footer>${v.id ? `<div class="left"><button type="button" class="btn danger" data-a="item-del" data-id="${v.id}">Supprimer</button></div>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   const cur = () => ({ reg: val("vi-reg").toUpperCase(), acType: val("vi-ac"), crs: picked(m, "vi-crs") });
   const upd = () => { const c = clientOfReg(val("vi-reg")); m.querySelector("#vi-client").textContent = c ? tr("Client") + " : " + c.name + (c.code ? " (" + c.code + ")" : "") : "";
     const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg); };
+  if (v.id) odWire(m, v);
   m.querySelector("#vi-reg").oninput = upd; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = upd; upd();
   const add = m.querySelector("#vi-add");
   if (add) add.onchange = () => { const p = staff(add.value); if (!p) return; for (const box of ["vi-crs", "vi-mech"]) m.querySelector("#" + box).insertAdjacentHTML("beforeend", `<label class="chk"><input type="checkbox" value="${p.id}"> ${esc(p.name)}</label>`); add.querySelector(`option[value="${p.id}"]`).remove(); add.value = ""; };
@@ -267,3 +268,38 @@ ACTIONS["notion-save"] = async () => { const k = val("notion-token"); if (!k) re
 ACTIONS["notion-parent"] = async () => { try { await API.call("POST", "notion/config", { parent: val("notion-parent") }); toast("Page Notion enregistrée"); } catch (e) { toast(tr(e.message)); } loadNotion(); };
 ACTIONS["notion-off"] = () => confirmBox("Retirer le jeton Notion ?", async () => { await API.call("POST", "notion/config", { token: "" }); loadNotion(); }, "Retirer");
 ACTIONS["notion-test"] = async () => { try { const r = await API.call("POST", "notion/test", {}); toast(tr("Connexion Notion OK") + " · " + (r.title || "")); } catch (e) { toast(tr(e.message)); } };
+
+/* ---- OneDrive : scans par avion du shift (rangés dans <racine>/<mois>/<date> Day|Night/<immat>) ---- */
+let OD = null;
+async function odStatus() { if (!SERVER || !API || !ME) return null; if (OD) return OD; try { OD = await API.call("GET", "onedrive/status"); } catch { OD = { configured: false }; } return OD; }
+function odScansHtml(v) {
+  const list = (v.scans || []).slice().reverse();
+  if (!(OD && OD.configured) && !list.length) return "";
+  return `<div class="stack od-scans"><b>Scans (OneDrive)</b><div class="row-g wrap">${list.map(f => `<a class="btn sm" href="${esc(f.url)}" target="_blank" rel="noopener" title="${esc((f.by || "") + " · " + fmtDT(f.at))}">${esc(f.name)} ↗</a>`).join("") || `<span class="muted small">Aucun scan.</span>`}
+    ${OD && OD.configured && !readOnly ? `<label class="btn sm primary">+ Scanner / joindre<input type="file" id="od-file" accept="application/pdf,image/*" capture="environment" multiple hidden></label>` : ""}</div></div>`;
+}
+function odWire(m, v) {
+  m.querySelector("#od-file")?.addEventListener("change", async e => {
+    const files = [...e.target.files]; e.target.value = ""; if (!files.length) return;
+    for (const f of files) { toast(tr("Envoi vers OneDrive…") + " " + f.name);
+      try { await API.postFile("onedrive/upload", f, { item: v.id }); } catch (x) { toast(tr(x.message)); return; } }
+    toast(files.length > 1 ? "Scans rangés dans OneDrive" : "Scan rangé dans OneDrive");
+    if (API.refresh) await API.refresh();
+    setTimeout(() => { const nv = S.shiftItems.find(i => i.id === v.id); const box = document.querySelector(".od-scans"); if (nv && box) { box.outerHTML = odScansHtml(nv); odWire(document.querySelector(".modal"), nv); } }, 400);
+  });
+}
+function odCardShell() { return isAdmin() ? `<section class="panel"><div class="pad"><h3>OneDrive (scans)</h3><div class="muted small">Les scans du shift sont rangés dans le OneDrive Microsoft 365 de la station, sous un seul dossier racine. Dans Entra ID : inscription d'application, permission Files.ReadWrite.All (application) avec consentement administrateur, puis un secret client.</div></div><div class="pad" id="od-card"><span class="muted">…</span></div></section>` : ""; }
+async function loadOd() {
+  const el = document.getElementById("od-card"); if (!el) return;
+  OD = null; const s = await odStatus() || {};
+  el.innerHTML = `<div class="stack"><div class="row-g wrap">${s.configured ? `<span class="chip good">Relié</span><button class="btn sm" data-a="od-test">Tester</button>` : `<span class="chip">Non configuré</span>`}${s.secret ? `<span class="chip sm">Secret enregistré</span>` : ""}</div>
+    <div class="fields">${field("od-tenant", "Locataire (tenant ID ou domaine)", s.tenant || "", { cls: "mono" })}${field("od-client", "ID d'application (client)", s.clientId || "", { cls: "mono" })}
+    <label class="f">Secret client<input type="password" id="od-secret" autocomplete="off" placeholder="${esc(tr(s.secret ? "Laisser vide pour garder le secret actuel" : "Secret client"))}"></label>
+    ${field("od-user", "Compte OneDrive (adresse)", s.user || "", { cls: "mono", ph: "station@challenge-technic.com" })}${field("od-root", "Dossier racine des scans", s.root || "", { ph: "Station TLV/Scans" })}</div>
+    <div><button class="btn sm primary" data-a="od-save">Enregistrer</button></div></div>`;
+}
+ACTIONS["od-save"] = async () => {
+  const b = { tenant: val("od-tenant"), clientId: val("od-client"), user: val("od-user"), root: val("od-root") }; if (val("od-secret")) b.secret = val("od-secret");
+  try { await API.call("POST", "onedrive/config", b); toast("Réglages OneDrive enregistrés"); } catch (e) { toast(tr(e.message)); } loadOd();
+};
+ACTIONS["od-test"] = async () => { try { const r = await API.call("POST", "onedrive/test", {}); toast(tr("Connexion OneDrive OK") + " · " + (r.drive || "")); } catch (e) { toast(tr(e.message)); } };
