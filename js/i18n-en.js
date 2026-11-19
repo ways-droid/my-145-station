@@ -892,3 +892,17 @@ Object.assign(EN, {
   "Prochains vols du personnel, nuits d'hôtel, jours de voyage sans vol.": "Next staff flights, hotel nights, travel days without a flight.", "vols dans 7 j": "flights in 7 days", "à l'hôtel ce soir": "at the hotel tonight", "à organiser": "to arrange"
 });
 rule(/^(\d+) dans les 7 jours$/, "$1 within 7 days");
+
+/* ---- OneDrive ---- */
+Object.assign(EN, {
+  "Scans (OneDrive)": "Scans (OneDrive)", "Aucun scan.": "No scans.", "+ Scanner / joindre": "+ Scan / attach", "Envoi vers OneDrive…": "Uploading to OneDrive…", "Scans rangés dans OneDrive": "Scans filed in OneDrive", "Scan rangé dans OneDrive": "Scan filed in OneDrive",
+  "Scans dans OneDrive": "Scans in OneDrive", "OneDrive (scans)": "OneDrive (scans)",
+  "Les scans du shift sont rangés dans le OneDrive Microsoft 365 de la station, sous un seul dossier racine. Dans Entra ID : inscription d'application, permission Files.ReadWrite.All (application) avec consentement administrateur, puis un secret client.": "Shift scans are filed in the station's Microsoft 365 OneDrive, under a single root folder. In Entra ID: app registration, Files.ReadWrite.All (application) permission with admin consent, then a client secret.",
+  "Relié": "Connected", "Secret enregistré": "Secret saved", "Locataire (tenant ID ou domaine)": "Tenant (tenant ID or domain)", "ID d'application (client)": "Application (client) ID", "Secret client": "Client secret",
+  "Laisser vide pour garder le secret actuel": "Leave empty to keep the current secret", "Compte OneDrive (adresse)": "OneDrive account (address)", "Dossier racine des scans": "Scans root folder",
+  "Réglages OneDrive enregistrés": "OneDrive settings saved", "Connexion OneDrive OK": "OneDrive connection OK",
+  "OneDrive n'est pas configuré : un administrateur doit le relier dans Paramètres.": "OneDrive is not set up: an administrator must connect it in Settings.",
+  "OneDrive : accès refusé, reconnectez OneDrive dans Paramètres.": "OneDrive: access denied, reconnect OneDrive in Settings.", "OneDrive : permission manquante (Files.ReadWrite.All avec consentement administrateur).": "OneDrive: missing permission (Files.ReadWrite.All with admin consent).",
+  "OneDrive : dossier ou compte introuvable (vérifiez l'adresse du compte OneDrive et le dossier racine).": "OneDrive: folder or account not found (check the OneDrive account address and the root folder).",
+  "Les scans se rangent par avion du shift.": "Scans are filed per shift aircraft.", "Fichier trop lourd (20 Mo maximum).": "File too large (20 MB maximum).", "Avion du shift introuvable": "Shift aircraft not found"
+});

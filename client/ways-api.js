@@ -133,6 +133,15 @@
         if (!r.ok) throw new Error(d.error || 'Envoi impossible');
         return d;
       },
+      async postFile(path, file, extra) {   // envoi d'un fichier vers une autre route (OneDrive…)
+        const fd = new FormData();
+        fd.append('file', file, file.name);
+        if (extra) Object.keys(extra).forEach(k => fd.append(k, extra[k]));
+        const r = await fetch(base + path, { method: 'POST', headers: { Authorization: 'Bearer ' + token }, body: fd });
+        const d = await r.json().catch(() => ({}));
+        if (!r.ok) throw new Error(d.error || 'Envoi impossible');
+        return d;
+      },
       fileUrl: (id, download) => base + 'files/' + id + '?token=' + enc(token) + (download ? '&download=1' : ''),
       removeFile: id => req('DELETE', 'files/' + id),
       refresh: poll,

@@ -217,6 +217,27 @@ ok "Notion : seule l'ancienne page de l'outil part à la corbeille" "$(J 'echo i
 no "Notion : la vraie page n'est jamais touchée" "$(J 'echo json_encode($o["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"]).implode(",",$S["log"]);')" 'archived\|bbbbbbbb'
 ok "Notion : tout est écrit sous la page de test" "$(J 'foreach($S["log"] as $l) if(str_starts_with($l,"page ")&&!str_ends_with($l,"under aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")) echo "AILLEURS "; echo "ok";')" '^ok$'
 pkill -f "127.0.0.1:8774" || true
+echo "> onedrive"
+pkill -f "127.0.0.1:8775" || true; rm -rf $T/od; mkdir -p $T/od
+(OD_MOCK_DIR=$T/od php -S 127.0.0.1:8775 "$D/onedrive-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["od_base","http://127.0.0.1:8775"]);' $T/t.db
+echo "scan ATL" > $T/scan.pdf
+ok "OneDrive non configuré" "$(curl -s -H "$HT" -F "file=@$T/scan.pdf" -F item=v1 $U/onedrive/upload)" "pas configuré"
+ok "OneDrive : réglages réservés aux admins" "$(curl -s -H "$B" -X POST -d '{"tenant":"tenant-ok"}' $U/onedrive/config)" 'administrateurs'
+curl -s -H "$A" -X POST -d '{"tenant":"tenant-ok","clientId":"app-123","secret":"od-secret-bad","user":"station@example.test","root":"../Station TLV/Scans"}' $U/onedrive/config >/dev/null
+ok "OneDrive : racine sans remontée" "$(curl -s -H "$A" $U/onedrive/status)" '"root":"Station TLV\/Scans"'
+ok "OneDrive : mauvais secret expliqué" "$(curl -s -H "$A" -X POST -d '{}' $U/onedrive/test)" 'connexion refusée'
+curl -s -H "$A" -X POST -d '{"secret":"od-secret-good"}' $U/onedrive/config >/dev/null
+ok "OneDrive : test OK" "$(curl -s -H "$A" -X POST -d '{}' $U/onedrive/test)" 'Station TLV'
+no "OneDrive : secret jamais renvoyé" "$(curl -s -H "$A" $U/onedrive/status)" 'od-secret-good'
+R=$(curl -s -H "$HT" -F "file=@$T/scan.pdf;filename=ATL 123?.pdf" -F item=v1 $U/onedrive/upload)
+ok "OneDrive : le terrain envoie un scan" "$R" '"ok":true'; ok "OneDrive : rangé par mois, shift et avion" "$R" '"path":"2026-11\/2026-11-19 Day\/9H-ABC\/[0-9]* ATL 123'
+ok "OneDrive : fichier écrit sous la racine" "$(find $T/od -name '*ATL*' | head -1)" "$T/od/Station TLV/Scans/2026-11/2026-11-19 Day/9H-ABC/"
+ok "OneDrive : scan noté sur l'avion" "$(curl -s -H "$HT" $U/docs/shiftItems/v1)" '"scans":\[{"name"'
+ok "OneDrive : liste sous la racine" "$(curl -s -H "$HT" -X POST -d '{"path":"2026-11/2026-11-19 Day/9H-ABC"}' $U/onedrive/list)" 'ATL 123'
+ok "OneDrive : pas de sortie de la racine" "$(curl -s -H "$HT" -X POST -d '{"path":"../../"}' $U/onedrive/list)" '"path":""'
+ok "OneDrive : seulement pour un avion du shift" "$(curl -s -H "$HT" -F "file=@$T/scan.pdf" -F item=t1 $U/onedrive/upload)" 'par avion'
+pkill -f "127.0.0.1:8775" || true
 echo "> dropbox"
 ok "adresses Dropbox réelles" "$(cd "$D/../api" && php -r 'function kv_get($k){return null;} require "dropbox.php"; echo dbx_url("oauth2","token")," ",dbx_url("api","files/list_folder")," ",dbx_url("content","files/upload");')" 'https://api.dropboxapi.com/oauth2/token https://api.dropboxapi.com/2/files/list_folder https://content.dropboxapi.com/2/files/upload'
 pkill -f "127.0.0.1:8771" || true

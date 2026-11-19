@@ -28,6 +28,7 @@ require __DIR__ . '/dropbox.php';
 require __DIR__ . '/whatsapp.php';
 require __DIR__ . '/fr24.php';
 require __DIR__ . '/notion.php';
+require __DIR__ . '/onedrive.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'POST' && isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
@@ -62,6 +63,7 @@ try {
     whatsapp_routes($route, $parts, $method, $who, $role);
     fr24_routes($route, $parts, $method, $who, $role);
     notion_routes($route, $parts, $method, $who, $role);
+    onedrive_routes($route, $parts, $method, $who, $role);
 
     // ---------- Documents ----------
     if ($route === 'docs') {
