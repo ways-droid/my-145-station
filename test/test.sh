@@ -111,6 +111,13 @@ no "terrain : changements sans documents des autres" "$(curl -s -H "$HT" "$U/cha
 ok "terrain : personnel en lecture seule" "$(curl -s -H "$HT" -X PATCH -d '{"name":"X"}' $U/docs/staff/s1)" 'rôle'
 ok "bureau : fiche complète" "$(curl -s -H "$B" $U/docs/staff/s2)" 'V999'
 ok "bureau : ajoute un document" "$(curl -s -H "$B" -X PATCH -d '{"docs":[{"id":"x2","type":"visa","number":"V999"},{"id":"x3","type":"ramp","name":"TLV","expires":"2027-02-01"}]}' $U/docs/staff/s2)" '"ok":true'
+echo "> roster"
+ok "bureau : roster enregistré" "$(curl -s -H "$B" -X PUT -d '{"staffId":"s1","month":"2026-11","days":{"1":{"c":"D","note":"note-bureau"},"2":{"c":"C","start":"06:00","end":"18:00"}}}' $U/docs/roster/s1_2026-11)" '"ok":true'
+R=$(curl -s -H "$HT" $U/docs/roster/s1_2026-11); ok "terrain : roster visible" "$R" '"c":"D"'; no "terrain : remarques du bureau masquées" "$R" 'note-bureau'
+no "terrain : changements sans remarques" "$(curl -s -H "$HT" "$U/changes?since=0&colls=roster")" 'note-bureau'
+ok "terrain : roster en lecture seule" "$(curl -s -H "$HT" -X PUT -d '{"staffId":"s1","month":"2026-11","days":{}}' $U/docs/roster/s1_2026-11)" 'rôle'
+ok "bureau : remarque visible" "$(curl -s -H "$B" $U/docs/roster/s1_2026-11)" 'note-bureau'
+ok "historique : roster nommé" "$(curl -s -H "$A" "$U/log?coll=roster")" 'Roster 2026-11 Marc Terrain'
 echo "> dropbox"
 ok "adresses Dropbox réelles" "$(cd "$D/../api" && php -r 'function kv_get($k){return null;} require "dropbox.php"; echo dbx_url("oauth2","token")," ",dbx_url("api","files/list_folder")," ",dbx_url("content","files/upload");')" 'https://api.dropboxapi.com/oauth2/token https://api.dropboxapi.com/2/files/list_folder https://content.dropboxapi.com/2/files/upload'
 pkill -f "127.0.0.1:8771" || true

@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
@@ -335,11 +335,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"]]],
+  ["Station", [["personnel", "Personnel"], ["roster", "Roster"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"]]],
   ["Clients", [["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
@@ -470,7 +470,7 @@ const TAB_IC = {
   euro: '<path d="M18 6a7 7 0 1 0 0 12M4 10h10M4 14h10"/>',
   tag: '<path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1.5"/>',
 };
-const TAB_ICON = { equipe: "people", matrice: "check", vehicules: "car", taches: "check", pannes: "alert", documents: "doc", pneus: "tire", amendes: "ticket",
+const TAB_ICON = { mois: "chart", jour: "people", codes: "tag", equipe: "people", matrice: "check", vehicules: "car", taches: "check", pannes: "alert", documents: "doc", pneus: "tire", amendes: "ticket",
   entretiens: "tools", stats: "chart", stock: "box", bouteilles: "bottle", clients: "people", livraisons: "truck", config: "cog", atelier: "flask", outils: "tools", labos: "flask", echeances: "bell",
   mouv: "bank", coda: "file", rclients: "people", ramendes: "ticket", vehicles: "car", tools: "tools", products: "tag", centres: "chart", anparam: "cog", notes: "note", gaz: "bottle", frais: "euro", etalonnage: "flask", articles: "tag" };
 const tabIcon = (route, k) => { const n = TAB_ICON[k] || (route === "admin" && k === "documents" ? "folder" : null); return n && TAB_IC[n] ? `<svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true">${TAB_IC[n]}</svg>` : ""; };

@@ -7,15 +7,18 @@
 //  Terrain : articles et prix, documents administratifs : invisibles ; clients en lecture seule ;
 //            paramètres : ne peut rien y modifier ; export / import complets : refusés ;
 //            personnel : lecture seule, fiche complète pour soi (même e-mail), sinon l'essentiel
-//            (nom, fonction, licences sans numéro, qualifications) sans documents ni données personnelles.
+//            (nom, fonction, licences sans numéro, qualifications) sans documents ni données personnelles ;
+//            roster : lecture seule, sans les remarques du bureau.
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders'];
-const TERRAIN_READONLY   = ['clients', 'settings', 'staff'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
 function staff_mine($d) { $me = (string) ($GLOBALS['ME_EMAIL'] ?? ''); return $me !== '' && mb_strtolower(trim((string) ($d['email'] ?? ''))) === $me; }
+/* roster vu par le terrain : sans les remarques du bureau */
+function roster_public($d) { if (is_array($d) && is_array($d['days'] ?? null)) foreach ($d['days'] as $k => $x) if (is_array($x)) unset($d['days'][$k]['note']); return $d; }
 function staff_public($d) {
     if (!is_array($d) || staff_mine($d)) return $d;
     $o = array_intersect_key($d, array_flip(STAFF_PUBLIC));
@@ -62,6 +65,7 @@ function perm_view($role, $coll, $data, $id = null) {
     if ($role !== 'terrain' || $data === null) return $data;
     if (in_array($coll, TERRAIN_HIDDEN, true)) return null;
     if ($coll === 'staff') return staff_public($data);
+    if ($coll === 'roster') return roster_public($data);
     return $data;
 }
 // Ligne d'API (doc_out) filtrée : null = à ne pas envoyer.
@@ -71,6 +75,7 @@ function perm_out($role, $out) {
     if ($role !== 'terrain') return $out;
     if (in_array($out['coll'], TERRAIN_HIDDEN, true)) return null;
     if ($out['coll'] === 'staff' && is_array($out['data'])) $out['data'] = staff_public($out['data']);
+    if ($out['coll'] === 'roster' && is_array($out['data'])) $out['data'] = roster_public($out['data']);
     return $out;
 }
 

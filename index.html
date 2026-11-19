@@ -801,6 +801,22 @@ tr.doc-row.old td { opacity: .6; }
 @media (max-width: 1100px) { .labs-grid { grid-template-columns: 1fr; } }
 tr.sel td { background: var(--accent-soft); }
 .pre { white-space: pre-line; }
+.grid2.grid-even { grid-template-columns: 1fr 1fr; } @media (max-width: 1100px) { .grid2.grid-even { grid-template-columns: 1fr; } }
+.rbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 10px; }
+.rcode { display: inline-block; min-width: 34px; padding: 3px 6px; border-radius: 6px; border: 1px solid var(--line); font: 600 12px/1.3 ui-monospace, monospace; text-align: center; cursor: pointer; background: var(--bg); color: inherit; }
+.rcode.on { outline: 2px solid var(--ink-1, #111); outline-offset: 1px; }
+.rc-green { background: var(--green-bg); color: var(--green-ink); } .rc-blue { background: var(--blue-bg); color: var(--blue-ink); } .rc-orange { background: var(--orange-bg); color: var(--orange-ink, inherit); }
+.rc-yellow { background: var(--yellow-bg); color: var(--yellow-ink); } .rc-red { background: var(--red-bg); color: var(--red-ink); } .rc-grey { background: var(--grey-bg); }
+.rc-purple { background: #ede4fb; color: #5b2a9a; } .rc-teal { background: #dcf3f0; color: #11665c; } .rc-white { background: var(--bg); }
+.rwrap { overflow-x: auto; } table.roster { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+table.roster th, table.roster td { padding: 0; border: 1px solid var(--line); text-align: center; min-width: 30px; height: 30px; }
+table.roster thead th { font-weight: 600; font-size: 11px; } table.roster thead th span { display: block; color: var(--ink-3); font-weight: 400; }
+table.roster th.we { background: var(--grey-bg); } table.roster .today { box-shadow: inset 0 0 0 2px var(--blue-ink); }
+table.roster .rname { position: sticky; left: 0; z-index: 1; background: var(--panel, #fff); text-align: left; padding: 4px 8px; min-width: 190px; white-space: nowrap; }
+table.roster tbody th.rname { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12.5px; color: inherit; } table.roster tbody th.rname a { font-weight: 600; text-decoration: none; color: inherit; }
+table.roster td.rc { cursor: pointer; font: 600 11px ui-monospace, monospace; position: relative; user-select: none; } table.painting td.rc { cursor: crosshair; }
+table.roster .rnote { position: absolute; top: 2px; right: 2px; width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+table.roster tr.rcov td { font-size: 11px; color: var(--ink-3); } table.roster tr.rcov td.todo { background: #ede4fb; color: #5b2a9a; font-weight: 700; } table.roster tr.rcov td.gap { background: var(--red-bg); color: var(--red-ink); font-weight: 700; }
 .matrix th.c, .matrix td.c, .rating-edit th.c, .rating-edit td.c { text-align: center; }
 .lic-row { flex-wrap: wrap; } .lic-row input, .lic-row select { padding: 7px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font: inherit; font-size: 13px; color: inherit; } .lic-row .l-num { width: 140px; }
 .tool-ln { font-size: 12px; margin-top: 4px; display: flex; gap: 8px; align-items: flex-start; justify-content: space-between; color: var(--ink-2); }
@@ -1009,6 +1025,7 @@ table.vlist a.btn { white-space: nowrap; } .wf-tile .val.sm { font-size: 13px; l
 <script src="js/whatsapp.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/staff.js"></script>
+<script src="js/roster.js"></script>
 <script src="js/security.js"></script>
 <script src="js/links.js"></script>
 </body>
