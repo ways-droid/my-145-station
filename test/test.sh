@@ -385,6 +385,9 @@ ok "panne gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime-la"}' $U/assistant/say); ok "nouvelle demande ≠ confirmation" "$R" 'pas un « oui »'
 ok "panne toujours gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "« oui » explicite : supprimée" "$R" 'Fait : .*deleted'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri crée un roster avec l'id personne_mois" "$R" 's1_2027-01'
+ok "roster de Sindri lu à sa place" "$(curl -s -H "$A" $U/docs/roster/s1_2027-01)" '"D/N"'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri : roster déjà existant → update_record" "$R" 'existe déjà'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Note sindri"}' $U/assistant/say); ok "Sindri crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
 NAX=$(echo "$R" | grep -o '\\"id\\":\\"ax[0-9a-f]*' | head -1 | grep -o 'ax[0-9a-f]*')
 ok "note de Sindri : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note de Sindri : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
@@ -397,7 +400,7 @@ curl -s -H "$B" -X PUT -d '{"title":"Perso Bea","body":"secret"}' $U/docs/notes/
 R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Sindri ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Sindri lit un PDF Dropbox" "$R" 'Lu : text,document'
 no "fichier lu non gardé dans le fil" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN) ? implode("", $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN)) : "";' $T/t.db)" 'JVBERi0'
-ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":20'
+ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":22'
 echo "> notes"
 curl -s -H "$B" -X PUT -d '{"title":"Code portail","body":"1234","owner":"autre"}' $U/docs/notes/n1 >/dev/null
 ok "note personnelle : auteur imposé" "$(curl -s -H "$B" $U/docs/notes/n1)" '"owner":"u3"'
