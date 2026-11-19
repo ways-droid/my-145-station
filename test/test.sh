@@ -118,6 +118,30 @@ no "terrain : changements sans remarques" "$(curl -s -H "$HT" "$U/changes?since=
 ok "terrain : roster en lecture seule" "$(curl -s -H "$HT" -X PUT -d '{"staffId":"s1","month":"2026-11","days":{}}' $U/docs/roster/s1_2026-11)" 'rôle'
 ok "bureau : remarque visible" "$(curl -s -H "$B" $U/docs/roster/s1_2026-11)" 'note-bureau'
 ok "historique : roster nommé" "$(curl -s -H "$A" "$U/log?coll=roster")" 'Roster 2026-11 Marc Terrain'
+echo "> shifts et handover"
+ok "terrain : saisit un avion" "$(curl -s -H "$HT" -X PUT -d '{"ho":"2026-11-19-day","kind":"visit","reg":"9H-ABC","acType":"B767","crs":["s2"],"done":"Transit OK"}' $U/docs/shiftItems/v1)" '"ok":true'
+ok "terrain : coche le Station Control" "$(curl -s -H "$HT" -X PUT -d '{"date":"2026-11-19","shift":"day","checks":{"Outillage":{"by":"Marc"}}}' $U/docs/handovers/2026-11-19-day)" '"ok":true'
+ok "terrain : ne supprime pas un shift" "$(curl -s -H "$HT" -X DELETE $U/docs/handovers/2026-11-19-day)" 'rôle'
+curl -s -H "$HT" -X PATCH -d '{"in":{"by":"Autre Personne","at":"2026-11-19T20:05:00Z"}}' $U/docs/handovers/2026-11-19-day >/dev/null
+ok "shift repris : avion verrouillé pour le terrain" "$(curl -s -H "$HT" -X PATCH -d '{"done":"x"}' $U/docs/shiftItems/v1)" 'clôturé'
+ok "shift repris : nouvel avion refusé au terrain" "$(curl -s -H "$HT" -X PUT -d '{"ho":"2026-11-19-day","kind":"visit","reg":"OO-X"}' $U/docs/shiftItems/v2)" 'clôturé'
+ok "shift repris : fiche du shift verrouillée" "$(curl -s -H "$HT" -X PATCH -d '{"checkNote":"x"}' $U/docs/handovers/2026-11-19-day)" 'clôturé'
+ok "shift repris : le bureau corrige encore" "$(curl -s -H "$B" -X PATCH -d '{"done":"Transit OK, roue changée"}' $U/docs/shiftItems/v1)" '"ok":true'
+ok "historique : shift nommé" "$(curl -s -H "$A" "$U/log?coll=shiftItems")" 'Avion 9H-ABC'
+echo "> flightradar24"
+pkill -f "127.0.0.1:8773" || true
+(php -S 127.0.0.1:8773 "$D/fr24-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fr24_base","http://127.0.0.1:8773/api"]);' $T/t.db
+ok "FR24 non configuré : saisie manuelle" "$(curl -s -H "$HT" -X POST -d '{"regs":["9H-ABC"]}' $U/fr24/track)" 'saisissez les heures'
+ok "FR24 : clé réservée aux admins" "$(curl -s -H "$B" -X POST -d '{"key":"fr24-good"}' $U/fr24/config)" 'administrateurs'
+curl -s -H "$A" -X POST -d '{"key":"fr24-bad-key"}' $U/fr24/config >/dev/null
+ok "FR24 : mauvaise clé expliquée" "$(curl -s -H "$A" -X POST -d '{}' $U/fr24/test)" 'clé API refusée'
+curl -s -H "$A" -X POST -d '{"key":"fr24-good"}' $U/fr24/config >/dev/null
+ok "FR24 : test OK" "$(curl -s -H "$A" -X POST -d '{}' $U/fr24/test)" '"ok":true'
+no "FR24 : clé jamais renvoyée" "$(curl -s -H "$A" $U/fr24/status)" 'fr24-good'
+R=$(curl -s -H "$HT" -X POST -d '{"regs":["9h-abc","4X-ICA","OO-NOP"]}' $U/fr24/track)
+ok "FR24 : avion en vol avec ETA" "$R" '"eta":"2026-11-19T14:35:00Z"'; ok "FR24 : vol terminé" "$R" '"landed":"2026-11-19T10:02:00Z"'; ok "FR24 : avion sans vol" "$R" '"OO-NOP":\[\]'
+pkill -f "127.0.0.1:8773" || true
 echo "> dropbox"
 ok "adresses Dropbox réelles" "$(cd "$D/../api" && php -r 'function kv_get($k){return null;} require "dropbox.php"; echo dbx_url("oauth2","token")," ",dbx_url("api","files/list_folder")," ",dbx_url("content","files/upload");')" 'https://api.dropboxapi.com/oauth2/token https://api.dropboxapi.com/2/files/list_folder https://content.dropboxapi.com/2/files/upload'
 pkill -f "127.0.0.1:8771" || true
