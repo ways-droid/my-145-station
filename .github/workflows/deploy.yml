@@ -105,8 +105,13 @@ jobs:
                       print("  " * depth + p + " -> " + tgt)
                   else:
                       print("  " * depth + p + ("/" if stat.S_ISDIR(a.st_mode) else ""))
-                      if stat.S_ISDIR(a.st_mode) and depth < 2 and not p.startswith("test/"): show(p, depth + 1)
+                      if stat.S_ISDIR(a.st_mode) and depth < 2 and p != "test": show(p, depth + 1)
           show(".", 0)
+          for d in ("webroots", "webroots/by-route"):
+              for a in sorted(s.listdir_attr(d), key=lambda a: a.filename):
+                  p = d + "/" + a.filename
+                  try: print(p + " -> " + s.readlink(p))
+                  except Exception as e: print(p + " (" + str(e) + ")")
           PY
             exit 0
           fi
