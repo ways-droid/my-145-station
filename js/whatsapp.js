@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= WhatsApp (Paramètres) =======================
-   Numéro de la station dédié à l'équipe, relié à l'API Cloud de Meta (API seule) : l'outil et Axel le surveillent.
+   Numéro de la station dédié à l'équipe, relié à l'API Cloud de Meta (API seule) : l'outil et Sindri le surveillent.
    Voir api/whatsapp.php. Identifiants saisis ici, gardés sur le serveur, jamais renvoyés. */
 let WA = null, waStarted = false;
 function waStart() {   // filet de sécurité : messages reçus mais pas encore traités (normalement traités dès réception)
@@ -26,7 +26,7 @@ async function loadWa() {
       <li>WhatsApp → <b>Configuration</b> → Webhook : Callback URL ${copy(s.webhook)} Verify token ${copy(s.verify)} puis « Verify and save » et abonnez le champ <b>messages</b>.</li>
       <li>Ajoutez un moyen de paiement au compte WhatsApp (au-delà des messages gratuits) et passez l'app en mode <b>Live</b>.</li></ol>`;
   if (!s.configured) {
-    box.innerHTML = `<div class="stack-s"><div>Un numéro WhatsApp de la station réservé à l'équipe : les collègues écrivent à Axel comme à un collègue — questions, photos, documents. Axel répond avec les droits de la personne, et la conversation est la même que dans son panneau Axel.</div>
+    box.innerHTML = `<div class="stack-s"><div>Un numéro WhatsApp de la station réservé à l'équipe : les collègues écrivent à Sindri comme à un collègue — questions, photos, documents. Sindri répond avec les droits de la personne, et la conversation est la même que dans son panneau Sindri.</div>
       ${steps}${s.error ? `<div class="banner warn">${esc(s.error)}</div>` : ""}<div><button class="btn primary" data-a="wa-form">Saisir les identifiants Meta</button></div></div>`;
     return;
   }
@@ -43,13 +43,13 @@ async function loadWa() {
     <div class="row-g wrap"><button class="btn" data-a="wa-test">Tester la connexion</button>${s.registered ? "" : `<button class="btn primary" data-a="wa-register">Enregistrer le numéro</button>`}<button class="btn" data-a="wa-send-test">Envoyer un message test</button><button class="btn" data-a="wa-form">Modifier les identifiants</button><button class="btn danger" data-a="wa-off">Déconnecter</button></div>
     <details><summary class="small">Procédure Meta (rappel)</summary>${steps}</details>
 
-    <h4 class="np" style="margin-top:6px">Qui peut écrire à Axel</h4>
-    <div class="small muted">Associez le numéro de chaque membre de l'équipe à son compte (Axel répond avec ses droits, et la conversation apparaît dans son panneau Axel).</div>
+    <h4 class="np" style="margin-top:6px">Qui peut écrire à Sindri</h4>
+    <div class="small muted">Associez le numéro de chaque membre de l'équipe à son compte (Sindri répond avec ses droits, et la conversation apparaît dans son panneau Sindri).</div>
     <div id="wa-contacts" class="stack-s">${(s.contacts || []).map((c, i) => waContactRow(c, people, i)).join("")}</div>
     <div class="row-g"><button class="btn sm" data-a="wa-c-add">Ajouter un numéro</button><button class="btn sm primary" data-a="wa-c-save">Enregistrer la liste</button></div>
 
-    <h4 class="np" style="margin-top:6px">Messages à l'équipe (via Axel)</h4>
-    <div class="small">On peut demander à Axel d'envoyer un message WhatsApp à un membre de l'équipe (« dis à Marc que… ») ; il montre le texte et attend un « oui » avant d'envoyer. WhatsApp n'accepte un texte libre que si la personne a écrit au numéro de la station dans les 24 dernières heures ; sinon, il faut un modèle de message approuvé par Meta.</div>
+    <h4 class="np" style="margin-top:6px">Messages à l'équipe (via Sindri)</h4>
+    <div class="small">On peut demander à Sindri d'envoyer un message WhatsApp à un membre de l'équipe (« dis à Marc que… ») ; il montre le texte et attend un « oui » avant d'envoyer. WhatsApp n'accepte un texte libre que si la personne a écrit au numéro de la station dans les 24 dernières heures ; sinon, il faut un modèle de message approuvé par Meta.</div>
     ${(() => { const t = s.tpl || {}, st = t.status || ""; const chip = st === "APPROVED" ? `<span class="chip good">approuvé</span>` : st === "PENDING" ? `<span class="chip warn">en cours d'examen chez Meta</span>` : st === "REJECTED" ? `<span class="chip bad">refusé${t.error ? " : " + esc(t.error) : ""}</span>` : st ? `<span class="chip">${esc(st)}</span>` : `<span class="chip">pas encore créé</span>`;
       return `<div class="small">Modèle « <span class="mono">${esc(t.name || "message_equipe")}</span> » (${esc(t.lang || "fr")}) : ${chip}</div><pre class="small" style="white-space:pre-wrap;margin:0;padding:8px 10px;background:var(--bg);border-radius:8px">${esc(s.tplBody || "")}</pre>
       <div class="row-g">${st === "APPROVED" ? "" : `<button class="btn sm primary" data-a="wa-tpl" data-create="1">Créer le modèle chez Meta</button>`}<button class="btn sm" data-a="wa-tpl">Vérifier l'état</button></div>${t.error && st !== "REJECTED" ? `<div class="small txt-bad">${esc(t.error)}</div>` : ""}`; })()}
@@ -103,7 +103,7 @@ ACTIONS["wa-form"] = () => {
 };
 ACTIONS["wa-test"] = async () => { try { await API.call("POST", "whatsapp/test", {}); toast("Connexion WhatsApp OK"); } catch (e) { toast(tr(e.message)); } loadWa(); };
 ACTIONS["wa-register"] = () => confirmBox("Enregistrer le numéro sur l'API WhatsApp ? L'outil choisit un code PIN à 6 chiffres (vérification en deux étapes) et le garde sur le serveur. Ce numéro ne pourra plus être utilisé dans l'application WhatsApp.", async () => {
-  try { await API.call("POST", "whatsapp/register", {}); toast("Numéro enregistré : Axel peut recevoir les messages"); } catch (e) { toast(tr(e.message)); } loadWa(); }, "Enregistrer");
+  try { await API.call("POST", "whatsapp/register", {}); toast("Numéro enregistré : Sindri peut recevoir les messages"); } catch (e) { toast(tr(e.message)); } loadWa(); }, "Enregistrer");
 ACTIONS["wa-send-test"] = () => {
   const m = modal(`${mHead("Message test")}<form><div class="body stack-s">${field("wt-to", "Numéro WhatsApp", "", { required: true, ph: "0470 12 34 56", autofocus: true })}
     <div class="hint">La personne doit avoir écrit à ce numéro dans les dernières 24 h (règle de WhatsApp pour les messages libres) : écrivez-lui d'abord « test » depuis votre téléphone.</div><div class="err" id="wt-err"></div></div>
@@ -111,4 +111,4 @@ ACTIONS["wa-send-test"] = () => {
   m.querySelector("form").onsubmit = async e => { e.preventDefault();
     try { await API.call("POST", "whatsapp/send-test", { to: val("wt-to") }); closeModal(); toast("Message test envoyé"); } catch (x) { m.querySelector("#wt-err").textContent = tr(x.message); } };
 };
-ACTIONS["wa-off"] = () => confirmBox("Déconnecter WhatsApp ? Axel ne recevra plus les messages. Rien n'est supprimé chez Meta.", async () => { await API.call("POST", "whatsapp/config", { disconnect: true }); loadWa(); }, "Déconnecter");
+ACTIONS["wa-off"] = () => confirmBox("Déconnecter WhatsApp ? Sindri ne recevra plus les messages. Rien n'est supprimé chez Meta.", async () => { await API.call("POST", "whatsapp/config", { disconnect: true }); loadWa(); }, "Déconnecter");

@@ -23,8 +23,8 @@ const AI_DEFAULT_MODEL = 'claude-sonnet-5-5';
 const AI_BUDGET = 40;          // secondes de travail par appel avant de rendre la main au navigateur
 const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble des reprises)
 const AI_HIDDEN = ['settings', 'userPrefs'];
-const AI_NAME = 'Axel';
-// collections qu'Axel peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
+const AI_NAME = 'Sindri';
+// collections que Sindri peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
 const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'travel', 'hotels', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
@@ -232,7 +232,7 @@ function ai_system($who, $role) {
     $lines = []; foreach (ai_colls($role) as $c) $lines[] = "- $c : " . AI_LABELS[$c];
     return "Tu es " . AI_NAME . ", collègue de l'équipe de " . ($set['name'] ?? 'la station') . " (station de maintenance en ligne, organisme Part 145), et tu travailles dans son outil de gestion de station avec les droits de la personne qui te parle (au plus ceux d'un employé du bureau). Tu parles à " . (isset($who['label']) ? preg_replace('/^(user|token):/', '', $who['label']) : 'un membre de l\'équipe') . " (rôle : $role).\n"
         . "Nous sommes le " . date('Y-m-d') . " (heure locale de la station ; les horaires des vols sont en UTC). Réponds dans la langue de la question, en français par défaut, comme un collègue : bref, concret, tutoiement si on te tutoie.\n\n"
-        . (($GLOBALS['AI_VIA'] ?? '') === 'whatsapp' ? "Cette conversation passe par WhatsApp : réponses courtes, sans tableau ni titre (listes simples, *gras* WhatsApp). Pour une suppression, demande la confirmation ici (réponds « oui » pour confirmer) ; tout reste annulable depuis le panneau Axel de l'outil. Tu ne peux pas écouter les messages vocaux.\n\n" : '')
+        . (($GLOBALS['AI_VIA'] ?? '') === 'whatsapp' ? "Cette conversation passe par WhatsApp : réponses courtes, sans tableau ni titre (listes simples, *gras* WhatsApp). Pour une suppression, demande la confirmation ici (réponds « oui » pour confirmer) ; tout reste annulable depuis le panneau Sindri de l'outil. Tu ne peux pas écouter les messages vocaux.\n\n" : '')
         . "Données consultables avec tes outils :\n" . implode("\n", $lines) . "\n\n"
         . "Repères : les données avion et maintenance (CRS, cartes de travail, traçabilité des pièces) sont dans AMOS, pas ici : si on te les demande, dis-le. Tu ne signes ni ne valides aucune maintenance.
 
@@ -392,7 +392,7 @@ function ai_run($who, $role, $msgs) {
             $d = ai_request($req);
         }
         $content = (array) ($d['content'] ?? []);
-        if (($d['stop_reason'] ?? '') === 'max_tokens') {   // réponse coupée : un appel d'outil incomplet est retiré, Axel continue plus brièvement
+        if (($d['stop_reason'] ?? '') === 'max_tokens') {   // réponse coupée : un appel d'outil incomplet est retiré, Sindri continue plus brièvement
             $content = array_values(array_filter($content, fn($b) => ($b['type'] ?? '') !== 'tool_use'));
             if (!$content) $content = [['type' => 'text', 'text' => '…']];
             $msgs[] = ['role' => 'assistant', 'content' => $content];
@@ -508,7 +508,7 @@ function ai_say_core($who, $role, $b, $via = null) {
     return ['ok' => true, 'reply' => $acc['text'], 'actions' => $acc['actions']] + ai_view_out($t);
 }
 
-/* ---------- ce qu'Axel apprend de toute l'équipe (partagé, sans rien de personnel) ---------- */
+/* ---------- ce que Sindri apprend de toute l'équipe (partagé, sans rien de personnel) ---------- */
 const AI_MEM_MAX = 80;
 function ai_memory() { return json_decode(aik('ai_memory', '[]'), true) ?: []; }
 function ai_remember($who, $in) {
@@ -529,9 +529,9 @@ function ai_out_msgs($msgs) {
         return ['role' => 'user', 'content' => str_starts_with($txt, '(Fichier déposé sans consigne') ? '' : $txt, 'files' => $m['_files']];
     }, $msgs);
 }
-/* écritures d'Axel : mêmes contrôles que pour un employé Bureau (perm_write), notées dans l'historique au nom d'Axel */
+/* écritures de Sindri : mêmes contrôles que pour un employé Bureau (perm_write), notées dans l'historique au nom de Sindri */
 function ai_by($who) { return AI_NAME . ' (pour ' . preg_replace('/^(user|token):/', '', (string) ($who['label'] ?? '?')) . ')'; }
-/* ---------- Dropbox (lecture seule pour Axel) ---------- */
+/* ---------- Dropbox (lecture seule pour Sindri) ---------- */
 function ai_dropbox($tool, $in) {
     if (!function_exists('dbx_connected') || !dbx_connected()) return ['error' => "Dropbox n'est pas relié à l'outil."];
     if ($tool === 'dropbox_search') { $r = dbx_search_scoped((string) ($in['query'] ?? ''), (string) ($in['path'] ?? ''), 40); return ['count' => count($r), 'entries' => $r]; }
@@ -550,7 +550,7 @@ function ai_dropbox($tool, $in) {
         $img = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'][$ext] ?? null;
         if ($img) return ['_blocks' => [$label, ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $img, 'data' => base64_encode($bytes)]]]];
         if (in_array($ext, ['txt', 'csv', 'md', 'json', 'xml', 'html', 'htm', 'log'], true) || mb_check_encoding($bytes, 'UTF-8')) return ['path' => $p, 'text' => mb_substr(mb_convert_encoding($bytes, 'UTF-8', 'UTF-8'), 0, 50000)];
-        return ['error' => "Format non lisible par Axel ($ext) : ouvrez-le depuis Administration → Dropbox."];
+        return ['error' => "Format non lisible par Sindri ($ext) : ouvrez-le depuis Administration → Dropbox."];
     }
     return ['error' => 'Outil inconnu'];
 }
@@ -581,7 +581,7 @@ function ai_wa_propose($who, $role, $in) {
 function ai_confirm_list($who) { return json_decode(aik('ai_confirm:' . ai_ukey($who), '[]'), true) ?: []; }
 function ai_write($who, $role, $tool, $in, &$actions) {
     if (!in_array($tool, ['confirm_delete', 'confirm_action'], true) && count(array_filter($actions, fn($a) => !in_array($a['op'] ?? '', ['delete', 'deleted'], true))) >= AI_MAX_WRITES) return ['error' => 'Trop de modifications pour une seule demande : fais une pause et demande à l\'utilisateur de continuer.'];
-    $wrole = $role === 'admin' ? 'bureau' : $role;                 // Axel a les droits d'un employé Bureau
+    $wrole = $role === 'admin' ? 'bureau' : $role;                 // Sindri a les droits d'un employé Bureau
     $coll = $tool === 'add_vehicle_document' ? 'vehicles' : (string) ($in['collection'] ?? '');
     if ($tool === 'propose_share_note') $coll = 'notes';
     if ($tool === 'add_note_file') {   // pièce jointe ajoutée à une note (même contrôle qu'une modification)
@@ -635,7 +635,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
                 kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
                 $t = null; foreach (wa_team_targets() as $x) if ($x['num'] === $p['num']) $t = $x;
                 if (!$t) return ['error' => "Ce destinataire n'est plus dans la liste de l'équipe."];
-                try { $how = wa_send_team((string) ($who['user']['name'] ?? 'Axel'), $t, (string) $p['text']); } catch (Throwable $e) { return ['error' => $e->getMessage()]; }
+                try { $how = wa_send_team((string) ($who['user']['name'] ?? 'Sindri'), $t, (string) $p['text']); } catch (Throwable $e) { return ['error' => $e->getMessage()]; }
                 $actions[] = ['op' => 'whatsapp', 'coll' => 'settings', 'id' => 'company', 'label' => 'WhatsApp envoyé à ' . $t['name']];
                 return ['ok' => true, 'sent' => 'Message WhatsApp envoyé à ' . $t['name'] . ($how === 'modèle' ? " (par le modèle « message d'équipe », car elle n'a pas écrit au numéro de la station depuis plus de 24 h)" : '')];
             }
@@ -741,7 +741,7 @@ function assistant_routes($route, $parts, $method, $who, $role) {
     }
     if ($act === 'thread' && $method === 'GET') { ai_tables(); out(ai_view_out(ai_thread_load($who))); }
     if ($act === 'topic' && $method === 'POST') { ai_tables(); $t = ai_thread_load($who); $t['msgs'] = []; $t['newTopic'] = true; ai_thread_save($who, $t); out(['ok' => true]); }
-    if ($act === 'mark' && $method === 'POST') {   // état d'une action affichée (annulée, supprimée…) + note de contexte pour Axel
+    if ($act === 'mark' && $method === 'POST') {   // état d'une action affichée (annulée, supprimée…) + note de contexte pour Sindri
         ai_tables(); $t = ai_thread_load($who); $i = (int) ($b['i'] ?? -1); $k = (int) ($b['a'] ?? -1);
         if (isset($t['view'][$i]['actions'][$k]) && in_array($b['state'] ?? '', ['done', 'undone', 'skip'], true)) $t['view'][$i]['actions'][$k]['state'] = $b['state'];
         if (($n = trim((string) ($b['note'] ?? ''))) !== '') { $t['msgs'][] = ['role' => 'user', 'content' => mb_substr($n, 0, 500)]; $t['msgs'][] = ['role' => 'assistant', 'content' => [['type' => 'text', 'text' => "C'est noté."]]]; }

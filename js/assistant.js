@@ -1,5 +1,5 @@
 /* ======================= Assistant IA (Claude) ======================= */
-/* Axel : panneau latéral pour le bureau et les administrateurs. Il consulte et écrit avec les droits du bureau via le serveur
+/* Sindri : panneau latéral pour le bureau et les administrateurs. Il consulte et écrit avec les droits du bureau via le serveur
    (api/assistant.php) et prépare des textes. La conversation reste dans cet onglet (mémoire + sessionStorage). */
 let AI = null, aiBusy = false, aiOpen = false, aiFiles = [];   /* aiFiles : fichiers joints en attente d'envoi */
 /* fil de conversation de l'utilisateur, gardé sur le serveur (privé, retrouvé sur tous ses appareils) : { view, topics, pending } */
@@ -21,7 +21,7 @@ function aiActions(list, mi) {
     <details><summary class="small">${esc(tr("Voir le détail"))}</summary><div class="stack-s" style="margin-top:6px">${list.map((a, ai) => a.op === "delete" ? "" : aiActionCard(a, mi, ai)).join("")}</div></details>
     ${live.length ? `<div class="row-g"><button class="btn sm" data-ai-undoall="${mi}">${esc(tr("Tout annuler"))}</button></div>` : ""}</div>${dels.map(([a, ai]) => aiActionCard(a, mi, ai)).join("")}`;
 }
-/* ce qu'Axel a fait (créé / modifié : déjà enregistré, avec « Annuler ») ou propose (suppression : à confirmer) */
+/* ce que Sindri a fait (créé / modifié : déjà enregistré, avec « Annuler ») ou propose (suppression : à confirmer) */
 function aiActionCard(a, mi, ai) {
   const open = AI_OPEN[a.coll] && a.state !== "undone" && a.op !== "delete" && a.op !== "deleted" ? `<button class="btn sm" data-a="${AI_OPEN[a.coll]}" data-id="${esc(a.id)}">${esc(tr("Ouvrir"))}</button>` : "";
   if (a.op === "delete") {
@@ -64,11 +64,11 @@ function aiMd(t) {
 function aiMount() {
   if (document.getElementById("ai-fab") || !aiAllowed()) return;
   const fab = document.createElement("button");
-  fab.id = "ai-fab"; fab.className = "ai-fab"; fab.type = "button"; fab.title = "Axel"; fab.setAttribute("aria-label", tr("Ouvrir Axel, l'assistant"));
-  fab.innerHTML = `<span aria-hidden="true">✦</span><span class="ai-fab-l">Axel</span>`;
+  fab.id = "ai-fab"; fab.className = "ai-fab"; fab.type = "button"; fab.title = "Sindri"; fab.setAttribute("aria-label", tr("Ouvrir Sindri, l'assistant"));
+  fab.innerHTML = `<span aria-hidden="true">✦</span><span class="ai-fab-l">Sindri</span>`;
   fab.onclick = () => aiToggle(true);
   const panel = document.createElement("aside");
-  panel.id = "ai-panel"; panel.className = "ai-panel"; panel.setAttribute("aria-label", "Axel"); panel.hidden = true;
+  panel.id = "ai-panel"; panel.className = "ai-panel"; panel.setAttribute("aria-label", "Sindri"); panel.hidden = true;
   document.body.append(fab, panel);
   /* glisser-déposer un fichier sur le panneau (ou sur le bouton Assistant, qui ouvre le panneau) */
   const over = e => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); panel.classList.add("drop"); } };
@@ -119,12 +119,12 @@ function aiRender() {
     (m.role === "user" ? `<div class="ai-m me" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${(m.files || []).map(f => `<div class="ai-file">📎 ${esc(f.name)}</div>`).join("")}${esc(m.text)}</div>`
       : `<div class="ai-m bot ${m.err ? "err" : ""}" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${m.err ? esc(m.text) : aiMd(m.text)}${aiActions(m.actions, mi)}</div>`);
   const body = !AI || !TH ? `<div class="muted pad">Chargement…</div>`
-    : !ready ? `<div class="pad stack-s"><div>Axel n'est pas encore configuré.</div>${isAdmin() ? `<div><a class="btn sm primary" href="#parametres" data-ai-close>Configurer dans Paramètres</a></div>` : `<div class="muted">Un administrateur doit saisir la clé API dans Paramètres.</div>`}</div>`
+    : !ready ? `<div class="pad stack-s"><div>Sindri n'est pas encore configuré.</div>${isAdmin() ? `<div><a class="btn sm primary" href="#parametres" data-ai-close>Configurer dans Paramètres</a></div>` : `<div class="muted">Un administrateur doit saisir la clé API dans Paramètres.</div>`}</div>`
     : view.length ? view.map(msg).join("") + (aiNewTopic ? `<div class="ai-topic new"><span>${esc(tr("Nouveau sujet"))}</span><span class="muted">${esc(tr("posez votre question"))}</span></div>` : "")
-        + (aiBusy ? `<div class="ai-m bot muted"><span class="ai-dots"><i></i><i></i><i></i></span> ${esc(tr("Axel consulte l'outil…"))}</div>` : "")
-    : `<div class="ai-hello"><p><b>Bonjour, je suis Axel</b>, votre collègue dans l'outil de la station. Demandez-moi une liste, un résumé, un e-mail, ou de créer et mettre à jour des fiches (véhicules, outillage, clients, tarifs, notes…).</p><p>Vous pouvez aussi <b>déposer un fichier</b> (contrôle technique, carte verte…) : je le range au bon endroit.</p><p class="muted small">Nos échanges restent entre vous et moi, et vous les retrouvez sur tous vos appareils. J'ai les droits d'un employé du bureau ; tout ce que je fais est noté dans l'historique et peut être annulé ; je ne supprime rien sans votre confirmation et je n'envoie rien hors de l'outil.</p>
+        + (aiBusy ? `<div class="ai-m bot muted"><span class="ai-dots"><i></i><i></i><i></i></span> ${esc(tr("Sindri consulte l'outil…"))}</div>` : "")
+    : `<div class="ai-hello"><p><b>Bonjour, je suis Sindri</b>, votre collègue dans l'outil de la station. Demandez-moi une liste, un résumé, un e-mail, ou de créer et mettre à jour des fiches (véhicules, outillage, clients, tarifs, notes…).</p><p>Vous pouvez aussi <b>déposer un fichier</b> (contrôle technique, carte verte…) : je le range au bon endroit.</p><p class="muted small">Nos échanges restent entre vous et moi, et vous les retrouvez sur tous vos appareils. J'ai les droits d'un employé du bureau ; tout ce que je fais est noté dans l'historique et peut être annulé ; je ne supprime rien sans votre confirmation et je n'envoie rien hors de l'outil.</p>
       <div class="ai-sugg">${AI_SUGGEST.map(s => `<button type="button" class="chip-btn" data-ai-s="${esc(s)}">${esc(tr(s))}</button>`).join("")}</div></div>`;
-  p.innerHTML = `<header class="ai-h"><b>✦ Axel</b><span class="muted small nowrap">${ready ? esc(((AI.models || {})[AI.model] || "").replace(/\s*\(.*\)$/, "")) : ""}</span>
+  p.innerHTML = `<header class="ai-h"><b>✦ Sindri</b><span class="muted small nowrap">${ready ? esc(((AI.models || {})[AI.model] || "").replace(/\s*\(.*\)$/, "")) : ""}</span>
       <span style="margin-left:auto" class="row-g">${topics.length ? `<button class="linkbtn small nowrap" id="ai-topics" aria-expanded="${aiTopicsOpen}">${esc(tr("Sujets"))} (${topics.length}) ${aiTopicsOpen ? "▴" : "▾"}</button>` : ""}${view.length ? `<button class="linkbtn small nowrap" id="ai-new">${esc(tr("Nouveau sujet"))}</button>` : ""}<button class="iconbtn" id="ai-x" aria-label="${esc(tr("Fermer"))}">×</button></span></header>
     ${aiTopicsOpen ? `<div class="ai-tlist" role="list">${topics.slice().reverse().map(t => `<button class="ai-tl" role="listitem" data-ai-go="${t.i}"><span>${esc(t.title || tr("(sans titre)"))}</span><span class="muted small nowrap">${esc(tAt(t.at))}</span></button>`).join("")}</div>` : ""}
     <div class="ai-body" id="ai-body">${body}</div>
@@ -147,7 +147,7 @@ function aiRender() {
   p.querySelectorAll("[data-ai-undo]").forEach(x => x.onclick = async () => { const [mi, ai] = x.dataset.aiUndo.split(":").map(Number), a = TH.view[mi].actions[ai]; x.disabled = true;
     try { await aiUndo(a); a.state = "undone"; toast(tr("Annulé : ") + a.label); } catch (e) { toast(tr(e.message || "Erreur")); x.disabled = false; return; }
     aiMark(mi, ai, "undone", `(J'ai annulé ce que tu avais fait sur ${a.label}.)`); aiRender(); });
-  p.querySelectorAll("[data-ai-undoall]").forEach(x => x.onclick = () => confirmBox(tr("Annuler toutes les modifications faites par Axel dans cette réponse ?"), async () => {
+  p.querySelectorAll("[data-ai-undoall]").forEach(x => x.onclick = () => confirmBox(tr("Annuler toutes les modifications faites par Sindri dans cette réponse ?"), async () => {
     const mi = +x.dataset.aiUndoall, acts = TH.view[mi].actions; let n = 0;
     for (let ai = acts.length - 1; ai >= 0; ai--) { const a = acts[ai]; if (a.op === "delete" || a.state === "undone") continue;
       try { await aiUndo(a); a.state = "undone"; n++; await aiMark(mi, ai, "undone", ""); } catch (e) { toast(tr(e.message || "Erreur")); break; } }
@@ -189,7 +189,7 @@ async function aiAsk(text) {
 async function aiAddFiles(list) {
   for (const f of list.slice(0, 5)) {
     if (!/^application\/pdf$|^image\//.test(f.type || "")) { toast(tr("Format non accepté : PDF ou photo.")); continue; }
-    if (f.size > 15 * 1048576) { toast(tr("Fichier trop lourd pour Axel (15 Mo maximum).")); continue; }
+    if (f.size > 15 * 1048576) { toast(tr("Fichier trop lourd pour Sindri (15 Mo maximum).")); continue; }
     const e = { name: f.name, mime: f.type, up: true }; aiFiles.push(e); aiRender();
     try { const r = await assets.upload(f); e.id = r.id; e.mime = r.contentType || f.type; } catch { toast(tr("Le fichier n'a pas pu être envoyé.")); aiFiles = aiFiles.filter(x => x !== e); }
     e.up = false; aiRender();
@@ -201,14 +201,14 @@ function aiStart() { if (!aiAllowed()) return; aiMount(); aiRefresh(); }
 /* ---------- Paramètres (administrateurs) ---------- */
 function aiCardShell() {
   if (!SERVER || !isAdmin()) return "";
-  return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack"><h3 class="np">Axel, l'assistant IA (Claude)</h3><div id="ai-box"><div class="muted">Chargement…</div></div></div></div>`;
+  return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack"><h3 class="np">Sindri, l'assistant IA (Claude)</h3><div id="ai-box"><div class="muted">Chargement…</div></div></div></div>`;
 }
 async function loadAi() {
   const box = document.getElementById("ai-box"); if (!box) return;
   const s = await aiRefresh();
   if (!s) { box.innerHTML = `<div class="err">${esc(tr("Le serveur ne répond pas."))}</div>`; return; }
   if (!s.configured) {
-    box.innerHTML = `<div class="stack-s"><div><b>Axel</b>, un collègue IA pour le <b>bureau et les administrateurs</b> : il répond aux questions sur les données de l'outil, prépare e-mails et résumés, et crée ou met à jour des fiches avec les droits d'un employé du bureau (suppressions sur confirmation, rien d'envoyé hors de l'outil).</div>
+    box.innerHTML = `<div class="stack-s"><div><b>Sindri</b>, un collègue IA pour le <b>bureau et les administrateurs</b> : il répond aux questions sur les données de l'outil, prépare e-mails et résumés, et crée ou met à jour des fiches avec les droits d'un employé du bureau (suppressions sur confirmation, rien d'envoyé hors de l'outil).</div>
       <ol class="small stack-s" style="margin:0;padding-left:18px"><li>Créez un compte sur <b>console.anthropic.com</b> (Anthropic, l'éditeur de Claude) et ajoutez un moyen de paiement : facturation à l'usage.</li>
       <li>Menu <b>API keys</b> → <b>Create key</b>, nom « my-145-station ». Copiez la clé (elle commence par <span class="mono">sk-ant-</span>).</li>
       <li>Collez-la ici et fixez un plafond mensuel. La clé reste sur le serveur.</li></ol>
@@ -220,7 +220,7 @@ async function loadAi() {
       <dt>Ce mois-ci</dt><dd>${plural(s.usage.questions, "question")} · environ <b>${s.usage.usd.toFixed(2).replace(".", ",")} $</b> sur un plafond de ${s.cap} $ <span class="muted small">(${pct} %)</span></dd></dl>
     <div class="hint">Estimation d'après les tarifs publics d'Anthropic ; la facture réelle est visible sur console.anthropic.com. Une fois le plafond atteint, l'assistant s'arrête jusqu'au mois suivant.</div>
     <div class="row-g wrap"><button class="btn" data-a="ai-test">Tester la connexion</button><button class="btn" data-a="ai-form">Modifier</button><button class="btn danger" data-a="ai-off">Déconnecter</button></div>
-    <h4 class="np" style="margin-top:10px">Ce qu'Axel a appris</h4>
+    <h4 class="np" style="margin-top:10px">Ce que Sindri a appris</h4>
     <div class="hint">Règles de travail retenues au fil des conversations (« retiens que… »), partagées avec toute l'équipe. Les conversations elles-mêmes restent privées.</div>
     <div id="ai-mem" class="stack-s"><div class="muted small">Chargement…</div></div></div>`;
   aiMemLoad();
@@ -229,13 +229,13 @@ async function aiMemLoad() {
   const el = document.getElementById("ai-mem"); if (!el) return;
   let notes = []; try { notes = (await API.call("GET", "assistant/memory")).notes || []; } catch { el.innerHTML = `<div class="err small">${esc(tr("Lecture impossible."))}</div>`; return; }
   el.innerHTML = notes.length ? `<ul class="ai-mem">${notes.slice().reverse().map(n => `<li><span>${esc(n.text)}<span class="muted small"> · ${esc(n.by || "")} · ${esc(fmtDate(n.at))}</span></span><button class="linkbtn small" style="color:var(--bad)" data-ai-forget="${esc(n.id)}">${esc(tr("Oublier"))}</button></li>`).join("")}</ul>`
-    : `<div class="muted small">${esc(tr("Rien pour l'instant. Dites par exemple à Axel : « Retiens que les outils partent en étalonnage chez notre laboratoire habituel ».")) }</div>`;
-  el.querySelectorAll("[data-ai-forget]").forEach(b => b.onclick = async () => { if (!confirm(tr("Axel oubliera cette règle pour toute l'équipe. Continuer ?"))) return;
+    : `<div class="muted small">${esc(tr("Rien pour l'instant. Dites par exemple à Sindri : « Retiens que les outils partent en étalonnage chez notre laboratoire habituel ».")) }</div>`;
+  el.querySelectorAll("[data-ai-forget]").forEach(b => b.onclick = async () => { if (!confirm(tr("Sindri oubliera cette règle pour toute l'équipe. Continuer ?"))) return;
     b.disabled = true; try { await API.call("POST", "assistant/memory", { delete: b.dataset.aiForget }); toast(tr("Règle oubliée")); } catch (e) { toast(tr(e.message)); } aiMemLoad(); });
 }
 ACTIONS["ai-form"] = () => {
   const has = !!(AI && AI.configured), models = (AI && AI.models) || { "claude-sonnet-5-5": "Claude Sonnet 5.5 (recommandé)" };
-  const m = modal(`${mHead("Axel, l'assistant IA")}<form autocomplete="off"><div class="body stack-s"><div class="fields">
+  const m = modal(`${mHead("Sindri, l'assistant IA")}<form autocomplete="off"><div class="body stack-s"><div class="fields">
     ${field("ai-key", "Clé API Anthropic", "", { type: "password", required: !has, ph: has ? "inchangée" : "sk-ant-…", wide: true })}
     ${field("ai-model", "Modèle", (AI && AI.model) || "claude-sonnet-5-5", { type: "select", options: Object.entries(models) })}
     ${field("ai-cap", "Plafond mensuel (USD)", (AI && AI.cap) || 30, { type: "number", min: 1, step: 1 })}</div>
@@ -250,5 +250,5 @@ ACTIONS["ai-form"] = () => {
     catch (x) { err.textContent = tr(x.message); go.disabled = false; }
   };
 };
-ACTIONS["ai-test"] = async () => { try { await API.call("POST", "assistant/test", {}); toast("Axel est connecté ✓"); } catch (e) { toast(tr(e.message)); } };
+ACTIONS["ai-test"] = async () => { try { await API.call("POST", "assistant/test", {}); toast("Sindri est connecté ✓"); } catch (e) { toast(tr(e.message)); } };
 ACTIONS["ai-off"] = async () => { if (!confirm(tr("Déconnecter l'assistant ? La clé API sera effacée du serveur."))) return; await API.call("POST", "assistant/config", { disconnect: true }); await loadAi(); toast("Assistant déconnecté"); };
