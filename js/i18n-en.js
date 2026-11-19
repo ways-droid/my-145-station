@@ -753,3 +753,19 @@ Object.assign(EN, {
   "Ajoutez d'abord les types d'avion dans Paramètres (Station).": "First add the aircraft types in Settings (Station).", "Les autorisations de signer (CRS) restent gérées dans AMOS.": "Certifying authorisations (CRS) stay in AMOS."
 });
 rule(/^(\d+) personnes? · licences, qualifications et documents$/, "$1 people · licences, qualifications and documents");
+/* ---- roster ---- */
+Object.assign(EN, {
+  "Roster": "Roster", "Planning de la station : une ligne par personne, un code par jour": "Station planning: one row per person, one code per day", "Exporter (Excel)": "Export (Excel)",
+  "Reprendre le mois précédent": "Copy previous month", "Mois": "Month", "Aujourd'hui": "Today", "Codes": "Codes", "Pinceau :": "Brush:", "Effacer": "Clear",
+  "Choisissez un code puis cliquez ou glissez sur les cases. Sans code choisi, un clic ouvre le détail de la case.": "Pick a code, then click or drag over the cells. With no code picked, a click opens the cell details.",
+  "Cliquez ou glissez sur les cases pour appliquer. Cliquez à nouveau sur le code pour arrêter.": "Click or drag over the cells to apply. Click the code again to stop.",
+  "Jour (08-20)": "Day (08-20)", "Nuit (20-08)": "Night (20-08)", "Jour ou nuit (à affecter)": "Day or night (to assign)", "Jour de voyage (aller ou retour)": "Travel day (to or from the station)",
+  "À la station, sans shift précis": "At the station, no set shift", "Formation sur le terrain (OJT)": "On-the-job training (OJT)", "Formation": "Training", "Repos / congé": "Off / leave",
+  "Autre station (détaché / flight mech)": "Other station (detached / flight mech)", "Équipe de jour": "Day shift", "Équipe de nuit": "Night shift", "Présent, équipe à affecter": "Present, shift to assign",
+  "Présent, sans équipe": "Present, no shift", "Voyage": "Travel", "Repos": "Off", "Compte comme": "Counts as", "Libellé": "Label", "Enregistrer les libellés": "Save labels",
+  "Code de 3 lettres d'une autre station": "3-letter code of another station", "Équipe de jour (08-20)": "Day shift (08-20)", "Équipe de nuit (20-08)": "Night shift (20-08)",
+  "Personne de prévu.": "No one scheduled.", "Hors équipe aujourd'hui": "Not on shift today", "Jour": "Day", "Nuit": "Night", "Début": "Start", "Fin": "End",
+  "Remarque (visible du bureau seulement)": "Note (office only)", "Code de la station": "Station code", "Roster enregistré": "Roster saved", "Autre station": "Other station",
+  "Équipes du jour": "Today's shifts", "Ouvrir le roster": "Open the roster", "Qui est de jour et de nuit aujourd'hui, et les trous de couverture des 7 prochains jours.": "Who is on day and night shift today, and coverage gaps in the next 7 days.",
+  "Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.": "Coverage: number of qualified people present on the type, per shift. Red: nobody qualified (or nobody with I to sign 4X- aircraft). Certifying authorisations stay in AMOS."
+});

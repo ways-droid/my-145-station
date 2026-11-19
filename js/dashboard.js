@@ -8,7 +8,7 @@ const section = (title, link, body, c = "blue") => `<section class="dsec c-${c}"
    Un widget n'est proposé que si le module correspondant est accessible au rôle. Pour ajouter un widget : WIDGETS.id = {…}. */
 const WSIZE = { s: "Petit", m: "Moyen", l: "Large" };
 const WIDGETS = {};
-const W_DEFAULT = ["shortcuts", "staff_due", "fleet_state", "faults", "fleet_due", "calib", "notes"];
+const W_DEFAULT = ["shortcuts", "roster_today", "staff_due", "fleet_state", "faults", "fleet_due", "calib", "notes"];
 const prefsId = () => "p-" + ((ME && (ME.key ? "key" : ME.id)) || "local");
 const myPrefs = () => (S.userPrefs || []).find(p => p.id === prefsId()) || (() => { try { return JSON.parse(localStorage.getItem("st-prefs") || "{}"); } catch { return {}; } })();
 const wOk = id => WIDGETS[id] && (!WIDGETS[id].m || allowed(WIDGETS[id].m)) && (!WIDGETS[id].ok || WIDGETS[id].ok());
