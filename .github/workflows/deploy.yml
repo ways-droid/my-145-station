@@ -90,7 +90,24 @@ jobs:
           case "$DIR" in *..*|/*|"") echo "::error::Dossier invalide : $DIR"; exit 1;; esac
           if [ "$LIST_ONLY" = "true" ]; then
             # noms des dossiers seulement (deux niveaux), pour savoir où pointe chaque (sous-)domaine
-            lftp --env-password -u "$USER" "sftp://$HOST" -e "set sftp:auto-confirm yes; pwd; cls -1 -F; cls -1 -F webroots/; ls webroots/; ls webroots/by-route/; cls -1 -F webroots/by-route/*/; cls -1 -F webroots/00d26625/ webroots/a690c4eb/; bye"
+            pip install -q paramiko > /dev/null
+            python3 - <<'PY'
+          import os, paramiko, stat
+          t = paramiko.Transport((os.environ["HOST"].split(":")[0], int((os.environ["HOST"].split(":") + ["22"])[1])))
+          t.connect(username=os.environ["USER"], password=os.environ["LFTP_PASSWORD"])
+          s = paramiko.SFTPClient.from_transport(t)
+          print("home:", s.normalize("."))
+          def show(d, depth):
+              for a in sorted(s.listdir_attr(d), key=lambda a: a.filename):
+                  p = (d + "/" + a.filename) if d != "." else a.filename
+                  if stat.S_ISLNK(a.st_mode):
+                      tgt = s.readlink(p)
+                      print("  " * depth + p + " -> " + tgt)
+                  else:
+                      print("  " * depth + p + ("/" if stat.S_ISDIR(a.st_mode) else ""))
+                      if stat.S_ISDIR(a.st_mode) and depth < 2 and not p.startswith("test/"): show(p, depth + 1)
+          show(".", 0)
+          PY
             exit 0
           fi
           lftp --env-password -u "$USER" "sftp://$HOST" -e "
