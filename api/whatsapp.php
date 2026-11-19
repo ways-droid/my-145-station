@@ -1,10 +1,10 @@
 <?php
 /* ======================= WhatsApp (API Cloud de Meta, numéro dédié à l'équipe) =======================
    - Un numéro de la station (SIM dédiée) relié en « API seule » à l'app Meta de l'entreprise : aucune application WhatsApp
-     n'utilise ce numéro, l'outil et Axel le surveillent. Identifiants (jeton, secret de l'app) dans ways_kv, jamais renvoyés.
+     n'utilise ce numéro, l'outil et Sindri le surveillent. Identifiants (jeton, secret de l'app) dans ways_kv, jamais renvoyés.
    - Webhook public : api/whatsapp/webhook (vérification par jeton, signature X-Hub-Signature-256 du secret de l'app).
    - Équipe seulement : numéros reconnus = liste de Paramètres (personne inscrite dans l'outil).
-     Axel répond avec les droits de la personne ; la conversation est la même que dans le panneau Axel (fil privé de la personne).
+     Sindri répond avec les droits de la personne ; la conversation est la même que dans le panneau Sindri (fil privé de la personne).
    - Numéros inconnus : réponse automatique (une fois par semaine et par numéro) ; messages gardés pour les administrateurs.
    - Réponse au webhook immédiate, traitement juste après (fastcgi_finish_request) ; file wa_queue reprise si besoin. */
 
@@ -46,7 +46,7 @@ function wa_http($method, $url, $body = null, $raw = false, $timeout = 30) {
     }
     return $d ?: [];
 }
-/* texte d'Axel (markdown) → mise en forme WhatsApp */
+/* texte de Sindri (markdown) → mise en forme WhatsApp */
 function wa_fmt($t) {
     $t = preg_replace('/^#{1,6}\s*(.+)$/m', '*$1*', (string) $t);
     $t = preg_replace('/\*\*(.+?)\*\*/s', '*$1*', $t);
@@ -66,12 +66,12 @@ function wa_send_text($to, $text) {
     wa_stat('out', count($ids));
     return $ids;
 }
-function wa_typing($msgId) {   // « lu » + « en train d'écrire… » pendant qu'Axel travaille
+function wa_typing($msgId) {   // « lu » + « en train d'écrire… » pendant que Sindri travaille
     try { wa_http('POST', wak('wa_phone_id') . '/messages', ['messaging_product' => 'whatsapp', 'status' => 'read', 'message_id' => $msgId, 'typing_indicator' => ['type' => 'text']], false, 10); } catch (Throwable $e) {}
 }
 function wa_stat($k, $n = 1) { $s = json_decode(wak('wa_stats_' . gmdate('Y-m'), '{}'), true) ?: []; $s[$k] = ($s[$k] ?? 0) + $n; kv_set('wa_stats_' . gmdate('Y-m'), json_encode($s)); }
 
-/* ---------- envoi d'un fichier (Axel → la personne qui lui parle) ---------- */
+/* ---------- envoi d'un fichier (Sindri → la personne qui lui parle) ---------- */
 /* numéro WhatsApp d'une personne de l'outil : liste de l'équipe */
 function wa_number_of($uid) {
     $uid = (string) $uid; if ($uid === '') return '';
@@ -92,12 +92,12 @@ function wa_upload_media($bytes, $mime, $name) {
     if ($st >= 400 || empty($d['id'])) throw new RuntimeException('WhatsApp : envoi du fichier refusé (' . ($d['error']['message'] ?? "HTTP $st") . ')');
     return $d['id'];
 }
-/* Axel envoie un fichier de l'outil (fileId) ou de Dropbox (dropboxPath) sur le WhatsApp de la personne qui lui parle — à elle seule */
+/* Sindri envoie un fichier de l'outil (fileId) ou de Dropbox (dropboxPath) sur le WhatsApp de la personne qui lui parle — à elle seule */
 function wa_send_file_to_me($who, $in) {
     if (!wa_configured()) return ['error' => "WhatsApp n'est pas relié à l'outil."];
     if (function_exists('sbx_id') && sbx_id()) return ['error' => 'Environnement de test : envoi WhatsApp désactivé.'];
     $uid = (string) ($who['user']['id'] ?? ''); $num = wa_number_of($uid);
-    if ($num === '') return ['error' => "Je ne connais pas ton numéro WhatsApp : un administrateur doit l'ajouter dans Paramètres → WhatsApp de l'équipe (« Qui peut écrire à Axel »)."];
+    if ($num === '') return ['error' => "Je ne connais pas ton numéro WhatsApp : un administrateur doit l'ajouter dans Paramètres → WhatsApp de l'équipe (« Qui peut écrire à Sindri »)."];
     $last = (int) wak('wa_in:' . $num, '0');
     if (time() - $last > 86000) return ['error' => "WhatsApp n'autorise l'envoi d'un fichier que dans les 24 h qui suivent ton dernier message au numéro de la station Envoie-moi d'abord un message sur WhatsApp (par ex. « envoie-moi … »), puis je pourrai te l'envoyer."];
     $fid = preg_replace('/[^a-f0-9]/', '', (string) ($in['fileId'] ?? '')); $path = trim((string) ($in['dropboxPath'] ?? ''));
@@ -125,16 +125,16 @@ function wa_send_file_to_me($who, $in) {
         wa_http('POST', wak('wa_phone_id') . '/messages', ['messaging_product' => 'whatsapp', 'recipient_type' => 'individual', 'to' => $num, 'type' => $img ? 'image' : 'document', $img ? 'image' : 'document' => $msg]);
         wa_stat('out');
     } catch (RuntimeException $e) { return ['error' => $e->getMessage()]; }
-    if (function_exists('log_event')) log_event('settings', 'company', 'update', 'WhatsApp', "Fichier « $name » envoyé par Axel sur WhatsApp");
+    if (function_exists('log_event')) log_event('settings', 'company', 'update', 'WhatsApp', "Fichier « $name » envoyé par Sindri sur WhatsApp");
     return ['ok' => true, 'sent' => $name, 'to' => 'ton WhatsApp (…' . substr($num, -3) . ')'];
 }
 
-/* ---------- message à un membre de l'équipe (demandé à Axel) ----------
+/* ---------- message à un membre de l'équipe (demandé à Sindri) ----------
    WhatsApp n'accepte un texte libre que dans les 24 h qui suivent le dernier message de la personne au numéro
    de la station ; au-delà, seul un modèle approuvé par Meta peut partir : « message_equipe »
    (« Message de {{1}} via my-145-station : {{2}} »), créé depuis Paramètres → WhatsApp. */
 const WA_TPL_NAME = 'message_equipe';
-const WA_TPL_BODY = "Message de {{1}} via my-145-station :\n\n{{2}}\n\nRépondez ici pour parler à Axel.";
+const WA_TPL_BODY = "Message de {{1}} via my-145-station :\n\n{{2}}\n\nRépondez ici pour parler à Sindri.";
 function wa_tpl() { return ['name' => wak('wa_tpl_name', WA_TPL_NAME), 'lang' => wak('wa_tpl_lang', 'fr'), 'status' => wak('wa_tpl_status', ''), 'error' => wak('wa_tpl_error', '')]; }
 function wa_window_open($num) { return time() - (int) wak('wa_in:' . $num, '0') < 86000; }
 /* membres joignables : numéros de la liste de l'équipe */
@@ -159,7 +159,7 @@ function wa_send_team($fromName, $t, $text) {
     if (!wa_configured()) throw new RuntimeException("WhatsApp n'est pas relié à l'outil.");
     if (function_exists('sbx_id') && sbx_id()) throw new RuntimeException('Environnement de test : envoi WhatsApp désactivé.');
     $text = trim($text); $how = 'texte';
-    if (wa_window_open($t['num'])) wa_send_text($t['num'], "💬 *Message de $fromName* (via Axel) :\n\n$text");
+    if (wa_window_open($t['num'])) wa_send_text($t['num'], "💬 *Message de $fromName* (via Sindri) :\n\n$text");
     else {
         $tp = wa_tpl(); if ($tp['status'] !== 'APPROVED') throw new RuntimeException('Hors fenêtre de 24 h et modèle « ' . $tp['name'] . " » pas encore approuvé par Meta.");
         $param = mb_substr(preg_replace('/ {4,}/', '   ', preg_replace('/[\r\n\t]+/', ' · ', $text)), 0, 1000);   // Meta refuse les retours à la ligne dans les paramètres
@@ -168,10 +168,10 @@ function wa_send_team($fromName, $t, $text) {
         wa_stat('out'); $how = 'modèle';
     }
     kv_set('wa_relay:' . $t['num'], json_encode(['from' => $fromName, 'text' => mb_substr($text, 0, 1500), 'at' => time()], JSON_UNESCAPED_UNICODE));
-    if (function_exists('log_event')) log_event('settings', 'company', 'update', 'WhatsApp', "Message de $fromName envoyé par Axel à {$t['name']} ($how)");
+    if (function_exists('log_event')) log_event('settings', 'company', 'update', 'WhatsApp', "Message de $fromName envoyé par Sindri à {$t['name']} ($how)");
     return $how;
 }
-/* message relayé récemment à cette personne (contexte pour Axel quand elle répond) */
+/* message relayé récemment à cette personne (contexte pour Sindri quand elle répond) */
 function wa_relay_for($uid) {
     $num = wa_number_of($uid); if ($num === '') return null;
     $r = json_decode(wak('wa_relay:' . $num, ''), true); return $r && time() - (int) $r['at'] < 3 * 86400 ? $r : null;
@@ -232,7 +232,7 @@ function wa_webhook($method) {
         foreach ((array) ($v['statuses'] ?? []) as $s) if (($s['status'] ?? '') === 'failed') kv_set('wa_error', 'Envoi refusé par WhatsApp : ' . ($s['errors'][0]['title'] ?? $s['errors'][0]['message'] ?? 'erreur') . ' (' . gmdate('c') . ')');
     }
     if ($new) { kv_set('wa_queue', json_encode(array_slice($q, -200), JSON_UNESCAPED_UNICODE)); kv_set('wa_seen', json_encode(array_slice(array_keys($seen), -500))); kv_set('wa_last_in', (string) now_ms()); }
-    /* répondre tout de suite à Meta, puis traiter (Axel peut prendre une minute) */
+    /* répondre tout de suite à Meta, puis traiter (Sindri peut prendre une minute) */
     http_response_code(200); header('Content-Type: application/json'); $o = '{"ok":true}';
     header('Content-Length: ' . strlen($o)); header('Connection: close'); echo $o;
     if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else { @ob_end_flush(); @flush(); }
@@ -273,7 +273,7 @@ function wa_handle($m) {
     elseif ($type === 'interactive' || $type === 'button') $text = (string) ($m['button']['text'] ?? $m['interactive']['button_reply']['title'] ?? $m['interactive']['list_reply']['title'] ?? '');
     else return;   // réactions, etc.
     if (trim($text) === '' && !$files) return;
-    if (!function_exists('ai_say_core') || aik('ai_key') === '') { wa_send_text($num, "Axel n'est pas disponible pour le moment."); return; }
+    if (!function_exists('ai_say_core') || aik('ai_key') === '') { wa_send_text($num, "Sindri n'est pas disponible pour le moment."); return; }
     wa_typing($m['id']);
     $GLOBALS['LOG_WHO'] = 'user:' . $p['name'] . ' (WhatsApp)'; $GLOBALS['AI_VIA'] = 'whatsapp';
     ai_tables();
@@ -284,7 +284,7 @@ function wa_handle($m) {
     $reply = (string) ($res['reply'] ?? '');
     $acts = (array) ($res['actions'] ?? []);
     $done = array_filter($acts, fn($a) => in_array($a['op'] ?? '', ['create', 'update', 'deleted'], true));
-    if ($done) $reply .= "\n\n_" . count($done) . ' modification' . (count($done) > 1 ? 's' : '') . " dans l'outil (annulable" . (count($done) > 1 ? 's' : '') . " depuis le panneau Axel)._";
+    if ($done) $reply .= "\n\n_" . count($done) . ' modification' . (count($done) > 1 ? 's' : '') . " dans l'outil (annulable" . (count($done) > 1 ? 's' : '') . " depuis le panneau Sindri)._";
     wa_send_text($num, $reply !== '' ? $reply : 'OK');
 }
 function wa_media($med, $type) {

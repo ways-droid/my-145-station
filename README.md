@@ -15,7 +15,7 @@ Présents dans ce socle :
 - Outillage et étalonnage (les outils de la station envoyés en étalonnage).
 - Clients (compagnies aériennes, code court, préfixes d'immatriculation) et articles et prix (tarifs des Charge Sheets).
 - Administration : documents, dossiers, notes, liens entre fiches, Dropbox (en attendant OneDrive).
-- Axel, l'assistant IA (Claude), dans l'outil et sur WhatsApp.
+- Sindri, l'assistant IA (Claude), dans l'outil et sur WhatsApp.
 
 Prévus, dans l'ordre : personnel et qualifications, planning (roster), planification des shifts avec Flightradar24 et handover vers Notion, Charge Sheet, outillage de la station, transferts de pièces, hôtels / vols / véhicules, scans OneDrive et e-mails, liaison avec W.A.Y.S.
 

@@ -41,7 +41,7 @@ function is_office($r) { return in_array($r, ['admin', 'bureau'], true); }
 function deny($msg = "Votre rôle ne permet pas cette action.") { if (!empty($GLOBALS['PERM_THROW'])) throw new RuntimeException($msg); fail(403, $msg); }
 
 /* ---------- Notes : personnelles (auteur seul) ou d'équipe (tout le monde) ----------
-   L'auteur courant est $GLOBALS['ME_UID'] (personne connectée, ou personne qui parle à Axel) ; « * » = clé d'API (sauvegardes). */
+   L'auteur courant est $GLOBALS['ME_UID'] (personne connectée, ou personne qui parle à Sindri) ; « * » = clé d'API (sauvegardes). */
 function notes_uid($who) { return ($who['kind'] ?? '') === 'session' ? (string) ($who['user']['id'] ?? '') : '*'; }
 function notes_mine($d) { $me = (string) ($GLOBALS['ME_UID'] ?? ''); return $me === '*' || ($me !== '' && (string) ($d['owner'] ?? '') === $me); }
 function notes_write($role, $op, $old, $new) {

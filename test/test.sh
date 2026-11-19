@@ -352,19 +352,19 @@ curl -s -H "$B" -X PUT -d '{"plate":"1-ABC-123","fleetNo":"042","docs":[]}' $U/d
 printf '%%PDF-1.4 controle technique 1-ABC-123' > $T/ct.pdf
 FID=$(curl -s -H "$B" -F "file=@$T/ct.pdf;type=application/pdf" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
 R=$(curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"\",\"files\":[{\"id\":\"$FID\",\"name\":\"ct.pdf\"}]}]}" $U/assistant/chat)
-ok "fichier rangé par Axel" "$R" '"op":"update"'; ok "véhicule modifié" "$R" '"id":"veh-t"'
+ok "fichier rangé par Sindri" "$R" '"op":"update"'; ok "véhicule modifié" "$R" '"id":"veh-t"'
 R2=$(curl -s -H "$K" $U/docs/vehicles/veh-t); ok "document ajouté au véhicule" "$R2" "\"file\":\"$FID\""; ok "échéance CT mise à jour" "$R2" '"ctDate":"2027-11-12"'
 no "contenu du fichier pas renvoyé" "$R" '"base64"'; ok "fichier gardé dans la conversation" "$R" '"name":"ct.pdf"'
 ok "document envoyé à Claude" "$(grep -c '"type":"document"' $T/ai.log)" '[12]'
 R=$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Crée une facture"}]}' $U/assistant/chat)
-ok "fiche créée par Axel" "$R" '"op":"create"'; ok "client créé" "$R" 'Cargo Test'
-ok "historique au nom d'Axel" "$(curl -s -H "$A" "$U/log?q=Axel")" 'Axel (pour Bea Bureau)'
+ok "fiche créée par Sindri" "$R" '"op":"create"'; ok "client créé" "$R" 'Cargo Test'
+ok "historique au nom de Sindri" "$(curl -s -H "$A" "$U/log?q=Sindri")" 'Sindri (pour Bea Bureau)'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Total des factures ?"}' $U/assistant/say); ok "fil : réponse enregistrée" "$R" '"role":"bot"'; ok "fil : sujet créé" "$R" '"title":"Total des factures ?"'
 ok "fil retrouvé (autre appareil)" "$(curl -s -H "$B" $U/assistant/thread)" 'Total des factures ?'
 no "fil privé" "$(curl -s -H "$A" $U/assistant/thread)" 'Total des factures ?'
 curl -s -H "$B" -X POST -d '{}' $U/assistant/topic >/dev/null
 R=$(curl -s -H "$B" -X POST -d '{"text":"Retiens : EXP pour Airside"}' $U/assistant/say); ok "nouveau sujet" "$R" '"title":"Retiens : EXP pour Airside"'
-ok "Axel apprend" "$(curl -s -H "$A" $U/assistant/memory)" 'Airside'
+ok "Sindri apprend" "$(curl -s -H "$A" $U/assistant/memory)" 'Airside'
 curl -s -H "$A" -X POST -d '{"text":"Bonjour"}' $U/assistant/say >/dev/null
 ok "appris partagé avec l'équipe" "$(tail -1 $T/ai.log)" "EXP"
 ok "mémoire réservée aux admins" "$(curl -s -H "$B" $U/assistant/memory)" 'administrateurs'
@@ -376,7 +376,7 @@ php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES
 (DBX_MOCK_DIR=$T/dbx php -S 127.0.0.1:8771 "$D/dropbox-mock.php" >/dev/null 2>&1 &); sleep 0.5
 curl -s -H "$K" -X PUT -d '{"vehicleId":"v-1","description":"Bruit","status":"ouverte","date":"2026-11-01"}' $U/docs/faults/f-ax >/dev/null
 curl -s -H "$K" -X PUT -d '{"vehicleId":"v-1","description":"Voyant","status":"ouverte","date":"2026-11-01"}' $U/docs/faults/f-ax2 >/dev/null
-R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime la panne Bruit"}' $U/assistant/say); ok "Axel propose et demande confirmation" "$R" 'Rien n.est supprim'; ok "Axel signale la panne non réparée" "$R" 'pas été réparée'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime la panne Bruit"}' $U/assistant/say); ok "Sindri propose et demande confirmation" "$R" 'Rien n.est supprim'; ok "Sindri signale la panne non réparée" "$R" 'pas été réparée'
 ok "rien supprimé avant la réponse" "$(curl -s -H "$K" $U/docs/faults/f-ax)" 'Bruit'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "après « oui » : supprimée" "$R" 'Fait : .*deleted'; ok "carte de proposition passée à Supprimé" "$R" '"op":"delete"[^}]*"state":"done"'
 ok "panne supprimée" "$(curl -s -o /dev/null -w '%{http_code}' -H "$K" $U/docs/faults/f-ax)" '404'
@@ -385,17 +385,17 @@ ok "panne gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime-la"}' $U/assistant/say); ok "nouvelle demande ≠ confirmation" "$R" 'pas un « oui »'
 ok "panne toujours gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "« oui » explicite : supprimée" "$R" 'Fait : .*deleted'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Note axel"}' $U/assistant/say); ok "Axel crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Note sindri"}' $U/assistant/say); ok "Sindri crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
 NAX=$(echo "$R" | grep -o '\\"id\\":\\"ax[0-9a-f]*' | head -1 | grep -o 'ax[0-9a-f]*')
-ok "note d'Axel : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note d'Axel : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
+ok "note de Sindri : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note de Sindri : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Partage la note='$NAX'"}' $U/assistant/say); ok "partage proposé, rien changé" "$R" 'Rien n.est chang'
 ok "toujours personnelle avant le oui" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "après « oui » : note d'équipe" "$(curl -s -H "$A" $U/docs/notes/$NAX)" '"team":true'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Joins fichier note='$NAX' file='$FID'"}' $U/assistant/say); ok "Axel joint un fichier à une note" "$R" 'Joint : .*ok'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Joins fichier note='$NAX' file='$FID'"}' $U/assistant/say); ok "Sindri joint un fichier à une note" "$R" 'Joint : .*ok'
 ok "pièce jointe dans la note" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"files":\[{"id":"'$FID'"'
 curl -s -H "$B" -X PUT -d '{"title":"Perso Bea","body":"secret"}' $U/docs/notes/n0 >/dev/null
-R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Axel ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Axel lit un PDF Dropbox" "$R" 'Lu : text,document'
+R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Sindri ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Sindri lit un PDF Dropbox" "$R" 'Lu : text,document'
 no "fichier lu non gardé dans le fil" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN) ? implode("", $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN)) : "";' $T/t.db)" 'JVBERi0'
 ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":20'
 echo "> notes"
@@ -442,7 +442,7 @@ curl -s -H "$A" -X POST -d '{"contacts":[{"num":"0475 12 34 56","kind":"user","r
 ok "numéro de l'équipe normalisé" "$(curl -s -H "$A" $U/whatsapp/status)" '"num":"32475123456"'
 : > $T/meta.log
 wa "$(wamsg 32475123456 wamid.D1 'Combien de véhicules ?')" >/dev/null; sleep 2
-R=$(cat $T/meta.log); ok "membre reconnu par son GSM : Axel répond" "$R" '"to":"32475123456"'; ok "« en train d'écrire »" "$R" 'typing_indicator'; no "pas de réponse « inconnu » au membre" "$R" 'réservé'
+R=$(cat $T/meta.log); ok "membre reconnu par son GSM : Sindri répond" "$R" '"to":"32475123456"'; ok "« en train d'écrire »" "$R" 'typing_indicator'; no "pas de réponse « inconnu » au membre" "$R" 'réservé'
 : > $T/meta.log
 wa "$(wamsg 32475123456 wamid.D1 'Combien de véhicules ?')" >/dev/null; sleep 1
 ok "message en double ignoré" "$(cat $T/meta.log | wc -l | tr -d ' ')" '^0$'
@@ -454,18 +454,18 @@ ok "réponse envoyée à Bea" "$(cat $T/meta.log)" '"to":"32475123456"'
 VO='{"object":"whatsapp_business_account","entry":[{"id":"456","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"123"},"messages":[{"from":"32475123456","id":"wamid.B2","timestamp":"1","type":"audio","audio":{"id":"media-2"}}]}}]}]}'
 wa "$VO" >/dev/null; sleep 1; ok "message vocal : explication" "$(tail -1 $T/meta.log)" 'vocaux'
 : > $T/meta.log
-R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "Axel envoie un fichier sur WhatsApp" "$R" 'Envoi : .*\\"ok\\":true'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "Sindri envoie un fichier sur WhatsApp" "$R" 'Envoi : .*\\"ok\\":true'
 ok "fichier téléversé chez Meta" "$(cat $T/meta.log)" 'upload":"image'; ok "fichier envoyé à Bea seulement" "$(cat $T/meta.log)" '"to":"32475123456","type":"image"'
 R=$(curl -s -H "$A" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "sans numéro WhatsApp : explication" "$R" 'ne connais pas ton num'
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->exec("UPDATE ways_kv SET v=\"1\" WHERE k=\"wa_in:32475123456\"");' $T/t.db
 R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi encore la photo"}' $U/assistant/say); ok "après 24 h : explication" "$R" '24 h'
-# message à un collègue (demandé à Axel) : confirmation, fenêtre de 24 h, modèle
+# message à un collègue (demandé à Sindri) : confirmation, fenêtre de 24 h, modèle
 R=$(curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say); ok "hors 24 h sans modèle : explication" "$R" 'doit cr'
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["wa_in:32475123456",(string)time()]);' $T/t.db
 : > $T/meta.log
 R=$(curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say); ok "message préparé, rien envoyé" "$R" 'Rien n.est envoy'; no "rien parti avant le oui" "$(cat $T/meta.log)" 'Passe au garage'
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "envoyé après oui" "$R" 'Message WhatsApp envoy'
-ok "texte signé de l'expéditeur, au bon numéro" "$(cat $T/meta.log)" '"to":"32475123456","type":"text","text":{"preview_url":false,"body":"💬 \*Message de .*lise Dupont\* (via Axel) :'
+ok "texte signé de l'expéditeur, au bon numéro" "$(cat $T/meta.log)" '"to":"32475123456","type":"text","text":{"preview_url":false,"body":"💬 \*Message de .*lise Dupont\* (via Sindri) :'
 ok "contexte gardé pour la réponse de Bea" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT v FROM ways_kv WHERE k=\"wa_relay:32475123456\"")->fetchColumn();' $T/t.db)" 'Passe au garage'
 R=$(curl -s -H "$A" -X POST -d '{"create":1}' $U/whatsapp/template); ok "modèle créé chez Meta" "$(cat $T/meta.log)" '"category":"UTILITY"'
 R=$(curl -s -H "$A" -X POST -d '{}' $U/whatsapp/template); ok "modèle approuvé" "$R" '"status":"APPROVED"'
