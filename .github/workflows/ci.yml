@@ -34,7 +34,11 @@ jobs:
         run: for f in js/*.js client/*.js; do node --check "$f"; done
 
       - name: Test de l'API
-        run: TEST_PHP_LOG=$RUNNER_TEMP/php.log bash test/test.sh > /dev/null
+        run: |
+          # sortie gardée : en cas d'échec, on affiche le contrôle en cause et la fin du journal PHP
+          if ! TEST_PHP_LOG=$RUNNER_TEMP/php.log bash test/test.sh > $RUNNER_TEMP/tests.log 2>&1; then
+            tail -n 15 $RUNNER_TEMP/tests.log; echo "--- journal PHP ---"; tail -n 15 $RUNNER_TEMP/php.log 2>/dev/null; exit 1
+          fi
 
       - name: Aucun avertissement PHP (Deprecated, Warning, Fatal)
         run: |
