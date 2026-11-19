@@ -90,7 +90,7 @@ jobs:
           case "$DIR" in *..*|/*|"") echo "::error::Dossier invalide : $DIR"; exit 1;; esac
           if [ "$LIST_ONLY" = "true" ]; then
             # noms des dossiers seulement (deux niveaux), pour savoir où pointe chaque (sous-)domaine
-            lftp --env-password -u "$USER" "sftp://$HOST" -e "set sftp:auto-confirm yes; pwd; cls -1 -F; cls -1 -F webroots/; cls -1 -F webroots/*/; bye"
+            lftp --env-password -u "$USER" "sftp://$HOST" -e "set sftp:auto-confirm yes; pwd; cls -1 -F; cls -1 -F webroots/; ls webroots/; ls webroots/by-route/; cls -1 -F webroots/by-route/*/; cls -1 -F webroots/00d26625/ webroots/a690c4eb/; bye"
             exit 0
           fi
           lftp --env-password -u "$USER" "sftp://$HOST" -e "
