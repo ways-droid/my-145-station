@@ -8,7 +8,7 @@
    L'écriture des pages Notion viendra ensuite (espace Notion de test d'abord). Rien ici ne remplace la CRS dans AMOS. */
 const SHIFTS = { day: "Jour (08-20)", night: "Nuit (20-08)" };
 const STATION_CHECKS = ["Outillage rangé et compté", "Équipements (GPU, ASU, azote…) contrôlés et rangés", "Clés et véhicules en ordre", "Magasin et pièces rangés", "Bureau, documents et ordinateurs en ordre"];
-const stationChecks = () => { const s = splitList(settings().stationChecks); return s.length ? s : STATION_CHECKS; };
+const stationChecks = () => { const s = String(settings().stationChecks || "").split("\n").map(x => x.trim()).filter(Boolean); return s.length ? s : STATION_CHECKS; };
 const hoId = (date, sh) => `${date}-${sh}`;
 const hoDoc = id => S.handovers.find(h => h.id === id);
 const hoItems = (id, kind) => S.shiftItems.filter(x => x.ho === id && (!kind || x.kind === kind)).sort((a, b) => (a.order || 0) - (b.order || 0) || String(a.arr || "").localeCompare(String(b.arr || "")));

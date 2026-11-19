@@ -4,7 +4,7 @@
 //  Administrateur (et clé d'API) : tout.
 //  Bureau  : tout, sauf la gestion des utilisateurs (auth.php) et les coordonnées de l'entreprise
 //            (nom, TVA, adresse, e-mail, téléphone) qui restent celles fixées par un administrateur.
-//  Terrain : articles et prix, documents administratifs : invisibles ; clients en lecture seule ;
+//  Terrain : articles et prix, Charge Sheet, documents administratifs : invisibles ; clients en lecture seule ;
 //            paramètres : ne peut rien y modifier ; export / import complets : refusés ;
 //            personnel : lecture seule, fiche complète pour soi (même e-mail), sinon l'essentiel
 //            (nom, fonction, licences sans numéro, qualifications) sans documents ni données personnelles ;
@@ -12,7 +12,7 @@
 //            shifts (handovers, shiftItems) : saisie permise tant que le shift n'est pas repris (clôturé).
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
-const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders'];
+const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
 const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 

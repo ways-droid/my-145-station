@@ -32,6 +32,7 @@ function log_label($coll, $d) {
     if ($coll === 'roster') { $n = ''; foreach (coll_docs('staff') as $id => $s) if ((string) $id === (string) ($d['staffId'] ?? '')) $n = (string) ($s['name'] ?? ''); return trim('Roster ' . ($d['month'] ?? '') . ' ' . $n); }
     if ($coll === 'handovers') return trim('Shift ' . ($d['date'] ?? '') . ' ' . (($d['shift'] ?? '') === 'night' ? 'nuit' : 'jour'));
     if ($coll === 'shiftItems') return trim(['visit' => 'Avion', 'todo' => 'Travail non terminé', 'equip' => 'Matériel'][$d['kind'] ?? ''] ?? 'Shift') . ' ' . ($d['reg'] ?? '') . ' · ' . ($d['ho'] ?? '');
+    if ($coll === 'chargeLines') return trim('Charge Sheet ' . ($d['rotation'] ?? '') . ' ' . ($d['workType'] ?? ''));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));
     foreach (['number', 'name', 'title', 'label', 'plate', 'serial', 'ref', 'type'] as $k) if (!empty($d[$k]) && is_scalar($d[$k])) return mb_substr((string) $d[$k], 0, 120);
     return '';
