@@ -13,8 +13,8 @@ cat > $T/router.php <<'EOF'
 <?php $u = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $_GET['p'] = preg_replace('#^/api/#', '', $u); require getenv('API_DIR') . '/index.php';
 EOF
-WAYS_CONFIG=$T/config.php API_DIR="$D/../api" php -S 127.0.0.1:8765 $T/router.php >$T/log 2>&1 &
-PID=$!; trap "kill $PID; pkill -f \"php -S 127.0.0.1:8771 $D\" 2>/dev/null; rm -rf $T" EXIT; sleep 1
+WAYS_CONFIG=$T/config.php API_DIR="$D/../api" php -d error_reporting=E_ALL -d display_errors=0 -d log_errors=1 -S 127.0.0.1:8765 $T/router.php >$T/log 2>&1 &
+PID=$!; trap "kill $PID; [ -n \"\$TEST_PHP_LOG\" ] && cp $T/log \"\$TEST_PHP_LOG\"; pkill -f \"php -S 127.0.0.1:8771 $D\" 2>/dev/null; rm -rf $T" EXIT; sleep 1
 K='Authorization: Bearer 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef'
 U=http://127.0.0.1:8765/api
 c() { echo "> $*"; curl -s "$@"; echo; }
