@@ -872,3 +872,23 @@ Object.assign(EN, {
   "en cours": "in progress", "Aucun mouvement en cours.": "No movement in progress."
 });
 rule(/^Réception · (.+)$/, "Receipt · $1"); rule(/^Pièce et certificat vérifiés \(P\/N, S\/N, état, (.+)\)$/, "Part and certificate checked (P/N, S/N, condition, $1)");
+
+/* ---- voyages ---- */
+Object.assign(EN, {
+  "Voyages": "Travel", "Vols et hôtels du personnel": "Staff flights and hotels", "Mes vols et mes nuits d'hôtel": "My flights and hotel nights", "Réserver un hôtel": "Book a hotel", "Ajouter un vol": "Add a flight",
+  "Vols à venir": "Upcoming flights", "À l'hôtel cette nuit": "At the hotel tonight", "Voyages à organiser": "Travel to arrange", "Jours T du roster sans vol": "Roster T days without a flight",
+  "Vols": "Flights", "Nom, hôtel, chambre, confirmation…": "Name, hotel, room, confirmation…", "Hôtel": "Hotel", "À organiser": "To arrange", "Hôtels": "Hotels", "Nom, aéroport, n° de vol, PNR…": "Name, airport, flight no., PNR…", "Passés": "Past",
+  "Personne": "Person", "Vol": "Flight", "Horaires": "Times", "PNR": "PNR", "Aucun vol passé.": "No past flights.", "Aucun vol à venir.": "No upcoming flights.",
+  "Chambres occupées par nuit": "Rooms occupied per night", "Nuits": "Nights", "En cours et à venir": "Current and upcoming", "Arrivée (check-in)": "Check-in", "Départ (check-out)": "Check-out", "Check-in": "Check-in", "Check-out": "Check-out", "Chambre": "Room", "Confirmation": "Confirmation",
+  "Aucune nuit d'hôtel prévue.": "No hotel nights planned.", "Aucune nuit d'hôtel passée.": "No past hotel nights.",
+  "Jours T (voyage) des 60 prochains jours dans le roster, sans vol enregistré pour la personne ce jour-là, la veille ou le lendemain.": "Roster T (travel) days in the next 60 days without a flight recorded for the person that day, the day before or the day after.",
+  "Ajouter le vol": "Add the flight", "Tous les jours de voyage du roster ont un vol.": "All roster travel days have a flight.", "Adresse": "Address", "Tarif": "Rate", "Ce soir": "Tonight",
+  "Aucun hôtel. Ajoutez les hôtels où loge le personnel de la station.": "No hotels. Add the hotels where the station staff stay.", "Nouveau vol": "New flight", "Nuits d'hôtel": "Hotel nights",
+  "De (aéroport)": "From (airport)", "Vers (aéroport)": "To (airport)", "Compagnie": "Airline", "N° de vol": "Flight no.", "Départ (heure locale)": "Departure (local time)", "Arrivée (heure locale)": "Arrival (local time)",
+  "PNR / réservation": "PNR / booking", "Ajoutez d'abord un hôtel (onglet Hôtels)": "Add a hotel first (Hotels tab)", "N° de confirmation": "Confirmation no.", "Coût": "Cost", "Devise": "Currency",
+  "Le départ doit être après l'arrivée.": "Check-out must be after check-in.", "Vol enregistré": "Flight saved", "Nuits d'hôtel enregistrées": "Hotel nights saved",
+  "Marquer cette réservation comme annulée ?": "Mark this booking as cancelled?", "Annulée": "Cancelled", "Supprimer cette réservation ?": "Delete this booking?", "Nouvel hôtel": "New hotel",
+  "Tarif par nuit": "Rate per night", "Notes (contrat, petit-déjeuner, navette…)": "Notes (contract, breakfast, shuttle…)", "Hôtel enregistré": "Hotel saved", "Supprimer cet hôtel ?": "Delete this hotel?",
+  "Prochains vols du personnel, nuits d'hôtel, jours de voyage sans vol.": "Next staff flights, hotel nights, travel days without a flight.", "vols dans 7 j": "flights in 7 days", "à l'hôtel ce soir": "at the hotel tonight", "à organiser": "to arrange"
+});
+rule(/^(\d+) dans les 7 jours$/, "$1 within 7 days");

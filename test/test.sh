@@ -146,6 +146,16 @@ ok "terrain : envoi de pièce" "$(curl -s -H "$HT" -X PUT -d '{"dir":"out","kind
 ok "terrain : met à jour l'envoi" "$(curl -s -H "$HT" -X PATCH -d '{"status":"sent","awb":"1234567890","carrier":"dhl"}' $U/docs/partMoves/pm1)" '"ok":true'
 ok "terrain : ne supprime pas" "$(curl -s -H "$HT" -X DELETE $U/docs/partMoves/pm1)" 'rôle'
 ok "historique : mouvement nommé" "$(curl -s -H "$A" "$U/log?coll=partMoves")" 'Envoi 123-456 TLV→ETM'
+echo "> voyages"
+ok "bureau : hôtel" "$(curl -s -H "$B" -X PUT -d '{"name":"Hôtel Test TLV"}' $U/docs/hotels/h1)" '"ok":true'
+ok "bureau : vol de Marc" "$(curl -s -H "$B" -X PUT -d '{"kind":"flight","staffId":"s1","date":"2026-12-01","from":"BRU","to":"TLV","pnr":"PNRMARC"}' $U/docs/travel/f1)" '"ok":true'
+ok "bureau : vol d'un collègue" "$(curl -s -H "$B" -X PUT -d '{"kind":"flight","staffId":"s2","date":"2026-12-01","from":"BRU","to":"TLV","pnr":"PNRAUTRE"}' $U/docs/travel/f2)" '"ok":true'
+R=$(curl -s -H "$HT" $U/docs/travel); ok "terrain : voit son propre vol" "$R" 'PNRMARC'; no "terrain : ne voit pas le vol d'un collègue" "$R" 'PNRAUTRE'
+no "terrain : changements sans le vol d'un collègue" "$(curl -s -H "$HT" "$U/changes?since=0")" 'PNRAUTRE'
+ok "terrain : vol d'un collègue introuvable" "$(curl -s -H "$HT" $U/docs/travel/f2)" 'introuvable'
+ok "terrain : ne réserve pas" "$(curl -s -H "$HT" -X PATCH -d '{"pnr":"X"}' $U/docs/travel/f1)" 'rôle'
+ok "terrain : hôtels visibles" "$(curl -s -H "$HT" $U/docs/hotels)" 'Hôtel Test TLV'
+ok "historique : vol nommé" "$(curl -s -H "$A" "$U/log?coll=travel")" 'Vol 2026-12-01 BRU→TLV Marc Terrain'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'

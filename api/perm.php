@@ -13,13 +13,15 @@
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
-const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
 function staff_mine($d) { $me = (string) ($GLOBALS['ME_EMAIL'] ?? ''); return $me !== '' && mb_strtolower(trim((string) ($d['email'] ?? ''))) === $me; }
 /* roster vu par le terrain : sans les remarques du bureau */
 function roster_public($d) { if (is_array($d) && is_array($d['days'] ?? null)) foreach ($d['days'] as $k => $x) if (is_array($x)) unset($d['days'][$k]['note']); return $d; }
+/* voyage de l'utilisateur connecté (sa fiche personnel a la même adresse e-mail) */
+function travel_mine($d) { static $st = null; if (!is_array($d) || empty($d['staffId'])) return false; $st ??= coll_docs('staff'); $p = $st[(string) $d['staffId']] ?? null; return is_array($p) && staff_mine($p); }
 function staff_public($d) {
     if (!is_array($d) || staff_mine($d)) return $d;
     $o = array_intersect_key($d, array_flip(STAFF_PUBLIC));
@@ -67,6 +69,7 @@ function perm_view($role, $coll, $data, $id = null) {
     if (in_array($coll, TERRAIN_HIDDEN, true)) return null;
     if ($coll === 'staff') return staff_public($data);
     if ($coll === 'roster') return roster_public($data);
+    if ($coll === 'travel') return travel_mine($data) ? $data : null;
     return $data;
 }
 // Ligne d'API (doc_out) filtrée : null = à ne pas envoyer.
@@ -77,6 +80,7 @@ function perm_out($role, $out) {
     if (in_array($out['coll'], TERRAIN_HIDDEN, true)) return null;
     if ($out['coll'] === 'staff' && is_array($out['data'])) $out['data'] = staff_public($out['data']);
     if ($out['coll'] === 'roster' && is_array($out['data'])) $out['data'] = roster_public($out['data']);
+    if ($out['coll'] === 'travel' && is_array($out['data']) && !travel_mine($out['data'])) return null;
     return $out;
 }
 

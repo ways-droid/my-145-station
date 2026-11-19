@@ -33,6 +33,7 @@ function log_label($coll, $d) {
     if ($coll === 'handovers') return trim('Shift ' . ($d['date'] ?? '') . ' ' . (($d['shift'] ?? '') === 'night' ? 'nuit' : 'jour'));
     if ($coll === 'shiftItems') return trim(['visit' => 'Avion', 'todo' => 'Travail non terminé', 'equip' => 'Matériel'][$d['kind'] ?? ''] ?? 'Shift') . ' ' . ($d['reg'] ?? '') . ' · ' . ($d['ho'] ?? '');
     if ($coll === 'chargeLines') return trim('Charge Sheet ' . ($d['rotation'] ?? '') . ' ' . ($d['workType'] ?? ''));
+    if ($coll === 'travel') { $n = (string) (coll_docs('staff')[(string) ($d['staffId'] ?? '')]['name'] ?? ''); return trim((($d['kind'] ?? '') === 'hotel' ? 'Hôtel ' . ($d['checkIn'] ?? '') : 'Vol ' . ($d['date'] ?? '') . ' ' . ($d['from'] ?? '') . '→' . ($d['to'] ?? '')) . ' ' . $n); }
     if ($coll === 'partMoves') return trim(($d['dir'] ?? '') === 'in' ? 'Réception' : 'Envoi') . ' ' . ($d['pn'] ?? '') . ' ' . ($d['from'] ?? '') . '→' . ($d['to'] ?? '');
     if ($coll === 'tools') return trim('Outil ' . ($d['toolNo'] ?? $d['serial'] ?? '') . ' ' . ($d['name'] ?? ''));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));
