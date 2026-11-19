@@ -1,5 +1,5 @@
 <?php
-// Installation guidée de l'API W.A.Y.S. : crée les tables, config.php et la clé d'accès.
+// Installation guidée de l'API my-145-station : crée les tables, config.php et la clé d'accès.
 // Ne fonctionne qu'une fois : dès que config.php existe, cette page se bloque.
 
 $configFile = __DIR__ . '/config.php';
@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             page('Installation réussie', '<h1>Installation réussie ✔</h1>'
                 . '<p class="ok">Les tables sont créées et l\'API de <b>' . h($envName) . '</b> est prête.</p>'
-                . '<p><b>Voici ta clé d\'accès provisoire.</b> Copie-la dans ton gestionnaire de mots de passe (nom : « ERP W.A.Y.S. ' . h($envName) . ' »). '
+                . '<p><b>Voici ta clé d\'accès provisoire.</b> Copie-la dans ton gestionnaire de mots de passe (nom : « my-145-station ' . h($envName) . ' »). '
                 . 'Elle ne sera plus jamais affichée. Ne l\'envoie à personne, ni dans le chat.</p>'
                 . '<p class="key">' . h($token) . '</p>'
                 . '<p>Ensuite : <a href="health">vérifier l\'API</a> — tu dois voir <code>"ok":true</code>.</p>');
@@ -84,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-page('Installation ERP W.A.Y.S.', '<h1>Installation de l\'ERP W.A.Y.S.</h1>'
+page('Installation my-145-station', '<h1>Installation de my-145-station</h1>'
     . '<p>Environnement : <b>' . h($envName) . '</b>. Copie ici les informations de ta base MySQL, telles qu\'affichées dans le panneau ONE.COM (rubrique <i>Base de données MySQL</i>).</p>'
     . ($err ? '<p class="err">' . h($err) . '</p>' : '')
     . '<form method="post" autocomplete="off">'

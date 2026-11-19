@@ -31,7 +31,7 @@ try { auth_tables(); } catch (Throwable $e) { page('Erreur', '<h1>Base de donné
 
 $cur = [
     'smtp_host' => kv_get('smtp_host', 'send.one.com'), 'smtp_port' => kv_get('smtp_port', '465'),
-    'smtp_user' => kv_get('smtp_user', 'noreply@ways.support'), 'smtp_from_name' => kv_get('smtp_from_name', 'ERP W.A.Y.S.'),
+    'smtp_user' => kv_get('smtp_user', 'noreply@my-145-station.com'), 'smtp_from_name' => kv_get('smtp_from_name', 'my-145-station'),
 ];
 $admin = db()->query("SELECT * FROM ways_users WHERE role = 'admin' ORDER BY created_at LIMIT 1")->fetch() ?: ['name' => '', 'email' => ''];
 $hasPass = (bool) kv_get('smtp_pass');
@@ -63,19 +63,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['step'] ?? '') === 'save') 
         if ($ex) db()->prepare("UPDATE ways_users SET email = ?, role = 'admin', active = 1 WHERE id = ?")->execute([$admin['email'], $ex['id']]);
         else db()->prepare("INSERT INTO ways_users (id, name, email, role, active, created_at) VALUES (?, ?, ?, 'admin', 1, ?)")->execute(['u' . bin2hex(random_bytes(6)), $admin['name'], $admin['email'], now_ms()]);
         $mail = '';
-        try { send_mail($admin['email'], 'ERP W.A.Y.S. : connexion configurée', "La connexion par code de l'ERP W.A.Y.S. ($env) est configurée. Les codes de connexion seront envoyés depuis " . $cur['smtp_user'] . '.'); $mail = '<p class="ok">Un e-mail de test a été envoyé à ' . h($admin['email']) . '. Vérifiez votre boîte (et les indésirables).</p>'; }
+        try { send_mail($admin['email'], 'my-145-station : connexion configurée', "La connexion par code de my-145-station ($env) est configurée. Les codes de connexion seront envoyés depuis " . $cur['smtp_user'] . '.'); $mail = '<p class="ok">Un e-mail de test a été envoyé à ' . h($admin['email']) . '. Vérifiez votre boîte (et les indésirables).</p>'; }
         catch (Throwable $e) { $mail = '<p class="warn"><b>Réglages enregistrés, mais l\'e-mail de test n\'est pas parti :</b><br>' . h($e->getMessage()) . '<br>Vérifiez l\'adresse et le mot de passe de la boîte, puis enregistrez à nouveau. Le code maître permet déjà de se connecter.</p>'; }
         page('Connexion configurée', '<h1>Connexion configurée ✔</h1>' . $mail
-            . '<p>Ouvrez l\'ERP (<a href="../">' . h($env) . '</a>) : tapez votre nom (<b>' . h($admin['name']) . '</b>), puis le code reçu par e-mail ou votre code maître.</p>'
+            . '<p>Ouvrez l\'outil (<a href="../">' . h($env) . '</a>) : tapez votre nom (<b>' . h($admin['name']) . '</b>), puis le code reçu par e-mail ou votre code maître.</p>'
             . '<p>Ajoutez ensuite les autres utilisateurs dans <b>Paramètres → Utilisateurs</b>.</p>');
     }
 }
 
-page('Connexion de l\'ERP', '<h1>Connexion de l\'ERP W.A.Y.S.</h1>'
+page('Connexion de my-145-station', '<h1>Connexion de my-145-station</h1>'
     . '<p>Environnement : <b>' . h($env) . '</b>. ' . (login_configured() ? 'La connexion par code est <b>active</b> ; vous pouvez modifier les réglages ci-dessous.' : 'Cette page active la connexion par nom et code à 8 chiffres envoyé par e-mail.') . '</p>' . $msg
     . '<form method="post" autocomplete="off"><input type="hidden" name="step" value="save">'
     . '<label>Clé d\'accès de l\'installation</label><input name="key" type="password" required><small>Celle affichée par install.php. Elle autorise cette page.</small>'
-    . '<h2>Boîte d\'envoi des codes</h2><small>Créez-la d\'abord dans le panneau ONE.COM → E-mail (par exemple noreply@ways.support).</small>'
+    . '<h2>Boîte d\'envoi des codes</h2><small>Créez-la d\'abord dans le panneau ONE.COM → E-mail (par exemple noreply@my-145-station.com).</small>'
     . '<label>Adresse d\'envoi</label><input name="smtp_user" value="' . h($cur['smtp_user']) . '">'
     . '<label>Mot de passe de cette boîte</label><input name="smtp_pass" type="password" placeholder="' . ($hasPass ? 'inchangé si laissé vide' : '') . '"><small>Il reste sur le serveur.</small>'
     . '<div class="row"><div><label>Serveur SMTP</label><input name="smtp_host" value="' . h($cur['smtp_host']) . '"></div><div><label>Port</label><input name="smtp_port" value="' . h($cur['smtp_port']) . '"></div></div>'

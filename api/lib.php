@@ -1,5 +1,5 @@
 <?php
-// Fonctions communes de l'API W.A.Y.S.
+// Fonctions communes de l'API my-145-station
 
 function cfg($key = null) {
     static $c = null;
@@ -56,15 +56,24 @@ function auth_who() {
 }
 function auth_user() { return auth_who()['label']; }
 
-// Collections de l'ERP : la liste de config.php s'ajoute à celle-ci, pour qu'un module
+// Collections de l'outil : la liste de config.php s'ajoute à celle-ci, pour qu'un module
 // ajouté plus tard fonctionne sans devoir modifier config.php sur le serveur.
 const WAYS_COLLECTIONS = [
-    'clients','products','docs','gasTypes','bottles','gasMoves','deliveries',
-    'vehicles','vehEvents','faults','driverLogs','tools','tires','labs','fines',
-    'adminDocs','adminFolders','vehPos','trips','settings','bankAccounts','bankTx','codaFiles','purchases','drivers','notes','garages','userPrefs','payments','reminders','links',
+    'clients','products','vehicles','vehEvents','faults','tools','labs',
+    'adminDocs','adminFolders','settings','notes','userPrefs','links',
 ];
 function collections() {
     return array_values(array_unique(array_merge(WAYS_COLLECTIONS, (array) cfg('collections'))));
+}
+
+/* tous les documents (non supprimés) d'une collection, en tenant compte de l'environnement de test */
+function coll_docs($coll) {
+    if (function_exists('sbx_id') && sbx_id()) { $out = []; foreach (sbx_rows($coll) as $id => $r) $out[$id] = json_decode($r['data'], true) ?: []; return $out; }
+    $out = [];
+    $st = db()->prepare('SELECT id, data FROM ways_docs WHERE coll = ? AND deleted = 0');
+    $st->execute([$coll]);
+    foreach ($st as $r) $out[$r['id']] = json_decode($r['data'], true) ?: [];
+    return $out;
 }
 
 function check_coll($c) {

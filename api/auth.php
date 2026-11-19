@@ -1,12 +1,12 @@
 <?php
-// Connexion à l'ERP : nom → code à 8 chiffres envoyé par e-mail (ou code maître) → session de 8 heures.
+// Connexion à l'outil : nom → code à 8 chiffres envoyé par e-mail (ou code maître) → session de 8 heures.
 // Inclus par index.php. Les identifiants SMTP et le code maître (haché) restent dans la base du serveur.
 
 const SESSION_HOURS  = 8;
 const CODE_MINUTES   = 10;
 const CODE_ATTEMPTS  = 5;
 const CODE_PER_15MIN = 5;
-const ROLES = ['admin', 'bureau', 'terrain', 'garage', 'chauffeur'];
+const ROLES = ['admin', 'bureau', 'terrain'];
 require_once __DIR__ . '/security.php';
 
 function auth_tables() {
@@ -63,7 +63,7 @@ function get_user($id) {
 }
 function user_out($u) {
     return ['id' => $u['id'], 'name' => $u['name'], 'email' => $u['email'], 'role' => $u['role'], 'active' => (int) $u['active'] === 1,
-        'tfa' => tfa_on($u['id']), 'tfaRequired' => tfa_required($u), 'canPay' => can_pay_user($u), 'payRight' => in_array($u['id'], pay_users(), true)];
+        'tfa' => tfa_on($u['id']), 'tfaRequired' => tfa_required($u)];
 }
 function mask_email($e) {
     [$a, $d] = array_pad(explode('@', $e, 2), 2, '');
@@ -103,7 +103,7 @@ function send_mail($to, $subject, $text, $html = null) {
     $m->SMTPSecure = $m->Port === 465 ? PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_SMTPS : PHPMailer\PHPMailer\PHPMailer::ENCRYPTION_STARTTLS;
     $m->Timeout = 15;
     $m->CharSet = 'UTF-8';
-    $m->setFrom(kv_get('smtp_user'), kv_get('smtp_from_name', 'ERP W.A.Y.S.'));
+    $m->setFrom(kv_get('smtp_user'), kv_get('smtp_from_name', 'my-145-station'));
     $m->addAddress($to);
     $m->Subject = $subject;
     if ($html) { $m->isHTML(true); $m->Body = $html; $m->AltBody = $text; } else { $m->Body = $text; }
@@ -112,10 +112,10 @@ function send_mail($to, $subject, $text, $html = null) {
 
 function code_mail($name, $code) {
     $c = substr($code, 0, 4) . ' ' . substr($code, 4);
-    $text = "Bonjour $name,\n\nVotre code de connexion à l'ERP W.A.Y.S. : $c\n\nIl est valable " . CODE_MINUTES . " minutes. Si vous n'avez pas demandé ce code, ignorez ce message.\n\nW.A.Y.S. SRL";
-    $html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">Bonjour ' . htmlspecialchars($name) . ',<br><br>Votre code de connexion à l\'ERP W.A.Y.S. :'
+    $text = "Bonjour $name,\n\nVotre code de connexion à my-145-station : $c\n\nIl est valable " . CODE_MINUTES . " minutes. Si vous n'avez pas demandé ce code, ignorez ce message.\n\nmy-145-station";
+    $html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222">Bonjour ' . htmlspecialchars($name) . ',<br><br>Votre code de connexion à my-145-station :'
         . '<div style="font-size:30px;font-weight:bold;letter-spacing:6px;margin:16px 0;color:#7a1f2b">' . $c . '</div>'
-        . 'Il est valable ' . CODE_MINUTES . ' minutes. Si vous n\'avez pas demandé ce code, ignorez ce message.<br><br>W.A.Y.S. SRL</div>';
+        . 'Il est valable ' . CODE_MINUTES . ' minutes. Si vous n\'avez pas demandé ce code, ignorez ce message.<br><br>my-145-station</div>';
     return [$text, $html];
 }
 
@@ -150,7 +150,7 @@ function auth_public_routes($route, $parts, $method) {
         $pdo->prepare('INSERT INTO ways_codes (id, user_id, code_hash, expires, attempts, created_at) VALUES (?, ?, ?, ?, 0, ?)')
             ->execute([bin2hex(random_bytes(8)), $u['id'], password_hash($code, PASSWORD_DEFAULT), now_ms() + CODE_MINUTES * 60000, now_ms()]);
         [$text, $html] = code_mail($u['name'], $code);
-        try { send_mail($u['email'], 'Votre code de connexion ERP W.A.Y.S.', $text, $html); }
+        try { send_mail($u['email'], 'Votre code de connexion my-145-station', $text, $html); }
         catch (Throwable $e) { error_log('WAYS mail: ' . $e->getMessage()); fail(502, 'L\'e-mail n\'a pas pu être envoyé. Utilisez le code maître ou prévenez l\'administrateur.'); }
         out(['ok' => true, 'sentTo' => mask_email($u['email']), 'minutes' => CODE_MINUTES]);
     }
@@ -226,15 +226,6 @@ function auth_private_routes($route, $parts, $method, $who) {
             }
             if ($cur) db()->prepare('UPDATE ways_users SET name = ?, email = ?, role = ?, active = ? WHERE id = ?')->execute([$name, $email, $role, $active, $id]);
             else db()->prepare('INSERT INTO ways_users (id, name, email, role, active, created_at) VALUES (?, ?, ?, ?, ?, ?)')->execute([$id, $name, $email, $role, $active, now_ms()]);
-            // droit de paiement : admin/bureau seulement ; donné ou retiré uniquement par une personne (pas une clé d'accès) dont le second facteur est actif
-            $wantPay = array_key_exists('canPay', $b) ? !empty($b['canPay']) : in_array($id, pay_users(), true);
-            if (!in_array($role, TFA_ROLES, true) || !$active) $wantPay = false;
-            if ($wantPay !== in_array($id, pay_users(), true)) {
-                if ($who['kind'] !== 'session' || !tfa_on($who['user']['id'])) fail(403, 'Seul un administrateur connecté avec son second facteur peut modifier le droit de paiement.');
-                pay_users_set($id, $wantPay);
-                if (function_exists('log_event')) log_event('auth', $id, 'update', $wantPay ? 'Droit « Initier des paiements » accordé' : 'Droit « Initier des paiements » retiré', null);
-                sec_alert_admins($wantPay ? 'Droit de paiement accordé' : 'Droit de paiement retiré', "« $name » " . ($wantPay ? 'peut désormais préparer des paiements depuis l\'ERP' : 'ne peut plus préparer de paiements') . ' (modifié par ' . $who['user']['name'] . ').');
-            }
             if (!$active || ($cur && $cur['role'] !== $role && in_array($role, TFA_ROLES, true) && !tfa_on($id))) db()->prepare('DELETE FROM ways_sessions WHERE user_id = ?')->execute([$id]);   // devient admin/bureau : reconnexion avec second facteur
             out(['ok' => true, 'user' => user_out(get_user($id))]);
         }
@@ -247,7 +238,7 @@ function auth_private_routes($route, $parts, $method, $who) {
             }
             db()->prepare('DELETE FROM ways_sessions WHERE user_id = ?')->execute([$cur['id']]);
             db()->prepare('DELETE FROM ways_users WHERE id = ?')->execute([$cur['id']]);
-            tfa_set($cur['id'], null); pay_users_set($cur['id'], false);
+            tfa_set($cur['id'], null);
             out(['ok' => true]);
         }
     }
@@ -255,7 +246,7 @@ function auth_private_routes($route, $parts, $method, $who) {
         $b = body_json();
         $to = $b['to'] ?? ($who['user']['email'] ?? '');
         if (!filter_var($to, FILTER_VALIDATE_EMAIL)) fail(400, 'Adresse e-mail invalide.');
-        try { send_mail($to, 'Test ERP W.A.Y.S.', "Ce message confirme que l'ERP W.A.Y.S. peut envoyer des e-mails."); }
+        try { send_mail($to, 'Test my-145-station', "Ce message confirme que my-145-station peut envoyer des e-mails."); }
         catch (Throwable $e) { fail(502, 'Envoi impossible : ' . $e->getMessage()); }
         out(['ok' => true]);
     }

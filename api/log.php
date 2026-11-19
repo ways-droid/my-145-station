@@ -5,13 +5,13 @@
 //  GET log?coll=&id=&by=&action=&from=&to=&q=&before=&limit=   (administrateurs et bureau)
 //  GET log/people                                              noms présents dans l'historique
 //
-// Les écritures des synchronisations (Odoo, Falco, Ponto, Webfleet…) ne sont notées que pour les créations,
+// Les écritures des synchronisations (Dropbox, WhatsApp…) ne sont notées que pour les créations,
 // suppressions et changements de statut ou de rapprochement, pour ne pas noyer l'historique.
 
-const LOG_SKIP_COLLS = ['vehPos', 'trips', 'userPrefs'];
-const LOG_SYSTEM = ['odoo' => 'Odoo', 'falco' => 'Falco', 'ponto' => 'Ponto (banque)', 'webfleet' => 'Webfleet', 'coda' => 'ERP (CODA)', 'server' => 'ERP', 'dropbox' => 'Dropbox', 'whatsapp' => 'WhatsApp'];
+const LOG_SKIP_COLLS = ['userPrefs'];
+const LOG_SYSTEM = ['server' => 'Outil', 'dropbox' => 'Dropbox', 'whatsapp' => 'WhatsApp'];
 const LOG_SYSTEM_KEYS = ['status', 'paymentStatus', 'paymentState', 'matches', 'match', 'response'];
-const LOG_IGNORE_KEYS = ['_rev', 'updatedAt', 'updated_at', 'pdfFileId', 'odooWriteDate', 'syncedAt'];
+const LOG_IGNORE_KEYS = ['_rev', 'updatedAt', 'updated_at', 'pdfFileId', 'syncedAt'];
 const LOG_KEEP_DAYS = 730;
 
 function log_tables() {
@@ -28,12 +28,6 @@ function log_tables() {
 
 function log_label($coll, $d) {
     if (!is_array($d)) return '';
-    $kinds = ['facture' => 'Facture', 'nc' => 'Note de crédit', 'devis' => 'Devis', 'livraison' => 'Bon de livraison'];
-    if ($coll === 'docs') return trim(($kinds[$d['kind'] ?? ''] ?? 'Document') . ' ' . (($d['number'] ?? '') ?: 'brouillon'));
-    if ($coll === 'purchases') return trim('Facture d\'achat ' . ($d['number'] ?? '') . ' · ' . ($d['supplierName'] ?? ''), ' ·');
-    if ($coll === 'bankTx') return trim('Mouvement ' . ($d['date'] ?? '') . ' · ' . number_format((float) ($d['amount'] ?? 0), 2, ',', ' ') . ' € · ' . ($d['counterpart'] ?? ''), ' ·');
-    if ($coll === 'drivers') return 'Chauffeur ' . ($d['name'] ?? '');
-    if ($coll === 'garages') return 'Garage ' . ($d['name'] ?? '');
     if ($coll === 'notes') return empty($d['team']) ? 'Note personnelle' : trim('Note d\'équipe ' . mb_substr((string) ($d['title'] ?? ''), 0, 80));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));
     foreach (['number', 'name', 'title', 'label', 'plate', 'serial', 'ref', 'type'] as $k) if (!empty($d[$k]) && is_scalar($d[$k])) return mb_substr((string) $d[$k], 0, 120);
@@ -57,7 +51,7 @@ function log_diff($old, $new) {
     return $ch;
 }
 function log_name($by) { $by = (string) $by; return str_starts_with($by, 'user:') ? substr($by, 5) : (str_starts_with($by, 'token:') ? 'Clé d\'accès' : $by); }
-/* fiche « parente » (véhicule d'une intervention, client d'une facture…) pour l'historique d'une fiche */
+/* fiche « parente » (véhicule d'une intervention…) pour l'historique d'une fiche */
 function log_parent($d) { foreach (['vehicleId', 'clientId', 'toolId', 'bottleId'] as $k) if (!empty($d[$k]) && is_scalar($d[$k])) return (string) $d[$k]; return null; }
 function log_write($by, $kind, $coll, $id, $action, $label, $details = null, $parent = null) {
     $by = log_name($by);
@@ -81,17 +75,6 @@ function log_doc_write($coll, $id, $old, $new, $user, $deleted) {
         if ($sys && !array_filter($ch, fn($c) => in_array($c[0], LOG_SYSTEM_KEYS, true))) return;
         $action = 'update'; $details = ['changes' => $ch]; $label = log_label($coll, $new);
         if ($coll === 'notes' && (empty($new['team']) || empty($old['team']))) $details = null;   // contenu d'une note personnelle : jamais dans l'historique
-        if ($coll === 'docs' && ($old['status'] ?? '') !== ($new['status'] ?? '')) {
-            $st = $new['status'] ?? '';
-            if ($st === 'envoyee' && in_array($old['status'] ?? '', ['', 'brouillon'], true)) $action = 'validate';
-            elseif ($st === 'payee') $action = 'paid';
-            elseif ($st === 'annulee') $action = 'cancel';
-        }
-        if ($coll === 'bankTx' && array_filter($ch, fn($c) => in_array($c[0], ['matches', 'match'], true))) {
-            $ms = $new['matches'] ?? (!empty($new['match']) ? [$new['match']] : []);
-            $action = $ms ? 'link' : 'unlink';
-            $details['docs'] = array_values(array_map(fn($m) => ['coll' => $m['coll'] ?? 'docs', 'id' => $m['docId'] ?? '', 'number' => $m['number'] ?? ''], (array) $ms));
-        }
         if (array_filter($ch, fn($c) => $c[0] === 'response')) $action = 'reply';
         if (array_filter($ch, fn($c) => $c[0] === 'archived')) $action = !empty($new['archived']) ? 'archive' : 'unarchive';
     }

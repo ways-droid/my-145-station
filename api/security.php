@@ -78,8 +78,8 @@ function tfa_new_recovery() {
     return [$plain, $hash];
 }
 function tfa_uri($u, $secret) {
-    $label = rawurlencode('W.A.Y.S. ERP:' . $u['name']);
-    return "otpauth://totp/$label?secret=$secret&issuer=" . rawurlencode('W.A.Y.S. ERP') . '&algorithm=SHA1&digits=6&period=30';
+    $label = rawurlencode('my-145-station:' . $u['name']);
+    return "otpauth://totp/$label?secret=$secret&issuer=" . rawurlencode('my-145-station') . '&algorithm=SHA1&digits=6&period=30';
 }
 // vérifie un code de l'application (ou de secours si $allowRec) pour un utilisateur activé ; met à jour l'anti-rejeu
 function tfa_verify_user($uid, $code, $allowRec = true) {
@@ -126,14 +126,14 @@ function sec_fail_note() {
     $m = sec_recent('master_fail', 15); $m[] = sec_now(); kv_set('master_fail', json_encode($m));
     if (count($m) >= MASTER_FAILS) {
         kv_set('master_lock', (string) (sec_now() + MASTER_LOCK_MIN * 60000)); kv_set('master_fail', '[]');
-        sec_alert_admins('Code maître bloqué', "Après " . MASTER_FAILS . " échecs de connexion en 15 minutes, le code maître de l'ERP est bloqué pendant " . MASTER_LOCK_MIN . " minutes.\n\nDernier essai depuis l'adresse $ip.\n\nSi ce n'était pas vous ou votre équipe, quelqu'un essaie peut-être d'entrer dans l'ERP : changez le code maître (api/setup.php).");
+        sec_alert_admins('Code maître bloqué', "Après " . MASTER_FAILS . " échecs de connexion en 15 minutes, le code maître de l'outil est bloqué pendant " . MASTER_LOCK_MIN . " minutes.\n\nDernier essai depuis l'adresse $ip.\n\nSi ce n'était pas vous ou votre équipe, quelqu'un essaie peut-être d'entrer dans l'outil : changez le code maître (api/setup.php).");
     }
 }
 function sec_master_locked() { return (int) kv_get('master_lock', '0') > sec_now(); }
 function sec_admin_emails() { $o = []; foreach (db()->query("SELECT email FROM ways_users WHERE role = 'admin' AND active = 1") as $r) if (filter_var($r['email'], FILTER_VALIDATE_EMAIL)) $o[] = $r['email']; return array_unique($o); }
 function sec_alert_admins($subject, $text) {
     if (function_exists('sbx_id') && sbx_id()) return;
-    foreach (sec_admin_emails() as $to) { try { send_mail($to, 'ERP W.A.Y.S. · ' . $subject, $text . "\n\n— " . gmdate('d/m/Y H:i') . ' UTC'); } catch (Throwable $e) { error_log('WAYS alerte: ' . $e->getMessage()); } }
+    foreach (sec_admin_emails() as $to) { try { send_mail($to, 'my-145-station · ' . $subject, $text . "\n\n— " . gmdate('d/m/Y H:i') . ' UTC'); } catch (Throwable $e) { error_log('WAYS alerte: ' . $e->getMessage()); } }
     if (function_exists('log_event')) log_event('auth', 'security', 'alert', $subject, null, 'ERP');
 }
 
@@ -147,7 +147,7 @@ function auth_after_code($u, $master) {
         $secret = b32_enc(random_bytes(20));
         out(['ok' => true, 'tfa' => 'enroll', 'ticket' => tfa_ticket($u, $master, $secret), 'secret' => $secret, 'uri' => tfa_uri($u, $secret)]);
     }
-    if (function_exists('log_event')) log_event('auth', $u['id'], 'login', 'Connexion à l\'ERP', null, $u['name']);
+    if (function_exists('log_event')) log_event('auth', $u['id'], 'login', 'Connexion à l\'outil', null, $u['name']);
     out(['ok' => true, 'token' => new_session($u), 'user' => user_out($u), 'hours' => SESSION_HOURS]);
 }
 function auth_step2($b) {
@@ -169,7 +169,7 @@ function auth_step2($b) {
         fail(401, $v['tries'] >= 5 ? 'Trop d\'essais : recommencez la connexion.' : 'Code de l\'application incorrect. Vérifiez que l\'heure du téléphone est à jour.');
     }
     tfa_ticket_drop($v);
-    if (function_exists('log_event')) log_event('auth', $u['id'], 'login', $how === 'recovery' ? 'Connexion à l\'ERP (code de secours)' : ($how === 'activation' ? 'Connexion à l\'ERP · second facteur activé' : 'Connexion à l\'ERP'), null, $u['name']);
+    if (function_exists('log_event')) log_event('auth', $u['id'], 'login', $how === 'recovery' ? 'Connexion à l\'outil (code de secours)' : ($how === 'activation' ? 'Connexion à l\'outil · second facteur activé' : 'Connexion à l\'outil'), null, $u['name']);
     if ($how === 'recovery') sec_alert_admins('Code de secours utilisé', "« {$u['name']} » s'est connecté avec un code de secours du second facteur. Il lui en reste " . count(tfa_get($u['id'])['rec'] ?? []) . '.');
     $o = ['ok' => true, 'token' => new_session($u), 'user' => user_out($u), 'hours' => SESSION_HOURS];
     if ($rec) $o['recovery'] = $rec;
@@ -209,18 +209,11 @@ function security_admin_routes($parts, $method, $who) {
     // auth/users/<id>/tfa-reset
     if (($parts[1] ?? '') === 'users' && ($parts[3] ?? '') === 'tfa-reset' && $method === 'POST') {
         $u = get_user(check_id($parts[2] ?? '')); if (!$u) fail(404, 'Utilisateur introuvable');
-        tfa_set($u['id'], null); pay_users_set($u['id'], false);
+        tfa_set($u['id'], null);
         db()->prepare('DELETE FROM ways_sessions WHERE user_id = ?')->execute([$u['id']]);
         if (function_exists('log_event')) log_event('auth', $u['id'], 'update', 'Second facteur réinitialisé par un administrateur', null);
-        sec_alert_admins('Second facteur réinitialisé', "Le second facteur de « {$u['name']} » a été réinitialisé par " . ($who['user']['name'] ?? 'une clé d\'accès') . ". Il devra le réactiver à sa prochaine connexion. Son droit de paiement a été retiré.");
+        sec_alert_admins('Second facteur réinitialisé', "Le second facteur de « {$u['name']} » a été réinitialisé par " . ($who['user']['name'] ?? 'une clé d\'accès') . ". Il devra le réactiver à sa prochaine connexion.");
         out(['ok' => true]);
     }
 }
 
-/* ---------- droit « Initier des paiements » (kv pay_users : liste d'identifiants) ---------- */
-function pay_users() { return json_decode((string) kv_get('pay_users', '[]'), true) ?: []; }
-function pay_users_set($uid, $on) {
-    $l = array_values(array_diff(pay_users(), [$uid])); if ($on) $l[] = $uid;
-    kv_set('pay_users', json_encode($l));
-}
-function can_pay_user($u) { return $u && in_array($u['role'] ?? '', TFA_ROLES, true) && (int) $u['active'] === 1 && in_array($u['id'], pay_users(), true) && tfa_on($u['id']); }
