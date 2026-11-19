@@ -25,7 +25,7 @@ const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble de
 const AI_HIDDEN = ['settings', 'userPrefs'];
 const AI_NAME = 'Sindri';
 // collections que Sindri peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
-const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'travel', 'hotels', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
+const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'travel', 'hotels', 'aircraft', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
     'staff' => "personnel de la station (name, function, employer, email, phone, licences [{cat, number, expires}], ratings {type d'avion: niveau}, docs [{type, number, expires}] = visas, permis de travail, badges, examens…)",
@@ -33,6 +33,7 @@ const AI_LABELS = [
     'handovers' => 'fiches de shift (id <date>-day|night : foreman, extra, checks Station Control, out/in = remise et reprise du shift)',
     'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, planned, done, mhrs, atl, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
     'travel' => 'voyages du personnel (kind flight|hotel, staffId, status booked|cancel ; vol : date, from, to, airline, flightNo, dep, arr, pnr ; hôtel : hotelId, checkIn, checkOut, room, conf ; cost, currency)',
+    'aircraft' => 'avions servis par la station (reg = immatriculation, clientId = compagnie, acType, variant, msn, engines, licences = licences exigées pour signer [E EASA, I approbation israélienne, F FAA], amosRef, active, notes) — la maintenance et la navigabilité restent dans AMOS',
     'hotels' => 'hôtels du personnel (name, address, contact, phone, email, rate, currency)',
     'partMoves' => 'mouvements de pièces de la station (dir in|out, kind, status prep|sent|received|cancel, aog, pn, desc, serial, qty, cond, cert, certNo, amosRef, from, to, reg, carrier, awb, eta) ; le stock reste dans AMOS',
     'chargeLines' => 'lignes de Charge Sheet (date, company, reg, rotation, type, workType, description, qty, unit, price, currency, reviewed, invoiced) ; montant = qty × price',

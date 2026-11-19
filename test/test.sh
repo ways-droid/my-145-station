@@ -156,6 +156,11 @@ ok "terrain : vol d'un collègue introuvable" "$(curl -s -H "$HT" $U/docs/travel
 ok "terrain : ne réserve pas" "$(curl -s -H "$HT" -X PATCH -d '{"pnr":"X"}' $U/docs/travel/f1)" 'rôle'
 ok "terrain : hôtels visibles" "$(curl -s -H "$HT" $U/docs/hotels)" 'Hôtel Test TLV'
 ok "historique : vol nommé" "$(curl -s -H "$A" "$U/log?coll=travel")" 'Vol 2026-12-01 BRU→TLV Marc Terrain'
+echo "> avions"
+ok "bureau : avion" "$(curl -s -H "$B" -X PUT -d '{"reg":"4X-EKA","acType":"B777","licences":["E","I"],"active":true}' $U/docs/aircraft/ac1)" '"ok":true'
+ok "terrain : avions visibles" "$(curl -s -H "$HT" $U/docs/aircraft)" '4X-EKA'
+ok "terrain : ne modifie pas un avion" "$(curl -s -H "$HT" -X PATCH -d '{"msn":"1"}' $U/docs/aircraft/ac1)" 'rôle'
+ok "historique : avion nommé" "$(curl -s -H "$A" "$U/log?coll=aircraft")" 'Avion 4X-EKA'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'

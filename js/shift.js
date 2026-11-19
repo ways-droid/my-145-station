@@ -24,13 +24,16 @@ function currentShift() {
 }
 const shiftName = (date, sh) => `${fmtDate(date)} · ${tr(SHIFTS[sh])}`;
 const sName = id => staff(id)?.name || "?";
-/* contrôle des qualifications d'un avion : au moins un CRS qualifié sur le type, et avec I pour un 4X- */
+/* contrôle des qualifications d'un avion : au moins un CRS qualifié sur le type, avec I pour un 4X-,
+   et avec les licences exigées par la fiche de l'avion (section Avions) quand elle existe */
 function visitCheck(v) {
   if (!v.acType) return { ok: true, msg: "" };
   const crs = (v.crs || []).map(staff).filter(Boolean), is4X = /^4X/i.test(v.reg || "");
   if (!crs.length) return { ok: false, msg: "Aucun CRS affecté" };
   if (!crs.some(p => rated(p, v.acType))) return { ok: false, msg: `Aucun CRS qualifié ${v.acType}` };
   if (is4X && !crs.some(p => hasI(p, v.acType))) return { ok: false, msg: `4X- : aucun CRS avec I sur ${v.acType}` };
+  const ac = typeof aircraftOf === "function" ? aircraftOf(v.reg) : null;
+  if (ac) for (const c of acLic(ac)) if (!crs.some(p => ratingHas(p, v.acType, c))) return { ok: false, msg: `${normReg(v.reg)} : aucun CRS avec ${c} sur ${v.acType}` };
   return { ok: true, msg: "" };
 }
 const hoClosed = h => !!(h && h.in && h.in.at);
@@ -103,7 +106,7 @@ ACTIONS["visit-form"] = el => {
   const others = staffActive().filter(p => !crew.includes(p)).sort(staffSort);
   const certs = crew.filter(p => (p.licences || []).length || Object.keys(p.ratings || {}).length);
   const m = modal(`${mHead(v.id ? "Avion · " + esc(v.reg) : "Nouvel avion")}<form><div class="body stack"><div class="fields">
-    ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
+    ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}<datalist id="vi-regs">${(S.aircraft || []).filter(a => a.active !== false).map(a => `<option value="${esc(a.reg)}">${esc([a.acType, a.variant].filter(Boolean).join(" "))}</option>`).join("")}</datalist>${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
     ${field("vi-arr", "ARR (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "DEP (UTC)", v.dep, { ph: "17:10", cls: "mono" })}
     ${field("vi-flt", "Vol / rotation", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-mhrs", "MHRS", v.mhrs, { cls: "mono", ph: "1EA, 2.5…" })}${field("vi-atl", "LOG PAGE / ATL n°", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
     <div class="muted small" id="vi-client"></div>
@@ -117,7 +120,8 @@ ACTIONS["visit-form"] = el => {
   const upd = () => { const c = clientOfReg(val("vi-reg")); m.querySelector("#vi-client").textContent = c ? tr("Client") + " : " + c.name + (c.code ? " (" + c.code + ")" : "") : "";
     const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg); };
   if (v.id) odWire(m, v);
-  m.querySelector("#vi-reg").oninput = upd; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = upd; upd();
+  m.querySelector("#vi-reg").setAttribute("list", "vi-regs");
+  m.querySelector("#vi-reg").oninput = () => { const ac = aircraftOf(val("vi-reg")); if (ac && ac.acType && !val("vi-ac")) m.querySelector("#vi-ac").value = ac.acType; upd(); }; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = upd; upd();
   const add = m.querySelector("#vi-add");
   if (add) add.onchange = () => { const p = staff(add.value); if (!p) return; for (const box of ["vi-crs", "vi-mech"]) m.querySelector("#" + box).insertAdjacentHTML("beforeend", `<label class="chk"><input type="checkbox" value="${p.id}"> ${esc(p.name)}</label>`); add.querySelector(`option[value="${p.id}"]`).remove(); add.value = ""; };
   m.querySelector("form").onsubmit = async e => {
