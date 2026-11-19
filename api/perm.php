@@ -13,7 +13,7 @@
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
-const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
@@ -101,6 +101,25 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
         if ($coll === 'handovers' && $op === 'delete') deny();
         return $new;
     }
+    if ($coll === 'tools') return tools_terrain_write($op, $old, $new);
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
+}
+/* outillage : le terrain sort et rentre les outils (champs out et history), le registre reste au bureau */
+function tools_usable(array $t) {
+    $st = (string) ($t['status'] ?? 'service'); if ($st === '') $st = 'service';
+    if ($st !== 'service') return false;
+    return ($t['calRequired'] ?? true) === false || empty($t['nextDue']) || (string) $t['nextDue'] >= gmdate('Y-m-d');
+}
+function tools_terrain_write($op, $old, $new) {
+    if ($op === 'delete' || !is_array($old)) deny();
+    $hist = (array) ($new['history'] ?? []); $oh = (array) ($old['history'] ?? []);
+    // l'historique ne fait que s'allonger (les plus anciennes lignes peuvent tomber au-delà de 300)
+    if (count($hist) < min(count($oh), 299) || ($oh && !in_array(end($oh), $hist, false) && count($oh) < 300)) deny('Historique de l\'outil non modifiable.');
+    $out = $old; $out['history'] = $hist;
+    if (!empty($new['out'])) {
+        if (empty($old['out']) && !tools_usable($old)) deny('Outil hors service, au labo ou étalonnage dépassé : il ne peut pas sortir.');
+        $out['out'] = $new['out'];
+    } else unset($out['out']);
+    return $out;
 }

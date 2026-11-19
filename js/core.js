@@ -365,9 +365,9 @@ function renderNav() {
   document.body.classList.toggle("sbx", !!SBX);
   const r = route();
   const faults = S.faults.filter(f => f.status !== "reparee" && isActiveVeh(f.vehicleId)).length;
-  const ready = S.tools.filter(t => t.status === "a_livrer").length;
+  const ready = typeof tOverdue === "function" ? S.tools.filter(tOverdue).length : 0;
   const badge = { flotte: faults, etalonnage: ready };
-  const badgeTip = { flotte: n => `${plural(n, "panne")} en cours (onglet Pannes)`, etalonnage: n => `${plural(n, "outil")} étalonné${n > 1 ? "s" : ""}, à rendre (colonne Calibrated)` };
+  const badgeTip = { flotte: n => `${plural(n, "panne")} en cours (onglet Pannes)`, etalonnage: n => `${plural(n, "outil")} : étalonnage dépassé (onglet Étalonnage)` };
   document.getElementById("nav").innerHTML =
     `<a href="#dashboard" class="brand-wrap" aria-label="Tableau de bord"><span class="logo-tile">${logoSvg()}</span><span><span class="brand">my<i>-</i>145<i>-</i>station</span><span class="brand-sub">${esc([settings().stationCode, settings().name].filter(Boolean).join(" · "))}</span></span></a>` +
     `<div class="lang-switch" role="group" aria-label="Langue / Language" data-noi18n><button data-a="set-lang" data-l="fr" class="${UI_LANG === "fr" ? "on" : ""}" aria-pressed="${UI_LANG === "fr"}">Français</button><button data-a="set-lang" data-l="en" class="${UI_LANG === "en" ? "on" : ""}" aria-pressed="${UI_LANG === "en"}">English</button></div>` +
