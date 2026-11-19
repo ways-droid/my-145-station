@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
@@ -335,11 +335,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["roster", "Roster"], ["shift", "Shift"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"]]],
+  ["Station", [["personnel", "Personnel"], ["roster", "Roster"], ["shift", "Shift"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
@@ -472,7 +472,7 @@ const TAB_IC = {
 };
 const TAB_ICON = { mois: "chart", jour: "people", codes: "tag", equipe: "people", matrice: "check", vehicules: "car", taches: "check", pannes: "alert", documents: "doc", pneus: "tire", amendes: "ticket",
   entretiens: "tools", stats: "chart", stock: "box", bouteilles: "bottle", clients: "people", livraisons: "truck", config: "cog", atelier: "flask", outils: "tools", labos: "flask", echeances: "bell",
-  mouv: "bank", coda: "file", rclients: "people", ramendes: "ticket", vehicles: "car", tools: "tools", products: "tag", centres: "chart", anparam: "cog", notes: "note", gaz: "bottle", frais: "euro", etalonnage: "flask", articles: "tag" };
+  mouv: "bank", coda: "file", rclients: "people", ramendes: "ticket", vehicles: "car", tools: "tools", products: "tag", centres: "chart", anparam: "cog", notes: "note", gaz: "bottle", frais: "euro", etalonnage: "flask", articles: "tag", cours: "truck", fini: "check", sortis: "tools", etal: "flask" };
 const tabIcon = (route, k) => { const n = TAB_ICON[k] || (route === "admin" && k === "documents" ? "folder" : null); return n && TAB_IC[n] ? `<svg class="tab-ic" viewBox="0 0 24 24" aria-hidden="true">${TAB_IC[n]}</svg>` : ""; };
 function tabs(routeKey, list) {
   const cur = UI.tab[routeKey] || list[0][0];
