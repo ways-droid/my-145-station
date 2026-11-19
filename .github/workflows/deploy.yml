@@ -20,6 +20,19 @@ name: Déploiement test (ONE.COM)
 
 on:
   workflow_dispatch:
+    inputs:
+      dir:
+        description: "Dossier de destination sur l'hébergement (vide = variable TEST_DIR, sinon « test »)"
+        required: false
+        default: ""
+      url:
+        description: "Adresse du site déployé, pour la vérification (vide = variable TEST_URL)"
+        required: false
+        default: ""
+      list_only:
+        description: "Lister seulement les dossiers de l'hébergement (rien n'est envoyé)"
+        type: boolean
+        default: false
 
 concurrency:
   group: deploy-test
@@ -65,7 +78,8 @@ jobs:
           HOST: ${{ secrets.SFTP_HOST }}
           USER: ${{ secrets.SFTP_USER }}
           PASS: ${{ secrets.SFTP_PASSWORD }}
-          DIR: ${{ vars.TEST_DIR || 'test' }}
+          DIR: ${{ inputs.dir || vars.TEST_DIR || 'test' }}
+          LIST_ONLY: ${{ inputs.list_only }}
         run: |
           sudo apt-get -qq update && sudo apt-get -qq install -y lftp > /dev/null
           # Mot de passe passé par variable d'environnement (caractères spéciaux sans risque) ;
@@ -73,6 +87,12 @@ jobs:
           HOST=$(printf %s "$HOST" | tr -d '[:space:]'); HOST=${HOST#sftp://}
           USER=$(printf %s "$USER" | tr -d '[:space:]')
           export LFTP_PASSWORD=$(printf %s "$PASS" | tr -d '\r\n')
+          case "$DIR" in *..*|/*|"") echo "::error::Dossier invalide : $DIR"; exit 1;; esac
+          if [ "$LIST_ONLY" = "true" ]; then
+            # noms des dossiers seulement (deux niveaux), pour savoir où pointe chaque (sous-)domaine
+            lftp --env-password -u "$USER" "sftp://$HOST" -e "set sftp:auto-confirm yes; pwd; cls -1 -F; cls -1 -F */; bye"
+            exit 0
+          fi
           lftp --env-password -u "$USER" "sftp://$HOST" -e "
             set sftp:auto-confirm yes;
             set net:max-retries 2;
@@ -81,8 +101,9 @@ jobs:
             bye"
 
       - name: Vérification
+        if: ${{ !inputs.list_only }}
         env:
-          URL: ${{ vars.TEST_URL || 'https://test.my-145-station.com' }}
+          URL: ${{ inputs.url || vars.TEST_URL || 'https://test.my-145-station.com' }}
         run: |
           sleep 3
           curl -fsS "$URL/api/health" || \
