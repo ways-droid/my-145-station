@@ -48,6 +48,10 @@ function rosterGaps(days = 7) {
     for (const x of coverage(d)) if (!x.n) out.push({ d, sh: x.sh, t: x.t }); }
   return out;
 }
+/* stations où le vendredi est chômé (Shabbat) : réglage de la station, sinon déduit du code (aéroports israéliens) */
+const FRI_OFF_STATIONS = ["TLV", "ETM", "HFA", "SDV", "VDA", "EIY", "RPN", "MTZ"];
+function fridayOff() { const s = settings(); return typeof s.fridayOff === "boolean" ? s.fridayOff : FRI_OFF_STATIONS.includes((s.stationCode || "").toUpperCase()); }
+const dayCls = d => { const w = new Date(d + "T12:00:00").getDay(); return w === 0 || w === 6 ? "we" : w === 5 && fridayOff() ? "fri" : ""; };
 const SH_LBL = { day: "Jour", night: "Nuit" };
 const cellTxt = x => !x ? "" : rcode(x.c).k === "custom" && x.start ? `${x.start.replace(":00", "")}-${(x.end || "").replace(":00", "")}` : x.c;
 
@@ -57,15 +61,19 @@ VIEWS.roster = {
     const [y, m] = ym.split("-");
     return head("Roster", "Planning de la station : une ligne par personne, un code par jour",
       `<button class="btn" data-a="roster-export">Exporter (Excel)</button>${isOffice() ? `<button class="btn" data-a="roster-copy" ${dis()}>Reprendre le mois précédent</button>` : ""}`,
-      `<div class="row-g"><button class="btn sm" data-a="roster-month" data-n="-1" aria-label="Mois précédent">‹</button><b class="rmonth">${MONTHS[+m - 1]} ${y}</b><button class="btn sm" data-a="roster-month" data-n="1" aria-label="Mois suivant">›</button>${ym !== ymOf(today()) ? `<button class="btn sm" data-a="roster-month" data-n="0">Aujourd'hui</button>` : ""}</div>`) +
+      `<div class="row-g rnav"><button class="btn sm" data-a="roster-month" data-n="-1" aria-label="Mois précédent">‹</button><b class="rmonth">${MONTHS[+m - 1]}${UI.r2 ? ` ${y !== ymAdd(ym, 1).slice(0, 4) ? y + " " : ""}– ${MONTHS[+ymAdd(ym, 1).slice(5) - 1]} ${ymAdd(ym, 1).slice(0, 4)}` : ` ${y}`}</b><button class="btn sm" data-a="roster-month" data-n="1" aria-label="Mois suivant">›</button>`
+        + `<button class="btn sm ${UI.r2 ? "primary" : ""}" data-a="roster-two" title="${esc(tr("Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre"))}">2 mois</button>`
+        + `<button class="btn sm" data-a="roster-month" data-n="0" ${ym === ymOf(today()) ? `style="visibility:hidden" tabindex="-1" aria-hidden="true"` : ""}>Aujourd'hui</button></div>`) +
       tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["codes", "Codes"]]) +
       ({ mois: rosterMonth, jour: rosterToday, codes: rosterCodes })[tab]();
   }
 };
 function rosterMonth() {
-  const ym = UI.rmonth, n = ymDays(ym), ppl = staffActive().sort(staffSort), ed = isOffice() && !readOnly;
+  const ym = UI.rmonth, ppl = staffActive().sort(staffSort), ed = isOffice() && !readOnly;
   if (!S.staff.length) return `<div class="panel pad">Ajoutez d'abord les personnes dans <a href="#personnel">Personnel</a>.</div>`;
-  const dates = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`), wd = d => new Date(d + "T12:00:00").getDay();
+  const months = UI.r2 ? [ym, ymAdd(ym, 1)] : [ym];
+  const dates = months.flatMap(mm => Array.from({ length: ymDays(mm) }, (_, i) => `${mm}-${pad(i + 1)}`)), wd = d => new Date(d + "T12:00:00").getDay();
+  const mcls = d => UI.r2 && d.slice(8) === "01" && d.slice(0, 7) !== ym ? " mstart" : "";
   const brush = UI.rbrush;
   const bar = ed ? `<div class="rbar"><span class="muted small">Pinceau :</span>${rcodes().map(c => `<button class="rcode rc-${c.col} ${brush === c.c ? "on" : ""}" data-a="roster-brush" data-c="${esc(c.c)}" title="${esc(tr(c.l))}">${esc(c.c)}</button>`).join("")}
     <button class="rcode rc-red ${brush && /^[A-Z]{3}$/.test(brush) && !rcodes().some(c => c.c === brush) ? "on" : ""}" data-a="roster-brush" data-c="?" title="${esc(tr("Autre station (détaché / flight mech)"))}">${brush && /^[A-Z]{3}$/.test(brush) && !rcodes().some(c => c.c === brush) ? esc(brush) : "XXX"}</button>
@@ -73,10 +81,10 @@ function rosterMonth() {
     <span class="muted small">${brush != null ? "Cliquez ou glissez sur les cases pour appliquer. Cliquez à nouveau sur le code pour arrêter." : "Choisissez un code puis cliquez ou glissez sur les cases. Sans code choisi, un clic ouvre le détail de la case."}</span></div>` : "";
   const cov = dates.map(d => planned(d) ? coverage(d) : null);
   const covRows = ["day", "night"].flatMap(sh => [...acTypes(), "I"].map(t => `<tr class="rcov"><th class="rname small">${SH_LBL[sh]} · ${t === "I" ? "I (4X-)" : esc(t)}</th>${cov.map(c => { if (!c) return `<td></td>`; const x = c.find(z => z.sh === sh && z.t === t);
-    return `<td class="${x.n ? "" : "gap"}" title="${esc(x.n + " " + (t === "I" ? tr("avec I") : tr("qualifiés")))}">${x.n}</td>`; }).join("")}</tr>`)).join("");
-  return `${bar}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${[0, 6].includes(wd(d)) ? "we" : ""} ${d === today() ? "today" : ""}"><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}</th>`).join("")}</tr></thead><tbody>
+    return `<td class="${x.n ? "" : "gap"}${mcls(dates[cov.indexOf(c)])}" title="${esc(x.n + " " + (t === "I" ? tr("avec I") : tr("qualifiés")))}">${x.n}</td>`; }).join("")}</tr>`)).join("");
+  return `${bar}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
     ${ppl.map(p => `<tr><th class="rname"><a href="#" data-a="staff-open" data-id="${p.id}">${esc(p.name)}</a><div class="muted small">${esc([STAFF_FN[p.function], Object.entries(p.ratings || {}).map(([t, l]) => t.replace(/^B/, "") + " " + l).join(" · ")].filter(Boolean).join(" · "))}</div></th>
-      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; return `<td class="rc ${c ? "rc-" + c.col : ""} ${d === today() ? "today" : ""}" data-rc="${p.id}|${d}" title="${esc(c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "")}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
+      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; return `<td class="rc ${c ? "rc-" + c.col : ""} ${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}" data-rc="${p.id}|${d}" title="${esc(c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "")}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
     ${covRows}<tr class="rcov"><th class="rname small">D/N à affecter</th>${dates.map((d, i) => { const k = cov[i] ? toAssign(d).length : 0; return `<td class="${k ? "todo" : ""}">${k || ""}</td>`; }).join("")}</tr></tbody></table></div><div class="pad hint">Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
 }
 function rosterToday() {
@@ -111,6 +119,8 @@ async function rosterSet(changes) {   /* changes : [[staffId, date, cell|null]] 
     await save("roster", id, { staffId: g.sid, month: g.ym, days });
   }
 }
+ACTIONS["roster-two"] = () => { UI.r2 = !UI.r2; try { localStorage.setItem("st-roster2", UI.r2 ? "1" : ""); } catch (e) {} render(true); };
+try { UI.r2 = localStorage.getItem("st-roster2") === "1"; } catch (e) {}
 ACTIONS["roster-month"] = el => { const n = +el.dataset.n; UI.rmonth = n ? ymAdd(UI.rmonth || ymOf(today()), n) : ymOf(today()); render(true); };
 ACTIONS["roster-brush"] = el => {
   let c = el.dataset.c;

@@ -906,3 +906,7 @@ Object.assign(EN, {
   "OneDrive : dossier ou compte introuvable (vérifiez l'adresse du compte OneDrive et le dossier racine).": "OneDrive: folder or account not found (check the OneDrive account address and the root folder).",
   "Les scans se rangent par avion du shift.": "Scans are filed per shift aircraft.", "Fichier trop lourd (20 Mo maximum).": "File too large (20 MB maximum).", "Avion du shift introuvable": "Shift aircraft not found"
 });
+Object.assign(EN, {
+  "2 mois": "2 months", "Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre": "Show this month and the next, to see the schedule across the month change",
+  "Le vendredi est un jour de repos à la station (Shabbat) : vendredi moucheté dans le roster": "Friday is a day off at the station (Shabbat): Friday shown speckled in the roster"
+});

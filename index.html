@@ -816,7 +816,12 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; } table.occ th,
 .rwrap { overflow-x: auto; } table.roster { border-collapse: collapse; font-size: 12px; min-width: 100%; }
 table.roster th, table.roster td { padding: 0; border: 1px solid var(--line); text-align: center; min-width: 30px; height: 30px; }
 table.roster thead th { font-weight: 600; font-size: 11px; } table.roster thead th span { display: block; color: var(--ink-3); font-weight: 400; }
-table.roster th.we { background: var(--grey-bg); } table.roster .today { box-shadow: inset 0 0 0 2px var(--blue-ink); }
+table.roster th.we { background: #c9ced6; } table.roster td.we:not([class*="rc-"]) { background: #d5d9df; } table.roster td.we[class*="rc-"] { background-image: linear-gradient(rgba(40, 50, 70, .14), rgba(40, 50, 70, .14)); }
+table.roster th.fri, table.roster td.fri { background-image: radial-gradient(rgba(40, 50, 70, .38) 1px, transparent 1.4px); background-size: 5px 5px; } table.roster th.fri, table.roster td.fri:not([class*="rc-"]) { background-color: #eceef1; }
+.rnav .rmonth { display: inline-block; min-width: 12.5em; text-align: center; white-space: nowrap; }
+table.roster .mstart { border-left: 3px solid var(--ink-3); } table.roster thead .rmlbl { display: block; font-style: normal; font-size: 9px; color: var(--ink-3); text-transform: uppercase; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) table.roster th.we, :root:not([data-theme="light"]) table.roster td.we:not([class*="rc-"]) { background: #3a404a; } :root:not([data-theme="light"]) table.roster th.fri, :root:not([data-theme="light"]) table.roster td.fri:not([class*="rc-"]) { background-color: #2b3038; } }
+:root[data-theme="dark"] table.roster th.we, :root[data-theme="dark"] table.roster td.we:not([class*="rc-"]) { background: #3a404a; } :root[data-theme="dark"] table.roster th.fri, :root[data-theme="dark"] table.roster td.fri:not([class*="rc-"]) { background-color: #2b3038; } table.roster .today { box-shadow: inset 0 0 0 2px var(--blue-ink); }
 table.roster .rname { position: sticky; left: 0; z-index: 1; background: var(--panel, #fff); text-align: left; padding: 4px 8px; min-width: 190px; white-space: nowrap; }
 table.roster tbody th.rname { text-transform: none; letter-spacing: 0; font-weight: 400; font-size: 12.5px; color: inherit; } table.roster tbody th.rname a { font-weight: 600; text-decoration: none; color: inherit; }
 table.roster td.rc { cursor: pointer; font: 600 11px ui-monospace, monospace; position: relative; user-select: none; } table.painting td.rc { cursor: crosshair; }
