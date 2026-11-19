@@ -5,11 +5,23 @@
 //  Bureau  : tout, sauf la gestion des utilisateurs (auth.php) et les coordonnées de l'entreprise
 //            (nom, TVA, adresse, e-mail, téléphone) qui restent celles fixées par un administrateur.
 //  Terrain : articles et prix, documents administratifs : invisibles ; clients en lecture seule ;
-//            paramètres : ne peut rien y modifier ; export / import complets : refusés.
+//            paramètres : ne peut rien y modifier ; export / import complets : refusés ;
+//            personnel : lecture seule, fiche complète pour soi (même e-mail), sinon l'essentiel
+//            (nom, fonction, licences sans numéro, qualifications) sans documents ni données personnelles.
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders'];
-const TERRAIN_READONLY   = ['clients', 'settings'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff'];
+const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
+
+/* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
+function staff_mine($d) { $me = (string) ($GLOBALS['ME_EMAIL'] ?? ''); return $me !== '' && mb_strtolower(trim((string) ($d['email'] ?? ''))) === $me; }
+function staff_public($d) {
+    if (!is_array($d) || staff_mine($d)) return $d;
+    $o = array_intersect_key($d, array_flip(STAFF_PUBLIC));
+    if (isset($d['licences']) && is_array($d['licences'])) $o['licences'] = array_values(array_map(fn($l) => ['cat' => (string) ($l['cat'] ?? '')], array_filter($d['licences'], 'is_array')));
+    return $o;
+}
 const COMPANY_IDENTITY   = ['name', 'vat', 'iban', 'address', 'email', 'phone', 'logo'];
 
 function role_of($who) {
@@ -49,6 +61,7 @@ function perm_view($role, $coll, $data, $id = null) {
     if ($coll === 'notes' && is_array($data) && $data && empty($data['team']) && !notes_mine($data)) return null;
     if ($role !== 'terrain' || $data === null) return $data;
     if (in_array($coll, TERRAIN_HIDDEN, true)) return null;
+    if ($coll === 'staff') return staff_public($data);
     return $data;
 }
 // Ligne d'API (doc_out) filtrée : null = à ne pas envoyer.
@@ -57,6 +70,7 @@ function perm_out($role, $out) {
     if ($out['coll'] === 'notes' && !$out['deleted'] && perm_view($role, 'notes', $out['data'], $out['id']) === null) { $out['deleted'] = true; $out['data'] = null; return $out; }   // note devenue personnelle : retirée chez les autres
     if ($role !== 'terrain') return $out;
     if (in_array($out['coll'], TERRAIN_HIDDEN, true)) return null;
+    if ($out['coll'] === 'staff' && is_array($out['data'])) $out['data'] = staff_public($out['data']);
     return $out;
 }
 

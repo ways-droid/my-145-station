@@ -11,7 +11,7 @@ async function aiRefresh() { try { AI = await API.call("GET", "assistant/status"
 const AI_SUGGEST = ["Quels véhicules ont une échéance ce mois-ci ?", "Quels outils arrivent à échéance d'étalonnage ?", "Quelles pannes de véhicules sont encore ouvertes ?",
   "Liste les tarifs du client MT", "Résume mes notes de la semaine"];
 const AI_DOC_LBL = { assurance: "Assurance", ct: "Contrôle technique", immat: "Certificat d'immatriculation", coc: "Certificat de conformité", badge: "Badge aéroport", leasing: "Contrat de leasing / location", autre: "Autre document" };
-const AI_OPEN = { vehicles: "veh-open", tools: "tool-open", clients: "client-form", products: "prod-form", faults: "fault-open", notes: "note-form" };
+const AI_OPEN = { staff: "staff-open", vehicles: "veh-open", tools: "tool-open", clients: "client-form", products: "prod-form", faults: "fault-open", notes: "note-form" };
 /* beaucoup d'actions (ex. 40 fiches modifiées) : un résumé repliable et « Tout annuler » plutôt que 40 cartes */
 function aiActions(list, mi) {
   list = list || []; if (list.length <= 4) return list.map((a, ai) => aiActionCard(a, mi, ai)).join("");
