@@ -769,3 +769,26 @@ Object.assign(EN, {
   "Équipes du jour": "Today's shifts", "Ouvrir le roster": "Open the roster", "Qui est de jour et de nuit aujourd'hui, et les trous de couverture des 7 prochains jours.": "Who is on day and night shift today, and coverage gaps in the next 7 days.",
   "Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.": "Coverage: number of qualified people present on the type, per shift. Red: nobody qualified (or nobody with I to sign 4X- aircraft). Certifying authorisations stay in AMOS."
 });
+/* ---- shifts et handover ---- */
+Object.assign(EN, {
+  "Shift": "Shift", "Planning des avions et handover : les 5 sections du handover de la station": "Aircraft planning and handover: the station's 5 handover sections", "Shift en cours": "Current shift",
+  "Travail non terminé": "Uncompleted work", "Ce qui reste à faire, repris par le shift suivant.": "What is left to do, taken over by the next shift.", "Ajouter": "Add", "Rien en attente.": "Nothing pending.",
+  "Avion": "Aircraft", "Travail": "Work", "Remarque": "Note", "Immatriculation": "Registration", "Travail à faire": "Work to do", "Nouveau travail non terminé": "New uncompleted work",
+  "Travail du shift (prévu et fait)": "Shift work (planned and done)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.": "One aircraft per row. The customer is found from the registration. CRS is done in AMOS.",
+  "Ajouter un avion": "Add an aircraft", "Nouvel avion": "New aircraft", "Mécanos": "Mechanics", "Prévu": "Planned", "Fait": "Done", "Aucun avion pour ce shift.": "No aircraft for this shift.",
+  "Vol / rotation": "Flight / rotation", "CRS (affectés à cet avion)": "CRS (assigned to this aircraft)", "Mécanos / aides": "Mechanics / helpers", "Ajouter quelqu'un qui n'est pas au roster de ce shift": "Add someone not on this shift's roster",
+  "Travail prévu": "Planned work", "Travail fait": "Work done", "Travail non terminé : à reprendre par le shift suivant": "Uncompleted: to be taken over by the next shift", "Avion enregistré": "Aircraft saved", "Non terminé": "Uncompleted",
+  "Aucun CRS affecté": "No CRS assigned", "Équipement et matériel": "Equipment and materials", "Équipements et consommables utilisés, par client ou utilisateur.": "Equipment and consumables used, by customer or user.",
+  "Client / utilisateur": "Customer / user", "Équipement ou matériel": "Equipment or material", "Quantité": "Quantity", "Rien de noté.": "Nothing recorded.", "Avion (si applicable)": "Aircraft (if applicable)", "Nouvel équipement ou matériel": "New equipment or material",
+  "Station Control": "Station Control", "Contrôles de fin de shift.": "End-of-shift checks", "Remarque Station Control": "Station Control note",
+  "Outillage rangé et compté": "Tools stored and counted", "Équipements (GPU, ASU, azote…) contrôlés et rangés": "Equipment (GPU, ASU, nitrogen…) checked and stored", "Clés et véhicules en ordre": "Keys and vehicles in order",
+  "Magasin et pièces rangés": "Store and parts tidy", "Bureau, documents et ordinateurs en ordre": "Office, documents and computers in order",
+  "Manpower et signatures": "Manpower and signatures", "Personnel du shift d'après le roster. La signature confirme la remise du shift, pas un travail sur avion.": "Shift staff from the roster. Signing confirms the shift handover, not work on an aircraft.",
+  "Shift Foreman": "Shift Foreman", "Ajouter au shift": "Add to the shift", "Ajouté": "Added", "Personne au roster pour ce shift.": "No one on the roster for this shift.", "Remis par": "Handed over by", "Repris par": "Taken over by", "Pas encore": "Not yet",
+  "Je remets le shift": "I hand over the shift", "Je reprends le shift": "I take over the shift", "Annuler les signatures": "Cancel signatures", "Remettre": "Hand over", "Reprendre": "Take over",
+  "Shift en cours": "Current shift", "Avions du shift en cours, travail non terminé, CRS manquants.": "Current shift aircraft, uncompleted work, missing CRS.", "Ouvrir le shift": "Open the shift", "avions": "aircraft", "non terminés": "uncompleted", "sans CRS qualifié": "without qualified CRS",
+  "Flightradar24": "Flightradar24", "Enregistrer la clé": "Save key", "Retirer la clé": "Remove key", "Tester": "Test", "Non configuré": "Not configured", "Clé API Flightradar24": "Flightradar24 API key",
+  "Positions Flightradar24 mises à jour": "Flightradar24 positions updated", "Pas de vol trouvé": "No flight found"
+});
+rule(/^(\d+) avions? sans CRS qualifié affecté : voir la section 2\.$/, "$1 aircraft without a qualified CRS assigned: see section 2.");
+rule(/^Aucun CRS qualifié (.+)$/, "No CRS qualified on $1"); rule(/^4X- : aucun CRS avec I sur (.+)$/, "4X-: no CRS with I on $1");

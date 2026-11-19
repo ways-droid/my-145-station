@@ -8,7 +8,8 @@
 //            paramètres : ne peut rien y modifier ; export / import complets : refusés ;
 //            personnel : lecture seule, fiche complète pour soi (même e-mail), sinon l'essentiel
 //            (nom, fonction, licences sans numéro, qualifications) sans documents ni données personnelles ;
-//            roster : lecture seule, sans les remarques du bureau.
+//            roster : lecture seule, sans les remarques du bureau ;
+//            shifts (handovers, shiftItems) : saisie permise tant que le shift n'est pas repris (clôturé).
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders'];
@@ -94,6 +95,12 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
     }
     if ($role === 'bureau') return $new;
     // terrain
+    if ($coll === 'handovers' || $coll === 'shiftItems') {   // saisie du shift par l'équipe ; shift repris (handover terminé) : verrouillé
+        $ho = $coll === 'handovers' ? $old : (($o = (string) (($old ?? $new)['ho'] ?? '')) !== '' ? (coll_docs('handovers')[$o] ?? null) : null);
+        if (is_array($ho) && !empty($ho['in']['at'])) deny('Ce shift est clôturé : seul le bureau peut encore le modifier.');
+        if ($coll === 'handovers' && $op === 'delete') deny();
+        return $new;
+    }
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
 }

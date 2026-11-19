@@ -70,6 +70,7 @@ function sbx_guard($route, $parts, $method) {
     $msg = "Environnement de test : cette action est désactivée (elle agirait en dehors de l'outil ou sur sa configuration). Quittez le test pour la faire.";
     if ($route === 'assistant' && in_array($act, ['config', 'test'], true)) fail(409, $msg);
     if ($route === 'whatsapp' && $act !== 'status') fail(409, $msg);
+    if ($route === 'fr24' && $act === 'config') fail(409, $msg);
     if ($route === 'dropbox') { if ($act === 'tick') out(['ok' => true, 'skipped' => true, 'sandbox' => true]); if (!in_array($act, ['list', 'search', 'link', 'new', 'new-ack'], true)) fail(409, $msg); }
     if ($route === 'auth' && ($act === 'users' || $act === 'smtp' || $act === 'test-mail')) fail(409, $msg);
     if ($route === 'import') fail(409, $msg);
