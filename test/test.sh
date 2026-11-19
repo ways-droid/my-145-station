@@ -180,6 +180,8 @@ ok "FR24 : test OK" "$(curl -s -H "$A" -X POST -d '{}' $U/fr24/test)" '"ok":true
 no "FR24 : clé jamais renvoyée" "$(curl -s -H "$A" $U/fr24/status)" 'fr24-good'
 R=$(curl -s -H "$HT" -X POST -d '{"regs":["9h-abc","4X-ICA","OO-NOP"]}' $U/fr24/track)
 ok "FR24 : avion en vol avec ETA" "$R" '"eta":"2026-11-19T14:35:00Z"'; ok "FR24 : vol terminé" "$R" '"landed":"2026-11-19T10:02:00Z"'; ok "FR24 : avion sans vol" "$R" '"OO-NOP":\[\]'
+ok "FR24 : arrivée à la station" "$R" '"arr":{"at":"2026-11-19T10:02:00Z"'
+R=$(curl -s -H "$HT" -X POST -d '{"regs":["9H-DEP"],"station":"TLV"}' $U/fr24/track); ok "FR24 : immatriculation sans tiret trouvée, arrivée et départ" "$R" '"dep":{"at":"2026-11-19T08:05:00Z"'
 pkill -f "127.0.0.1:8773" || true
 echo "> notion"
 pkill -f "127.0.0.1:8774" || true; rm -rf $T/notion; mkdir -p $T/notion

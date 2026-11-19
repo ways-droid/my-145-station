@@ -28,20 +28,32 @@ function fr24_http($path, $q) {
     return $d;
 }
 function fr24_norm_reg($r) { return strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string) $r)); }
-function fr24_provider_track(array $regs) {
+function fr24_key_reg($r) { return str_replace('-', '', fr24_norm_reg($r)); }    // 9H-CAC et 9HCAC : même avion
+function fr24_iata($x, $a, $b) { foreach ([$a, $b] as $k) if (!empty($x[$k])) return strtoupper((string) $x[$k]); return ''; }
+/* Suivi par immatriculation. FR24 ne donne pas les horaires prévus : seulement les vols en cours (live) et les vols
+   passés (flight-summary, filtré sur « first_seen », d'où une fenêtre de 72 h). Pour chaque avion :
+   live (en vol), last (dernier vol), arr (dernier atterrissage à la station), dep (dernier décollage de la station). */
+function fr24_provider_track(array $regs, $station = '') {
     $regs = array_values(array_unique(array_filter(array_map('fr24_norm_reg', $regs))));
-    $out = []; foreach ($regs as $r) $out[$r] = [];
+    $out = []; $byKey = []; foreach ($regs as $r) { $out[$r] = []; $byKey[fr24_key_reg($r)] = $r; }
     if (!$regs) return $out;
-    $list = implode(',', array_slice($regs, 0, 15));
-    $live = fr24_http('live/flight-positions/full', ['registrations' => $list]);
-    foreach ((array) ($live['data'] ?? []) as $p) { $r = fr24_norm_reg($p['reg'] ?? ''); if (!isset($out[$r])) continue;
-        $out[$r]['live'] = ['flight' => (string) ($p['flight'] ?? $p['callsign'] ?? ''), 'from' => (string) ($p['orig_iata'] ?? $p['orig_icao'] ?? ''), 'to' => (string) ($p['dest_iata'] ?? $p['dest_icao'] ?? ''),
-            'eta' => (string) ($p['eta'] ?? ''), 'alt' => (int) ($p['alt'] ?? 0), 'gspeed' => (int) ($p['gspeed'] ?? 0), 'type' => (string) ($p['type'] ?? ''), 'at' => (string) ($p['timestamp'] ?? '')]; }
-    $sum = fr24_http('flight-summary/full', ['registrations' => $list, 'flight_datetime_from' => gmdate('Y-m-d\TH:i:s', time() - 86400), 'flight_datetime_to' => gmdate('Y-m-d\TH:i:s', time() + 3600)]);
-    foreach ((array) ($sum['data'] ?? []) as $f) { $r = fr24_norm_reg($f['reg'] ?? ''); if (!isset($out[$r])) continue;
-        $x = ['flight' => (string) ($f['flight'] ?? $f['callsign'] ?? ''), 'from' => (string) ($f['orig_iata'] ?? $f['orig_icao'] ?? ''), 'to' => (string) ($f['dest_iata_actual'] ?? $f['dest_iata'] ?? $f['dest_icao'] ?? ''),
-            'takeoff' => (string) ($f['datetime_takeoff'] ?? ''), 'landed' => (string) ($f['datetime_landed'] ?? ''), 'type' => (string) ($f['type'] ?? '')];
-        if (!isset($out[$r]['last']) || strcmp($x['takeoff'], $out[$r]['last']['takeoff']) > 0) $out[$r]['last'] = $x; }
+    $st = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) $station));
+    $forms = []; foreach ($regs as $r) { $forms[] = $r; if (strpos($r, '-') !== false) $forms[] = str_replace('-', '', $r); }
+    $from = gmdate('Y-m-d\TH:i:s\Z', time() - 72 * 3600); $to = gmdate('Y-m-d\TH:i:s\Z');
+    foreach (array_chunk(array_values(array_unique($forms)), 15) as $chunk) {
+        $list = implode(',', $chunk);
+        $live = fr24_http('live/flight-positions/full', ['registrations' => $list]);
+        foreach ((array) ($live['data'] ?? []) as $p) { $r = $byKey[fr24_key_reg($p['reg'] ?? '')] ?? null; if ($r === null) continue;
+            $out[$r]['live'] = ['flight' => (string) ($p['flight'] ?? $p['callsign'] ?? ''), 'from' => fr24_iata($p, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($p, 'dest_iata', 'dest_icao'),
+                'eta' => (string) ($p['eta'] ?? ''), 'alt' => (int) ($p['alt'] ?? 0), 'gspeed' => (int) ($p['gspeed'] ?? 0), 'type' => (string) ($p['type'] ?? ''), 'at' => (string) ($p['timestamp'] ?? '')]; }
+        $sum = fr24_http('flight-summary/full', ['registrations' => $list, 'flight_datetime_from' => $from, 'flight_datetime_to' => $to, 'limit' => 200]);
+        foreach ((array) ($sum['data'] ?? []) as $f) { $r = $byKey[fr24_key_reg($f['reg'] ?? '')] ?? null; if ($r === null) continue;
+            $x = ['flight' => (string) ($f['flight'] ?? $f['callsign'] ?? ''), 'from' => fr24_iata($f, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($f, 'dest_iata_actual', 'dest_iata') ?: fr24_iata($f, 'dest_icao_actual', 'dest_icao'),
+                'takeoff' => (string) ($f['datetime_takeoff'] ?? ''), 'landed' => (string) ($f['datetime_landed'] ?? ''), 'type' => (string) ($f['type'] ?? '')];
+            if (!isset($out[$r]['last']) || strcmp($x['takeoff'], $out[$r]['last']['takeoff']) > 0) $out[$r]['last'] = $x;
+            if ($st !== '' && $x['to'] === $st && $x['landed'] !== '' && (!isset($out[$r]['arr']) || strcmp($x['landed'], $out[$r]['arr']['at']) > 0)) $out[$r]['arr'] = ['at' => $x['landed'], 'from' => $x['from'], 'flight' => $x['flight']];
+            if ($st !== '' && $x['from'] === $st && $x['takeoff'] !== '' && (!isset($out[$r]['dep']) || strcmp($x['takeoff'], $out[$r]['dep']['at']) > 0)) $out[$r]['dep'] = ['at' => $x['takeoff'], 'to' => $x['to'], 'flight' => $x['flight']]; }
+    }
     return $out;
 }
 
@@ -60,9 +72,10 @@ function fr24_routes($route, $parts, $method, $who, $role) {
     try {
         if ($act === 'test' && $method === 'POST') { if ($role !== 'admin') fail(403, 'Réservé aux administrateurs'); fr24_http('live/flight-positions/full', ['registrations' => 'TEST-REG']); out(['ok' => true]); }
         if ($act === 'track' && $method === 'POST') {
-            $regs = array_slice(array_map('strval', (array) ($b['regs'] ?? [])), 0, 15);
+            $regs = array_slice(array_map('strval', (array) ($b['regs'] ?? [])), 0, 30);
             if (!$regs) fail(400, 'Aucune immatriculation');
-            out(['items' => fr24_provider_track($regs), 'at' => gmdate('c')]);
+            $c = get_doc('settings', 'company'); $set = $c ? (json_decode($c['data'], true) ?: []) : [];
+            out(['items' => fr24_provider_track($regs, (string) ($b['station'] ?? $set['stationCode'] ?? '')), 'at' => gmdate('c')]);
         }
     } catch (RuntimeException $e) { fail(502, $e->getMessage()); }
     fail(404, 'Route inconnue');
