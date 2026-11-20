@@ -82,9 +82,11 @@ function rosterMonth() {
   const cov = dates.map(d => planned(d) ? coverage(d) : null);
   const covRows = ["day", "night"].flatMap(sh => [...acTypes(), "I"].map(t => `<tr class="rcov"><th class="rname small">${SH_LBL[sh]} · ${t === "I" ? "I (4X-)" : esc(t)}</th>${cov.map(c => { if (!c) return `<td></td>`; const x = c.find(z => z.sh === sh && z.t === t);
     return `<td class="${x.n ? "" : "gap"}${mcls(dates[cov.indexOf(c)])}" title="${esc(x.n + " " + (t === "I" ? tr("avec I") : tr("qualifiés")))}">${x.n}</td>`; }).join("")}</tr>`)).join("");
-  return `${bar}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
+  const view = `<div class="rbar rview"><label class="chk line small"><input type="checkbox" data-a="roster-col" ${UI.rcol ? "checked" : ""}> ${esc(tr("Griser toute la colonne des week-ends"))}${fridayOff() ? esc(tr(" et vendredis")) : ""}</label>
+    ${fridayOff() ? `<label class="small row-g">${esc(tr("Vendredi"))} <input type="range" id="r-fri" min="0" max="100" step="5" value="${UI.rfri}" style="width:110px" aria-label="${esc(tr("Intensité du moucheté du vendredi"))}"></label>` : ""}</div>`;
+  return `${bar}${view}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}" style="--fri-a:${(UI.rfri / 100 * 0.6).toFixed(3)}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
     ${ppl.map(p => `<tr><th class="rname"><a href="#" data-a="staff-open" data-id="${p.id}">${esc(p.name)}</a><div class="muted small">${esc([STAFF_FN[p.function], Object.entries(p.ratings || {}).map(([t, l]) => t.replace(/^B/, "") + " " + l).join(" · ")].filter(Boolean).join(" · "))}</div></th>
-      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; return `<td class="rc ${c ? "rc-" + c.col : ""} ${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}" data-rc="${p.id}|${d}" title="${esc(c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "")}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
+      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; return `<td class="rc ${c ? "rc-" + c.col : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}" data-rc="${p.id}|${d}" title="${esc(c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "")}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
     ${covRows}<tr class="rcov"><th class="rname small">D/N à affecter</th>${dates.map((d, i) => { const k = cov[i] ? toAssign(d).length : 0; return `<td class="${k ? "todo" : ""}">${k || ""}</td>`; }).join("")}</tr></tbody></table></div><div class="pad hint">Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
 }
 function rosterToday() {
@@ -119,6 +121,11 @@ async function rosterSet(changes) {   /* changes : [[staffId, date, cell|null]] 
     await save("roster", id, { staffId: g.sid, month: g.ym, days });
   }
 }
+/* affichage (préférences de ce navigateur) : colonne entière grisée ou seulement l'en-tête, intensité du moucheté du vendredi */
+try { UI.rcol = localStorage.getItem("st-rcol") !== "0"; UI.rfri = +(localStorage.getItem("st-rfri") ?? 40); } catch (e) { UI.rcol = true; UI.rfri = 40; }
+if (isNaN(UI.rfri)) UI.rfri = 40;
+ACTIONS["roster-col"] = el => { UI.rcol = el.checked; try { localStorage.setItem("st-rcol", UI.rcol ? "1" : "0"); } catch (e) {} render(true); };
+document.addEventListener("input", e => { if (e.target.id !== "r-fri") return; UI.rfri = +e.target.value; const t = document.querySelector("table.roster"); if (t) t.style.setProperty("--fri-a", (UI.rfri / 100 * 0.6).toFixed(3)); try { localStorage.setItem("st-rfri", String(UI.rfri)); } catch (x) {} });
 ACTIONS["roster-two"] = () => { UI.r2 = !UI.r2; try { localStorage.setItem("st-roster2", UI.r2 ? "1" : ""); } catch (e) {} render(true); };
 try { UI.r2 = localStorage.getItem("st-roster2") === "1"; } catch (e) {}
 ACTIONS["roster-month"] = el => { const n = +el.dataset.n; UI.rmonth = n ? ymAdd(UI.rmonth || ymOf(today()), n) : ymOf(today()); render(true); };

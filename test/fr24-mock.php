@@ -11,7 +11,7 @@ if (str_ends_with($p, 'live/flight-positions/full')) {
 if (str_ends_with($p, 'flight-summary/full')) {
     if (empty($_GET['flight_datetime_from']) || !str_ends_with($_GET['flight_datetime_from'], 'Z')) { http_response_code(400); echo json_encode(['message' => 'flight_datetime_from required']); exit; }
     $d = []; if (in_array('4X-ICA', $regs, true)) $d[] = ['fr24_id' => 'x2', 'flight' => 'IL55', 'reg' => '4X-ICA', 'type' => 'B744', 'orig_iata' => 'CGN', 'dest_iata' => 'TLV', 'datetime_takeoff' => '2026-11-19T06:10:00Z', 'datetime_landed' => '2026-11-19T10:02:00Z'];
-    if (in_array('9HDEP', $regs, true)) { $d[] = ['flight' => 'MT9', 'reg' => '9H-DEP', 'orig_iata' => 'LGG', 'dest_iata' => 'TLV', 'datetime_takeoff' => '2026-11-19T01:00:00Z', 'datetime_landed' => '2026-11-19T05:20:00Z'];
+    if (in_array('9H-DEP', $regs, true)) { $d[] = ['flight' => 'MT9', 'reg' => '9H-DEP', 'orig_iata' => 'LGG', 'dest_iata' => 'TLV', 'datetime_takeoff' => '2026-11-19T01:00:00Z', 'datetime_landed' => '2026-11-19T05:20:00Z'];
         $d[] = ['flight' => 'MT10', 'reg' => '9H-DEP', 'orig_iata' => 'TLV', 'dest_iata' => 'LGG', 'datetime_takeoff' => '2026-11-19T08:05:00Z', 'datetime_landed' => '2026-11-19T12:30:00Z']; }
     echo json_encode(['data' => $d]); exit;
 }
