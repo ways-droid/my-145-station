@@ -31,7 +31,7 @@ const AI_LABELS = [
     'staff' => "personnel de la station (name, function, employer, email, phone, licences [{cat, number, expires}], ratings {type d'avion: niveau}, docs [{type, number, expires}] = visas, permis de travail, badges, examens…)",
     'roster' => "roster de la station, un document par personne et par mois (id <staffId>_<AAAA-MM>, staffId, month, days {jour du mois: {c = code, start, end, note}}). Codes : D jour 08-20, N nuit 20-08, D/N jour ou nuit à affecter, C horaire libre (start-end), T jour de voyage, TLV à la station sans shift, OJT/TRNG formation, OFF repos, code de 3 lettres d'une autre station = détaché / flight mech",
     'handovers' => 'fiches de shift (id <date>-day|night : foreman, extra, checks Station Control, out/in = remise et reprise du shift)',
-    'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, tasks = Tech Log [{text défaut/tâche, action, logPage, wo, techs [{id, h}], mhrs}], planned, done, mhrs = textes recalculés depuis tasks, atl = LogBook n° arrivée, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
+    'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, tasks = Tech Log [{text défaut/tâche, action, logPage, wo, techs [{id, h}], mhrs} ; chaque tâche que tu écris est marquée « encodée par Sindri – à vérifier » : une personne doit la valider avant la remise du shift, tu ne peux pas la valider toi-même], planned, done, mhrs = textes recalculés depuis tasks, atl = LogBook n° arrivée, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
     'travel' => 'voyages du personnel (kind flight|hotel, staffId, status booked|cancel ; vol : date, from, to, airline, flightNo, dep, arr, pnr ; hôtel : hotelId, checkIn, checkOut, room, conf ; cost, currency)',
     'aircraft' => 'avions servis par la station (reg = immatriculation, clientId = compagnie, acType, variant, msn, engines, licences = licences exigées pour signer [E EASA, I approbation israélienne, F FAA], amosRef, active, notes) — la maintenance et la navigabilité restent dans AMOS',
     'hotels' => 'hôtels du personnel (name, address, contact, phone, email, rate, currency)',
@@ -603,6 +603,24 @@ function ai_wa_propose($who, $role, $in) {
     return ['ok' => true, 'token' => $tok, 'to' => $t['name'], 'mode' => $open ? 'texte libre' : "modèle « message d'équipe » (le texte sera mis sur une ligne)", 'todo' => "Rien n'est envoyé. Montre à la personne le destinataire ({$t['name']}) et le texte exact entre guillemets, signale qu'il partira signé de son nom, et demande-lui de répondre « oui » pour l'envoyer."];
 }
 function ai_confirm_list($who) { return json_decode(aik('ai_confirm:' . ai_ukey($who), '[]'), true) ?: []; }
+/* tâches du Tech Log écrites par Sindri (scan d'une log page, chat) : marquées « encodée par Sindri – à vérifier » (ai).
+   Seule une personne les valide (ok = {by, at}) ; tant qu'il en reste, le shift ne peut pas être remis (api/perm.php).
+   Une tâche que Sindri ne change pas garde son état ; une tâche qu'il crée ou modifie repart « à vérifier ». */
+function ai_mark_tasks($coll, $old, $new) {
+    if ($coll !== 'shiftItems' || !is_array($new) || !isset($new['tasks']) || !is_array($new['tasks'])) return $new;
+    $prev = []; foreach ((array) (($old ?? [])['tasks'] ?? []) as $t) if (is_array($t) && isset($t['id'])) $prev[(string) $t['id']] = $t;
+    $core = function ($t) { unset($t['ai'], $t['ok']); return json_encode($t); };
+    foreach ($new['tasks'] as $i => $t) {
+        if (!is_array($t)) { unset($new['tasks'][$i]); continue; }
+        if (empty($t['id'])) $t['id'] = 'ai' . bin2hex(random_bytes(5));
+        $o = $prev[(string) $t['id']] ?? null;
+        if ($o !== null && $core($o) === $core($t)) { unset($t['ai'], $t['ok']); if (isset($o['ai'])) $t['ai'] = $o['ai']; if (isset($o['ok'])) $t['ok'] = $o['ok']; }
+        else { unset($t['ok']); $t['ai'] = ['by' => AI_NAME, 'at' => gmdate('c')]; }
+        $new['tasks'][$i] = $t;
+    }
+    $new['tasks'] = array_values($new['tasks']);
+    return $new;
+}
 function ai_write($who, $role, $tool, $in, &$actions) {
     if (!in_array($tool, ['confirm_delete', 'confirm_action'], true) && count(array_filter($actions, fn($a) => !in_array($a['op'] ?? '', ['delete', 'deleted'], true))) >= AI_MAX_WRITES) return ['error' => 'Trop de modifications pour une seule demande : fais une pause et demande à l\'utilisateur de continuer.'];
     $wrole = $role === 'admin' ? 'bureau' : $role;                 // Sindri a les droits d'un employé Bureau
@@ -697,6 +715,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
             if (isset($nat['id']) && ($ex = get_doc($coll, $id)) && !$ex['deleted']) { db()->rollBack(); return ['error' => "Cette fiche existe déjà (id $id) : relis-la avec get_record puis modifie-la avec update_record."]; }
             $forced = $coll === 'notes' && !empty($data['team']);
             if ($coll === 'notes') { $data['team'] = false; $data['createdAt'] = $data['createdAt'] ?? gmdate('c'); $data['order'] = $data['order'] ?? -now_ms(); }
+            $data = ai_mark_tasks($coll, null, $data);
             $data = perm_write($wrole, $coll, 'put', null, $data, null, $id);
             write_doc($coll, $id, $data, $by);
             db()->commit();
@@ -726,6 +745,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
             if ($coll === 'notes' && !empty($changes['team']) && empty($old['team'])) { db()->rollBack(); return ['error' => "Partage d'une note personnelle : utilise propose_share_note puis demande confirmation."]; }
             if ($coll === 'notes' && perm_view($role, 'notes', $old) === null) { db()->rollBack(); return ['error' => 'Fiche introuvable : vérifie l\'identifiant avec search_records.']; }
             $new = $old; foreach ($changes as $k => $v) { if ($v === null) unset($new[$k]); else $new[$k] = $v; }
+            $new = ai_mark_tasks($coll, $old, $new);
             $new = perm_write($wrole, $coll, 'patch', $old, $new, $changes, $id);
             write_doc($coll, $id, $new, $by);
             db()->commit();

@@ -347,6 +347,7 @@ async function init() {
     db.collection(c).onSnapshot(snap => {
       S[c] = snap.docs.map(d => Object.assign({ id: d.id }, d.data()));
       if (!snap.metadata.fromCache) S.loaded[c] = true;
+      if ((c === "shiftItems" || c === "handovers") && typeof visitHealSoon === "function") visitHealSoon();
       done(); soon();
     }, e => { S.loaded[c] = true; done(); if (e.code === "revoked") mode = "revoked"; soon(); });
   }

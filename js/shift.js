@@ -178,8 +178,29 @@ async function visitSync(v) {
     if (VISIT_SHARED.some(k => (x[k] ?? "") !== shared[k]) || x.visitId !== gid) await patch("shiftItems", x.id, Object.assign({ visitId: gid }, shared));
   }
   for (const ho of want) if (ho !== v.ho && !group.some(x => x.ho === ho))
-    await save("shiftItems", null, Object.assign({ kind: "visit", ho, visitId: gid, crs: [], mech: [], order: v.order || Date.now() }, shared));
+    await save("shiftItems", `${gid}_${ho}`, Object.assign({ kind: "visit", ho, visitId: gid, crs: [], mech: [], order: v.order || Date.now() }, shared));
   if (!v.visitId && want.length > 1) await patch("shiftItems", v.id, { visitId: gid });
+}
+/* avion créé ou modifié ailleurs que dans le formulaire (Sindri, Flightradar24, autre appareil) : les shifts couverts par
+   l'escale (heures Z converties à l'heure de la station) reçoivent leur ligne. Identifiant fixe par shift : deux appareils
+   qui réparent en même temps écrivent la même ligne, sans doublon. Les shifts remis (verrouillés) ne sont pas touchés. */
+let healT = null, healing = false;
+const visitHealSoon = () => { clearTimeout(healT); healT = setTimeout(visitHeal, 1500); };
+async function visitHeal() {
+  if (healing || readOnly || mode !== "db" || !S.loaded.shiftItems || !S.loaded.handovers) return;
+  healing = true;
+  try {
+    const lim = addDays(today(), -10), groups = new Map();
+    for (const x of S.shiftItems) if (x.kind === "visit" && x.ho >= lim) { const g = visitGid(x); if (!groups.has(g)) groups.set(g, []); groups.get(g).push(x); }
+    for (const [g, rows] of groups) {
+      const src = rows.slice().sort((a, b) => shKey(a.ho).localeCompare(shKey(b.ho)))[0];
+      if (!hmOk(src.arr) && !hmOk(src.dep)) continue;
+      const shared = Object.fromEntries(VISIT_SHARED.map(k => [k, src[k] ?? ""]));
+      const missing = visitShifts(src).filter(ho => !rows.some(r => r.ho === ho) && hoEd(ho) && !S.shiftItems.some(x => x.id === `${g}_${ho}`));
+      for (const ho of missing) { try { await db.collection("shiftItems").doc(`${g}_${ho}`).set(Object.assign({ kind: "visit", ho, visitId: g, crs: [], mech: [], order: src.order || Date.now() }, shared)); } catch (e) { } }
+      if (missing.length && !src.visitId) { try { await db.collection("shiftItems").doc(src.id).update({ visitId: g }); } catch (e) { } }
+    }
+  } finally { healing = false; }
 }
 const shiftLabel = ho => `${fmtDate(ho.slice(0, 10))} · ${tr(SHIFTS[ho.slice(11)])}`;
 /* code IATA de la station (paramètres ; TLV si non renseigné) */
@@ -226,12 +247,27 @@ const fmtH = n => n ? String(Math.round(n * 100) / 100) : "";
 /* tâches d'une ligne : les anciennes lignes (texte prévu / fait) deviennent une tâche */
 const visitTasks = v => Array.isArray(v.tasks) ? v.tasks : (v.planned || v.done ? [{ id: "legacy", text: v.planned || "", action: v.done || "", mhrs: v.mhrs || "" }] : []);
 const visitH = v => visitTasks(v).reduce((a, t) => a + taskH(t), 0) || numH(v.mhrs);
+/* tâche encodée par Sindri : à vérifier par une personne (case), puis « Vérifié et validé par … » en vert */
+const aiTaskPending = id => hoItems(id, "visit").reduce((n, v) => n + visitTasks(v).filter(t => t.ai && !t.ok).length, 0);
+function aiTaskChip(v, t) {
+  if (!t.ai) return "";
+  if (t.ok) return `<div class="ai-ok">✔ ${esc(tr("Vérifié et validé par"))} ${esc(t.ok.by || "")} · ${fmtDT(t.ok.at)}${hoEd(v.ho) ? ` <button type="button" class="linkbtn small" data-a="tl-verify" data-v="${v.id}" data-t="${esc(t.id)}">${esc(tr("annuler"))}</button>` : ""}</div>`;
+  return `<div class="ai-todo"><span class="chip sm warn">✦ ${esc(tr("Encodée par Sindri – à vérifier"))}</span>${hoEd(v.ho) ? ` <label class="chk ai-chk" data-a="tl-verify" data-v="${v.id}" data-t="${esc(t.id)}"><input type="checkbox" data-a="tl-verify" data-v="${v.id}" data-t="${esc(t.id)}"> ${esc(tr("J'ai vérifié, c'est validé"))}</label>` : ""}</div>`;
+}
+ACTIONS["tl-verify"] = async el => {
+  const v = S.shiftItems.find(x => x.id === el.dataset.v); if (!v || !hoEd(v.ho)) return;
+  const tid = el.dataset.t, t0 = visitTasks(v).find(t => t.id === tid); if (!t0) return;
+  const ok = !t0.ok;
+  if (ok && !meName()) return;
+  const tasks = visitTasks(v).map(t => { if (t.id !== tid) return t; const x = Object.assign({}, t); if (ok) x.ok = { by: meName(), at: new Date().toISOString() }; else delete x.ok; return x; });
+  await patch("shiftItems", v.id, { tasks }); render(true);
+};
 function techLogHtml(v) {
   const ts = visitTasks(v);
   if (!ts.length) return `<span class="muted">—</span>`;
   const taken = new Set(S.shiftItems.filter(x => x.kind === "visit" && x.ho !== v.ho && visitGid(x) === visitGid(v)).flatMap(x => (x.tasks || []).map(t => t.from)).filter(Boolean));
   return `<div class="tl">${ts.map(t => { const meta = [t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · "), who = (t.techs || []).map(x => sName(x.id) + (numH(x.h) ? " " + fmtH(numH(x.h)) + "h" : "")).join(", ");
-    return `<div class="tl-row ${t.unc ? "tl-row-unc" : ""}"><div class="tl-d">${t.unc ? `<span class="chip sm bad unc-chip">✔ ${esc(tr("Non terminée · passée au shift suivant"))}</span> ` : ""}${t.from && uncSrc(t.from) ? `<span class="chip sm warn">${esc(tr("Reprise du shift précédent"))}</span> ` : ""}${esc(t.text || "—")}${meta ? `<div class="mono muted">${esc(meta)}</div>` : ""}</div>
+    return `<div class="tl-row ${t.unc ? "tl-row-unc" : ""} ${t.ai && !t.ok ? "tl-row-ai" : ""}"><div class="tl-d">${aiTaskChip(v, t)}${t.unc ? `<span class="chip sm bad unc-chip">✔ ${esc(tr("Non terminée · passée au shift suivant"))}</span> ` : ""}${t.from && uncSrc(t.from) ? `<span class="chip sm warn">${esc(tr("Reprise du shift précédent"))}</span> ` : ""}${esc(t.text || "—")}${meta ? `<div class="mono muted">${esc(meta)}</div>` : ""}</div>
       <div class="tl-a ${t.action || taken.has(t.id) ? "" : "tl-open"}">${t.action ? esc(t.action) : taken.has(t.id) ? `<span class="muted">${esc(tr("Reprise par un shift suivant"))}</span>` : esc(tr("À faire"))}${who || taskH(t) ? `<div class="muted">${[who ? esc(who) : "", taskH(t) ? `<b>${fmtH(taskH(t))} h</b>` : ""].filter(Boolean).join(" · ")}</div>` : ""}</div></div>`; }).join("")}</div>`;
 }
 
@@ -241,6 +277,7 @@ ACTIONS["vo-toggle"] = el => { UI.voOpen = UI.voOpen || new Set(); const g = el.
 function shiftVisits(id) {
   const rows = hoItems(id, "visit"), ed = hoEd(id);
   return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && (rows.length || (S.aircraft || []).length) ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
+    (aiTaskPending(id) ? `<div class="banner warn">✦ ${plural(aiTaskPending(id), "tâche")} ${esc(tr("du Tech Log encodée(s) par Sindri : vérifiez chacune et cochez « J'ai vérifié, c'est validé ». Le shift ne peut pas être remis avant."))}</div>` : "") +
     (FR24ERR && rows.length ? `<div class="banner warn">${esc(tr(FR24ERR))}</div>` : "") +
     (rows.length ? `<div class="tablewrap"><table class="visits"><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Tech Log : défaut / tâche → action</th><th>MHRS</th><th title="${esc(tr("LogBook n° d'arrivée"))}">LogBook</th></tr></thead>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
       const other = visitGroup(v).filter(x => x.id !== v.id && hasWork(x)).sort((x, y) => shKey(x.ho).localeCompare(shKey(y.ho)));
@@ -303,6 +340,7 @@ ACTIONS["visit-form"] = el => {
   const drawTasks = () => {
     const tot = tasks.reduce((a, t) => a + taskH(t), 0), people = crewNow();
     $t.innerHTML = tasks.map((t, i) => `<div class="tl-card" data-ti="${i}">
+      ${t.ai ? `<div class="${t.ok ? "ai-ok" : "ai-todo"}">${t.ok ? `✔ ${esc(tr("Vérifié et validé par"))} ${esc(t.ok.by || "")}` : `<span class="chip sm warn">✦ ${esc(tr("Encodée par Sindri – à vérifier"))}</span>`} <label class="chk ai-chk"><input type="checkbox" data-k="ok" ${t.ok ? "checked" : ""}> ${esc(tr("J'ai vérifié, c'est validé"))}</label></div>` : ""}
       <div class="tl-2"><label class="f"><span>${esc(tr("Défaut / tâche"))}</span><textarea data-k="text" rows="2">${esc(t.text || "")}</textarea></label>
         <label class="f"><span>${esc(tr("Action / travail fait"))}</span><textarea data-k="action" rows="2" placeholder="${esc(tr("Vide = à faire"))}">${esc(t.action || "")}</textarea></label></div>
       <div class="row-g wrap tl-meta"><label class="f"><span>LogPage n°</span><input class="mono" data-k="logPage" value="${esc(t.logPage || "")}"></label><label class="f"><span>WO n°</span><input class="mono" data-k="wo" value="${esc(t.wo || "")}"></label>
@@ -316,6 +354,7 @@ ACTIONS["visit-form"] = el => {
         <span class="muted small" style="margin-left:auto">${esc(tr("Total MHRS"))} : <b>${fmtH(tot) || "0"}</b></span></div>`;
   };
   $t.addEventListener("input", e => { const c = e.target.closest("[data-ti]"); if (!c) return; const t = tasks[+c.dataset.ti];
+    if (e.target.dataset.k === "ok") { if (e.target.checked) t.ok = { by: meName(), at: new Date().toISOString() }; else delete t.ok; drawTasks(); return; }
     if (e.target.dataset.k === "equip") t.equip = e.target.checked; else if (e.target.dataset.k === "unc") { t.unc = e.target.checked; e.target.closest(".tl-unc").classList.toggle("on", t.unc); } else if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
     if (e.target.dataset.tj != null || e.target.dataset.k === "mhrs") { const b = $t.querySelector(".tl-add b"); if (b) b.textContent = fmtH(tasks.reduce((a, x) => a + taskH(x), 0)) || "0"; } });
   $t.addEventListener("change", e => { if (e.target.matches("[data-tadd]") && e.target.value) { const t = tasks[+e.target.closest("[data-ti]").dataset.ti]; t.techs = [...(t.techs || []), { id: e.target.value, h: "" }]; drawTasks(); }
@@ -505,8 +544,9 @@ ACTIONS["ho-sign"] = el => {
   const pb = prevBlock(id);
   if (pb) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body">${esc(tr("Le shift précédent"))} <b>${esc(shiftLabel(pb))}</b> ${esc(tr("doit d'abord être remis et repris."))}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   /* et tous les contrôles Station Control (section 4) doivent être cochés */
-  const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]);
-  if (k === "out" && (eq.length || miss.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
+  const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]), aiN = aiTaskPending(id);
+  if (k === "out" && (eq.length || miss.length || aiN)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
+    ${aiN ? `<div>✦ ${plural(aiN, "tâche")} ${esc(tr("du Tech Log encodée(s) par Sindri à vérifier et valider (section 2) :"))}</div><ul>${hoItems(id, "visit").flatMap(v => visitTasks(v).filter(t => t.ai && !t.ok).map(t => `<li><b class="mono">${esc(v.reg || "")}</b> · ${esc(t.text || "")}</li>`)).join("")}</ul>` : ""}
     ${eq.length ? `<div>${esc(tr("Équipement à renseigner (section 3) pour :"))}</div><ul>${eq.map(x => `<li><b class="mono">${esc(x.reg || "")}</b> · ${esc(x.task || "")}</li>`).join("")}</ul>` : ""}
     ${miss.length ? `<div>${esc(tr("Station Control à cocher (section 4) :"))}</div><ul>${miss.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   confirmBox(`${k === "out" ? "Remettre" : "Reprendre"} le shift ${esc(shiftName(...UI.shift))} au nom de ${esc(meName())} ?${open && k === "out" ? `<div class="banner warn small" style="margin-top:8px">${plural(open, "avion")} sans CRS qualifié affecté.</div>` : ""}`,

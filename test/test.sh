@@ -167,6 +167,11 @@ ok "bureau : ajoute un formulaire" "$(curl -s -H "$B" -X PUT -d '{"no":"CT-F-001
 ok "terrain : lit les formulaires" "$(curl -s -H "$HT" $U/docs/forms/fm1)" 'Occurrence report'
 ok "terrain : ne modifie pas un formulaire" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/forms/fm1)" 'rôle'
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
+echo "> tâches encodées par Sindri"
+curl -s -H "$B" -X PUT -d '{"kind":"visit","ho":"2026-11-25-day","reg":"OO-ACE","tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Sindri"}}]}' $U/docs/shiftItems/vai >/dev/null
+ok "remise refusée : tâche Sindri non vérifiée" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-25","shift":"day","out":{"by":"Bea","at":"2026-11-25T18:00:00Z"}}' $U/docs/handovers/2026-11-25-day)" 'Sindri'
+curl -s -H "$B" -X PATCH -d '{"tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Sindri"},"ok":{"by":"Bea","at":"2026-11-25T17:00:00Z"}}]}' $U/docs/shiftItems/vai >/dev/null
+ok "remise acceptée après vérification" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-25","shift":"day","out":{"by":"Bea","at":"2026-11-25T18:00:00Z"}}' $U/docs/handovers/2026-11-25-day)" '"ok":true'
 echo "> contacts de la station"
 ok "bureau : ajoute un contact" "$(curl -s -H "$B" -X PUT -d '{"cat":"emergency","org":"Airport fire","phone":"+972 3 000"}' $U/docs/contacts/ct1)" '"ok":true'
 ok "terrain : lit les contacts" "$(curl -s -H "$HT" $U/docs/contacts/ct1)" 'Airport fire'
