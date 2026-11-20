@@ -1003,3 +1003,8 @@ Object.assign(EN, {
   "Le Station Lead peut le réactiver.": "The Station Lead can reopen it.", "Modification réactivée par": "Changes reopened by", "Terminer et reverrouiller": "Done, lock again",
   "Ce shift a été remis : il est verrouillé.": "This shift was handed over: it is locked.",
 });
+Object.assign(EN, {
+  "Admin (assistant administratif)": "Admin (administrative assistant)", "Administrateur système": "System administrator", "Admin système": "Sys admin",
+  "— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée.": "— manages the whole system, on top of their function. Their account (same e-mail) must have two-factor authentication on.",
+  "Droit Administrateur système en attente : activez la double authentification (Sécurité) puis reconnectez-vous.": "System administrator right pending: turn on two-factor authentication (Security), then sign in again.",
+});

@@ -124,6 +124,10 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
     }
     if ($coll === 'userPrefs') { if ($id === null || !prefs_mine($id)) deny('Préférences d\'un autre utilisateur.'); return $new; }
     if ($coll === 'notes') return notes_write($role, $op, $old, $new);
+    if ($coll === 'staff' && $role !== 'admin') {   // droit Administrateur système : octroyé ou retiré par un administrateur seulement
+        if (!empty(($old ?? [])['sysAdmin']) !== !empty(($new ?? [])['sysAdmin']) && $op !== 'delete') deny('Seul un administrateur peut octroyer ou retirer le droit Administrateur système.');
+        if (!empty(($old ?? [])['sysAdmin']) && ($op === 'delete' || mb_strtolower(trim((string) ($old['email'] ?? ''))) !== mb_strtolower(trim((string) (($new ?? [])['email'] ?? ''))))) deny('Fiche d\'un administrateur système : seul un administrateur peut changer son e-mail ou la supprimer.');
+    }
     if ($role === 'admin') return $new;
     if ($coll === 'settings') {
         if ($op === 'delete' || $role !== 'bureau') deny();
