@@ -67,7 +67,7 @@ VIEWS.headquarters = {
         <div class="panel tile c-red ${late.length ? "alert" : ""}"><div class="lbl">${esc(tr("Échéances expirées"))}</div><div class="val">${late.length}</div><div class="note">${due.length - late.length} ${esc(tr("à venir"))} (${exDays()} ${esc(tr("jours"))})</div></div>
         <div class="panel tile c-yellow"><div class="lbl">${esc(tr("Sans licence encodée"))}</div><div class="val">${noLic.length}</div><div class="note">${esc(tr("Engineers, foremen, lead"))}</div></div>
         <div class="panel tile c-green"><div class="lbl">${esc(tr("Formulaires"))}</div><div class="val">${formsActive().length}</div></div></div>` +
-      tabs("headquarters", [["equipe", "Personnel et licences", ppl.length], ["matrice", "Qualifications"], ["echeances", "Échéances du personnel", due.length, late.length > 0], ["formulaires", "Formulaires", formsActive().length]]) +
-      ({ equipe: staffTeam, matrice: staffMatrix, echeances: () => exList(expiryAll().filter(x => x.src === "staff")), formulaires: formsList })[tab]();
+      tabs("headquarters", [["equipe", "Personnel et licences", ppl.length], ["matrice", "Qualifications"], ["echeances", "Échéances du personnel", due.length, late.length > 0], ["formation", "Formation station", indTodo().length], ["formulaires", "Formulaires", formsActive().length]]) +
+      ({ equipe: staffTeam, matrice: staffMatrix, echeances: () => exList(expiryAll().filter(x => x.src === "staff")), formation: inductionList, formulaires: formsList })[tab]();
   }
 };

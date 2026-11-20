@@ -123,6 +123,7 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
         $o = $old; $n = $new ?? []; unset($o['reopenForemen'], $n['reopenForemen']);   // le Station Lead règle lui-même la délégation
         if (json_encode($o) === json_encode($n)) return $new;
     }
+    if ($coll === 'induction' && ($GLOBALS['ME_UID'] ?? '') !== '*') induction_write($role, $op, $old, $new, (string) $id);
     if ($coll === 'userPrefs') { if ($id === null || !prefs_mine($id)) deny('Préférences d\'un autre utilisateur.'); return $new; }
     if ($coll === 'notes') return notes_write($role, $op, $old, $new);
     if ($coll === 'staff' && $role !== 'admin') {   // droit Administrateur système : octroyé ou retiré par un administrateur seulement
@@ -163,6 +164,23 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
     }   // le magasinier saisit et met à jour, le bureau supprime
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
+}
+/* formation station : chaque point et la signature finale sont faits par un formateur relié à sa fiche Personnel,
+   jamais par la personne formée ; rien ne s'efface (sauf par un administrateur) */
+function induction_write($role, $op, $old, $new, $id) {
+    if ($op === 'delete') { if ($role !== 'admin') deny(); return; }
+    $me = me_staff_id(); $o = is_array($old) ? $old : []; $n = is_array($new) ? $new : [];
+    $oi = (array) ($o['items'] ?? []); $ni = (array) ($n['items'] ?? []);
+    if ($role !== 'admin') {
+        foreach ($oi as $k => $v) if (json_encode($v) !== json_encode($ni[$k] ?? null)) deny('Un point validé ne se modifie pas.');
+        if (!empty($o['signed']) && json_encode($o['signed']) !== json_encode($n['signed'] ?? null)) deny('La formation est déjà signée.');
+    }
+    $changed = array_filter($ni, fn($v, $k) => json_encode($v) !== json_encode($oi[$k] ?? null), ARRAY_FILTER_USE_BOTH);
+    if (!empty($n['signed']) && json_encode($n['signed']) !== json_encode($o['signed'] ?? null)) $changed['_signed'] = $n['signed'];
+    foreach ($changed as $v) {
+        if ($me === '' || (string) ($v['by'] ?? '') !== $me) deny('Validez en votre nom : votre compte doit être relié à votre fiche Personnel.');
+        if ($me === $id) deny('La personne formée ne valide pas sa propre formation : un formateur le fait.');
+    }
 }
 /* outillage : le terrain sort et rentre les outils (champs out et history), le registre reste au bureau */
 function tools_usable(array $t) {

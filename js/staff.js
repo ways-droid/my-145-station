@@ -39,8 +39,8 @@ VIEWS.personnel = {
     const tab = curTab("personnel", "equipe"), due = staffDue(60), late = due.filter(x => x.date < today()).length;
     return head("Personnel", `${plural(staffActive().length, "personne")} · licences, qualifications et documents`,
       isOffice() ? `<button class="btn primary" data-a="staff-form" ${dis()}>Ajouter une personne</button>` : "") +
-      tabs("personnel", [["equipe", "Équipe", staffActive().length], ["matrice", "Qualifications"], ["echeances", "Échéances", due.length, late > 0]]) +
-      ({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList })[tab]();
+      tabs("personnel", [["equipe", "Équipe", staffActive().length], ["matrice", "Qualifications"], ["echeances", "Échéances", due.length, late > 0], ["formation", "Formation station", typeof indTodo === "function" ? indTodo().length : 0]]) +
+      ({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList, formation: () => inductionList() })[tab]();
   }
 };
 function staffTeam() {
@@ -82,7 +82,7 @@ function openStaff(id) {
   const p = staff(id); if (!p) return;
   const ed = isOffice() && !readOnly, docs = (p.docs || []).slice().sort((a, b) => (a.old - b.old) || (a.expires || "9").localeCompare(b.expires || "9"));
   modal(`${mHead(esc(p.name))}<div class="body stack">
-    <div class="row-g wrap"><span class="chip info">${esc(STAFF_FN[p.function] || p.function || "—")}</span>${p.active === false ? `<span class="chip">Ne fait plus partie de la station</span>` : ""}${p.shift ? `<span class="chip">${esc(SHIFT_LBL[p.shift] || p.shift)}</span>` : ""}</div>
+    <div class="row-g wrap"><span class="chip info">${esc(STAFF_FN[p.function] || p.function || "—")}</span>${typeof indChip === "function" && p.function !== "hq" ? `<button class="linkbtn" data-a="ind-open" data-id="${p.id}">${indChip(p.id)}</button>` : ""}${p.active === false ? `<span class="chip">Ne fait plus partie de la station</span>` : ""}${p.shift ? `<span class="chip">${esc(SHIFT_LBL[p.shift] || p.shift)}</span>` : ""}</div>
     <dl class="kv sm">${[["Employeur", p.employer], ["Station de base", p.base], ["E-mail", p.email], ["Téléphone", p.phone], ["Nationalité", p.nationality]].filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
     <h3>Licences</h3>${(p.licences || []).length ? `<table class="small"><tbody>${p.licences.map(l => `<tr><td class="mono"><b>${esc(l.cat)}</b></td><td class="mono">${esc(l.number || "")}</td><td>${esc(l.authority || "")}</td><td>${l.expires ? dueChip(l.expires, 60) : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Aucune licence enregistrée.</div>`}
     <h3>Qualifications par type d'avion</h3><div>${ratingChips(p) || `<span class="muted">Aucune.</span>`}</div>
