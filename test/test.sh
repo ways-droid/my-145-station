@@ -193,6 +193,13 @@ ok "terrain : ne signe pas pour un autre" "$(curl -s -H "$HT" -X PATCH -d '{"ack
 ok "terrain : ne change pas sa signature" "$(curl -s -H "$HT" -X PATCH -d '{"acks":{"s1":{"at":"2026-11-21T09:00:00Z","name":"Marc"}}}' $U/docs/instructions/in1)" 'vous-même'
 ok "terrain : ne modifie pas la consigne" "$(curl -s -H "$HT" -X PATCH -d '{"body":"autre"}' $U/docs/instructions/in1)" 'Station Lead'
 ok "historique : signature tracée" "$(curl -s -H "$A" "$U/log?coll=instructions")" 'acks'
+echo "> formation à la station"
+ok "la personne formée ne valide pas sa formation" "$(curl -s -H "$HT" -X PUT -d '{"staffId":"s1","items":{"Badge":{"at":"2026-11-20T09:00:00Z","by":"s1","name":"Marc"}}}' $U/docs/induction/s1)" 'formateur'
+ok "formateur : valide un point pour un collègue" "$(curl -s -H "$HT" -X PUT -d '{"staffId":"s2","items":{"Badge":{"at":"2026-11-20T09:00:00Z","by":"s1","name":"Marc"}}}' $U/docs/induction/s2)" '"ok":true'
+ok "formateur : pas au nom d'un autre" "$(curl -s -H "$HT" -X PATCH -d '{"items":{"Piste":{"at":"2026-11-20T09:00:00Z","by":"s9","name":"X"}}}' $U/docs/induction/s2)" 'votre nom'
+ok "point validé : non modifiable" "$(curl -s -H "$HT" -X PATCH -d '{"items":{"Badge":{"at":"2026-11-21T09:00:00Z","by":"s1","name":"Marc"}}}' $U/docs/induction/s2)" 'ne se modifie pas'
+ok "formateur : signe la formation" "$(curl -s -H "$HT" -X PATCH -d '{"signed":{"at":"2026-11-20T10:00:00Z","by":"s1","name":"Marc"}}' $U/docs/induction/s2)" '"ok":true'
+ok "formation signée : verrouillée" "$(curl -s -H "$B" -X PATCH -d '{"signed":null}' $U/docs/induction/s2)" 'déjà signée'
 echo "> outillage"
 F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
 ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'

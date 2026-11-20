@@ -1105,3 +1105,17 @@ Object.assign(EN, {
   "Consignes du Station Lead à lire et signer « Lu et compris ».": "Station Lead instructions to read and sign “Read and understood”.", "à lire": "to read", "en cours": "active",
   "pas signée par": "not signed by", "signée par l'équipe": "signed by the crew"
 });
+/* Formation à la station */
+Object.assign(EN, {
+  "Formation station": "Station induction", "Formation station faite": "Station induction done", "Progression": "Progress", "Signée par": "Signed by",
+  "Chaque nouvelle personne suit la formation station. Chaque point est validé par un formateur, puis le formateur signe. Les points se règlent dans Paramètres.": "Every new person follows the station induction. Each item is validated by a trainer, then the trainer signs. Items are set in Settings.",
+  "Pour valider, votre compte doit être relié à une fiche Personnel (même e-mail).": "To validate, your account must be linked to a Staff record (same e-mail).", "C'est votre formation : un formateur valide chaque point.": "This is your induction: a trainer validates each item.",
+  "Valider": "Validate", "Formation signée par le formateur": "Induction signed by trainer", "Tous les points doivent être validés": "All items must be validated", "Signer la formation (formateur)": "Sign the induction (trainer)",
+  "Je confirme, en tant que formateur, que": "I confirm, as trainer, that", "a suivi toute la formation station.": "has completed the whole station induction.", "Signer": "Sign",
+  "Formation station : points à valider (un par ligne)": "Station induction: items to validate (one per line)",
+  "Présentation de la station, des bureaux et des contacts": "Station, offices and contacts introduction", "Sécurité piste : zones, gilets, FOD, circulation côté piste": "Ramp safety: zones, vests, FOD, airside traffic",
+  "Badge aéroport et règles d'accès": "Airport badge and access rules", "Procédures d'urgence, extincteurs, premiers secours": "Emergency procedures, extinguishers, first aid",
+  "Outillage : sortie / retour, étalonnage (MOE 2.6.5)": "Tooling: sign-out / return, calibration (MOE 2.6.5)", "Magasin et pièces : réception, quarantaine, envois": "Stores and parts: receiving, quarantine, shipping",
+  "Handover du shift et Tech Log (cet outil)": "Shift handover and Tech Log (this tool)", "AMOS : CRS et documentation": "AMOS: CRS and documentation",
+  "Véhicules de la station et conduite côté piste": "Station vehicles and airside driving", "Déchets et produits dangereux": "Waste and dangerous goods"
+});

@@ -114,6 +114,7 @@ VIEWS.parametres = {
       ${field("s-icao", "Code OACI de la station (météo)", s.stationIcao || "", { cls: "mono", ph: "LLBG" })}${field("s-gust", "Alerte rafales au-dessus de (kt)", s.gustKt || 45, { type: "number", min: 20 })}
       ${field("s-notam", "Lien NOTAM (facultatif)", s.notamUrl || "", { ph: "https://…" })}
       ${field("s-expd", "Expirations : alerte (jours avant l'échéance)", s.expiryDays || 60, { type: "number", min: 7 })}
+      ${field("s-ind", "Formation station : points à valider (un par ligne)", s.inductionItems || (typeof IND_DEFAULT !== "undefined" ? IND_DEFAULT.join("\n") : ""), { type: "textarea", wide: true })}
       ${field("s-tasks", "Tech Log : tâches pré-encodées (une par ligne)", s.taskPresets || (typeof TASK_PRESETS !== "undefined" ? TASK_PRESETS.join("\n") : ""), { type: "textarea", wide: true })}
     </div>
     <div class="hint">Les tarifs des Charge Sheets se gèrent dans <a href="#produits">Articles et prix</a>.</div>
@@ -146,7 +147,7 @@ VIEWS.parametres = {
     f.onsubmit = async e => {
       e.preventDefault();
       await saveSettings({ name: val("s-name") || DEFAULT_SETTINGS.name, approval: val("s-approval"), vat: val("s-vat"), email: val("s-email"), phone: val("s-phone"), address: val("s-address"),
-        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60, stationIcao: val("s-icao").trim().toUpperCase(), gustKt: +val("s-gust") || 45, notamUrl: /^https:\/\//i.test(val("s-notam").trim()) ? val("s-notam").trim() : "" });
+        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60, inductionItems: val("s-ind"), stationIcao: val("s-icao").trim().toUpperCase(), gustKt: +val("s-gust") || 45, notamUrl: /^https:\/\//i.test(val("s-notam").trim()) ? val("s-notam").trim() : "" });
       toast("Paramètres enregistrés");
     };
   }
