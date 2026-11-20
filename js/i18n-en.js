@@ -942,7 +942,7 @@ Object.assign(EN, {
 rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
 /* ---- Flightradar24 : heures remplies ---- */
 Object.assign(EN, { "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)": "No flight in the last 72 h (FR24 does not provide scheduled flights)" });
-rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures remplies pour (\d+))?\.$/, (m, a, b, c) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times filled for ${c}` : ""}.`);
+rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures connues pour (\d+))?\.$/, (m, a, b, c) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times known for ${c}` : ""}.`);
 /* ---- roster : affichage ; FR24 : diagnostic ---- */
 Object.assign(EN, {
   "Griser toute la colonne des week-ends": "Shade the whole weekend column", " et vendredis": " and Fridays", "Intensité du moucheté du vendredi": "Friday speckle intensity",
@@ -951,3 +951,10 @@ Object.assign(EN, {
 });
 rule(/^Vols en cours : (.+)$/, (m, a) => "Live flights: " + tr(a)); rule(/^Vols récents : (.+)$/, (m, a) => "Recent flights: " + tr(a));
 Object.assign(EN, { "Flightradar24 renvoie des données de démonstration : la clé enregistrée est une clé de test (sandbox). Créez une clé de production sur fr24api.flightradar24.com et remplacez-la dans Paramètres.": "Flightradar24 returns demo data: the saved key is a test (sandbox) key. Create a production key on fr24api.flightradar24.com and replace it in Settings." });
+
+Object.assign(EN, {
+  "Données de shift précédent": "Previous shift data", "Données de shift suivant": "Next shift data", "Escale": "Stay",
+  "Date de départ (UTC)": "Departure date (UTC)", "L'avion apparaîtra sur": "The aircraft will appear on",
+  "Heure invalide : format HH:MM (UTC).": "Invalid time: HH:MM format (UTC).", "Heures Flightradar24 (réelles, ou estimée en vol)": "Flightradar24 times (actual, or estimate while airborne)",
+});
+Object.assign(EN, { "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.": "Remove this aircraft from this shift? Its empty rows on other shifts are removed too; rows with work entered stay." });
