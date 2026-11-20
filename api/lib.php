@@ -72,7 +72,7 @@ function sysadmin_elevate($u) {
 // Collections de l'outil : la liste de config.php s'ajoute à celle-ci, pour qu'un module
 // ajouté plus tard fonctionne sans devoir modifier config.php sur le serveur.
 const WAYS_COLLECTIONS = [
-    'staff','roster','handovers','shiftItems','chargeLines','partMoves','needs','situations','expiries','forms','instructions','induction','travel','hotels','aircraft','clients','products','vehicles','vehEvents','faults','driverLogs','tires','tools','labs',
+    'staff','roster','handovers','shiftItems','chargeLines','partMoves','needs','situations','expiries','forms','contacts','instructions','induction','travel','hotels','aircraft','clients','products','vehicles','vehEvents','faults','driverLogs','tires','tools','labs',
     'adminDocs','adminFolders','settings','notes','userPrefs','links',
 ];
 function collections() {

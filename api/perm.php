@@ -13,7 +13,7 @@
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
-const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel', 'aircraft', 'expiries', 'forms'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel', 'aircraft', 'expiries', 'forms', 'contacts'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
@@ -162,6 +162,7 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
         if ($a !== $b && !($b === 'received' && $a === 'ordered')) deny('Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.');
         if (!is_array($old) && $b !== 'asked') deny('Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.');
     }   // le magasinier saisit et met à jour, le bureau supprime
+    if ($coll === 'contacts' && $op !== 'delete' && (string) ((me_staff() ?? [])['function'] ?? '') === 'lead') return $new;   // contacts de la station : Station Lead ou bureau
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
 }

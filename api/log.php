@@ -37,6 +37,7 @@ function log_label($coll, $d) {
     if ($coll === 'partMoves') return trim(($d['dir'] ?? '') === 'in' ? 'Réception' : 'Envoi') . ' ' . ($d['pn'] ?? '') . ' ' . ($d['from'] ?? '') . '→' . ($d['to'] ?? '');
     if ($coll === 'needs') return trim('Besoin ' . mb_substr((string) ($d['title'] ?? ''), 0, 80));
     if ($coll === 'situations') return trim('Situation ' . mb_substr((string) ($d['title'] ?? $d['party'] ?? ''), 0, 80));
+    if ($coll === 'contacts') return ($d['kind'] ?? '') === 'form' ? 'Contacts : en-tête du formulaire' : trim('Contact ' . mb_substr(trim(($d['org'] ?? '') . ' ' . ($d['role'] ?? '') . ' ' . ($d['name'] ?? '')), 0, 80));
     if ($coll === 'aircraft') return trim('Avion ' . ($d['reg'] ?? ''));
     if ($coll === 'tools') return trim('Outil ' . ($d['toolNo'] ?? $d['serial'] ?? '') . ' ' . ($d['name'] ?? ''));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));

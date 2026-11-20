@@ -1145,3 +1145,18 @@ Object.assign(EN, {
   "Fatigue et temps de repos (alertes du roster)": "Fatigue and rest time (roster alerts)", "Service maximum (heures)": "Maximum duty (hours)", "Repos minimum entre deux services (heures)": "Minimum rest between two duties (hours)",
   "Jours de travail d'affilée maximum": "Maximum working days in a row", "Nuits d'affilée maximum": "Maximum nights in a row", "Heures maximum sur 7 jours glissants": "Maximum hours over 7 rolling days"
 });
+/* contacts de la station */
+Object.assign(EN, {
+  "Contacts de la station": "Station contacts", "La liste des contacts de la station (formulaire approuvé). Touchez un numéro pour appeler.": "The station contact list (approved form). Tap a number to call.",
+  "Urgences": "Emergency", "Organisation 145": "145 organisation",  "Autorités": "Authorities", "Compagnies clientes": "Customer airlines", "Fournisseurs et services": "Suppliers and services", 
+  "Organisation / fonction": "Organisation / function",   "En-tête du formulaire": "Form header", "Ajouter un contact": "Add a contact", "Station contact list": "Station contact list",
+   "N° du formulaire à renseigner": "Form number to fill in", "Organisation, nom ou numéro…": "Organisation, name or number…", "Afficher l'équipe de la station (fiches Personnel)": "Show the station team (Staff records)",
+  "Aucun contact pour l'instant.": "No contacts yet.", "Préparer les rubriques habituelles (à compléter)": "Prepare the usual entries (to complete)", "Équipe de la station": "Station team",
+  "Nouveau contact": "New contact", "Rubrique": "Section",  "Fonction / service": "Function / department", "Nom (facultatif)": "Name (optional)", "Autre téléphone": "Other phone",
+  "Ordre dans la rubrique": "Order in the section",  "Indiquez au moins l'organisation, la fonction ou le nom.": "Enter at least the organisation, function or name.", "Contact enregistré": "Contact saved",
+  "Supprimer ce contact de la liste ?": "Delete this contact from the list?", "Reprenez ici les références du formulaire « contacts de la station » approuvé par l'autorité.": "Enter here the references of the authority-approved \"station contacts\" form.",
+  "Titre du formulaire": "Form title", "En-tête enregistré": "Header saved", "Rubriques préparées : complétez les numéros": "Entries prepared: fill in the numbers", "Contacts d'urgence": "Emergency contacts",
+  "Les numéros d'urgence de la station, à toucher pour appeler.": "The station's emergency numbers, tap to call.", "Aucun contact d'urgence encodé.": "No emergency contact entered.",
+  "Pompiers de l'aéroport": "Airport fire service", "Service médical de l'aéroport": "Airport medical service", "Police / sûreté de l'aéroport": "Airport police / security", "Opérations aéroport": "Airport operations",
+  "Handling / piste": "Handling / ramp",  "Badges aéroport": "Airport badges", "Autorité de l'aviation civile (CAAI)": "Civil Aviation Authority (CAAI)", "Étalonnage de l'outillage": "Tool calibration", "Transport de pièces (AOG)": "Parts transport (AOG)"
+});
