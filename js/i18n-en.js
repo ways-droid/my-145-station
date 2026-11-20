@@ -1078,3 +1078,15 @@ Object.assign(EN, {
   "Formation / document": "Training / document", "Personnel de la station": "Station staff", "Échéances expirées": "Expired due dates", "à venir": "upcoming", "Sans licence encodée": "No licence recorded",
   "Engineers, foremen, lead": "Engineers, foremen, lead", "Personnel et licences": "Staff and licences", "Échéances du personnel": "Staff due dates"
 });
+/* Briefing du shift et météo */
+Object.assign(EN, {
+  "Briefing": "Briefing", "Rafales jusqu'à": "Gusts up to", "seuil": "threshold", "en ce moment (METAR)": "right now (METAR)", "Sécurisez les escaliers, les capots, les portes et l'équipement de piste.": "Secure stairs, cowlings, doors and ramp equipment.",
+  "Code OACI de la station inconnu : renseignez-le dans Paramètres (Station).": "Station ICAO code unknown: set it in Settings (Station).", "Chargement de la météo…": "Loading weather…", "Météo indisponible pour l'instant.": "Weather unavailable for now.",
+  "Source : aviationweather.gov": "Source: aviationweather.gov", "dernière version connue": "last known version", "Alerte rafales au-dessus de": "Gust alert above", "recherche": "search",
+  "Météo et NOTAM": "Weather and NOTAM", "Avions attendus": "Expected aircraft", "Équipe du shift": "Shift crew", "Travail repris": "Carried-over work", "Besoins urgents": "Urgent needs",
+  "Tout fait": "All done", "reprise": "carried over", "Aucun avion encodé pour ce shift.": "No aircraft entered for this shift.", "expiré": "expired", "expire le": "expires on",
+  "Personne au roster pour ce shift.": "Nobody on the roster for this shift.", "shift précédent": "previous shift", "Rien à reprendre.": "Nothing to carry over.",
+  "Briefing du shift": "Shift briefing", "Météo et alerte rafales, avions attendus, équipe et situations ouvertes du shift en cours.": "Weather and gust alert, expected aircraft, crew and open situations of the current shift.",
+  "avions": "aircraft", "à l'équipe": "on crew", "situations ouvertes": "open situations",
+  "Code OACI de la station (météo)": "Station ICAO code (weather)", "Alerte rafales au-dessus de (kt)": "Gust alert above (kt)", "Lien NOTAM (facultatif)": "NOTAM link (optional)"
+});
