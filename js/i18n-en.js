@@ -1119,3 +1119,11 @@ Object.assign(EN, {
   "Handover du shift et Tech Log (cet outil)": "Shift handover and Tech Log (this tool)", "AMOS : CRS et documentation": "AMOS: CRS and documentation",
   "Véhicules de la station et conduite côté piste": "Station vehicles and airside driving", "Déchets et produits dangereux": "Waste and dangerous goods"
 });
+/* Rapport mensuel */
+Object.assign(EN, {
+  "Rapport mensuel": "Monthly report", "Calculé automatiquement depuis les shifts du mois. Imprimez-le ou enregistrez-le en PDF.": "Calculated automatically from the month's shifts. Print it or save it as PDF.",
+  "Imprimer / PDF": "Print / PDF", "Shifts": "Shifts", "handovers complets": "complete handovers", "Rotations": "Rotations", "avions différents": "different aircraft", "tâches Tech Log": "Tech Log tasks",
+  "Tâches non terminées passées": "Uncompleted tasks handed over", "Rotations par compagnie": "Rotations by airline", "Rotations par type d'avion": "Rotations by aircraft type", "MHRS par compagnie": "MHRS by airline",
+  "MHRS par technicien": "MHRS by technician", "Tâches les plus fréquentes": "Most frequent tasks", "Situations ouvertes ce mois": "Situations opened this month", "Situations revenues à la normale": "Situations back to normal",
+  "Besoins demandés": "Needs requested", "Consignes publiées": "Instructions published", "Formations station signées": "Station inductions signed", "Inconnue": "Unknown"
+});
