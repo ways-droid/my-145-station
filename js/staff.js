@@ -6,7 +6,7 @@
    documents avec échéance (passeport, visa, permis de travail, badges piste, examens, run-up…).
    Le serveur réduit les fiches pour le rôle terrain : la sienne en entier, celles des autres sans
    documents ni coordonnées. Rien ici ne vaut autorisation de signer : les CRS restent dans AMOS. */
-const STAFF_FN = { lead: "Station Lead", admin: "Admin (assistant administratif)", foreman: "Shift Foreman", engineer: "Engineer", mechanic: "Mechanic", storekeeper: "Store Keeper", helper: "Helper" };
+const STAFF_FN = { lead: "Station Lead", admin: "Admin (assistant administratif)", foreman: "Shift Foreman", engineer: "Engineer", mechanic: "Mechanic", storekeeper: "Store Keeper", helper: "Helper", hq: "Headquarters" };
 const STAFF_FN_ORDER = Object.keys(STAFF_FN);
 const LIC_CATS = ["B1", "B2", "B1+B2", "A", "C", "FAA A&P", "Autre"];
 const SDOC_TYPES = { passport: "Passeport", visa: "Visa", workPermit: "Permis de travail", ramp: "Badge piste / aéroport", exam: "Examen (CAAI…)", runup: "Autorisation run-up",
@@ -18,6 +18,8 @@ const RATING_CODES = { E: "EASA", I: "Approbation israélienne", F: "FAA" };
 const ratingHas = (p, t, c) => String((p.ratings || {})[t] || "").split("+").includes(c);
 const staff = id => S.staff.find(p => p.id === id);
 const staffActive = () => S.staff.filter(p => p.active !== false);
+/* Headquarters (training manager…) : pas dans le roster ni dans les équipes de la station */
+const rosterStaff = () => staffActive().filter(p => p.function !== "hq");
 const fnRank = p => { const i = STAFF_FN_ORDER.indexOf(p.function); return i < 0 ? 99 : i; };
 const staffSort = (a, b) => fnRank(a) - fnRank(b) || byName(a, b);
 const licText = p => (p.licences || []).map(l => l.cat).filter(Boolean).join(" · ");
@@ -102,7 +104,7 @@ ACTIONS["staff-form"] = el => {
   const p = staff(el.dataset.id) || { function: "engineer", active: true, ratings: {}, licences: [] };
   const isNew = !p.id, types = Array.from(new Set([...acTypes(), ...Object.keys(p.ratings || {})]));
   const m = modal(`${mHead(isNew ? "Nouvelle personne" : esc(p.name))}<form><div class="body stack"><div class="fields">
-    ${field("st-name", "Nom et prénom", p.name, { required: true, autofocus: true })}${field("st-fn", "Fonction", p.function, { type: "select", options: Object.entries(STAFF_FN) })}
+    ${field("st-name", "Nom et prénom", p.name, { required: true, autofocus: true })}${field("st-fn", "Fonction", p.function, { type: "select", options: Object.entries(STAFF_FN).filter(([k]) => k !== "hq" || isAdmin() || p.function === "hq") })}
     ${field("st-emp", "Employeur", p.employer, { ph: "Challenge Technic, sous-traitant…" })}${field("st-base", "Station de base", p.base, { ph: "TLV, LGG…", cls: "mono" })}
     ${field("st-email", "E-mail (le même que son compte, pour qu'il voie sa fiche)", p.email, { type: "email" })}${field("st-phone", "Téléphone", p.phone)}
     ${field("st-nat", "Nationalité", p.nationality)}${field("st-shift", "Horaire habituel", p.shift || "", { type: "select", options: [["", "—"], ...Object.entries(SHIFT_LBL)] })}
@@ -111,6 +113,7 @@ ACTIONS["staff-form"] = el => {
   <div><h3>Qualifications par type d'avion</h3>${types.length ? `<table class="small rating-edit"><thead><tr><th>Type</th>${Object.entries(RATING_CODES).map(([c, l]) => `<th class="c" title="${esc(tr(l))}">${c} · ${esc(tr(l))}</th>`).join("")}</tr></thead><tbody>
     ${types.map((t, i) => `<tr><td><b>${esc(t)}</b></td>${Object.keys(RATING_CODES).map(c => `<td class="c"><input type="checkbox" class="st-r" data-t="${i}" data-c="${c}" ${ratingHas(p, t, c) ? "checked" : ""} aria-label="${esc(t + " " + c)}"></td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="hint">Ajoutez d'abord les types d'avion dans Paramètres (Station).</div>`}</div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
+  ${isAdmin() ? `<div class="hint">${esc(tr("Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station."))}</div>` : ""}
   ${isAdmin() ? `<label class="chk sysadm"><input type="checkbox" id="st-sysadm" ${p.sysAdmin ? "checked" : ""}> <b>${esc(tr("Administrateur système"))}</b> <span class="muted small">${esc(tr("— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée."))}</span></label>`
     : p.sysAdmin ? `<div class="small"><span class="chip info">${esc(tr("Administrateur système"))}</span></div>` : ""}
   ${isNew ? "" : `<label class="chk"><input type="checkbox" id="st-gone" ${p.active === false ? "checked" : ""}> Ne fait plus partie de la station <span class="muted small">(fiche gardée, sortie des listes et des échéances)</span></label>`}

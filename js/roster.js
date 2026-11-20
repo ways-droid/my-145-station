@@ -28,8 +28,8 @@ function cellShifts(x) {
     if (Math.min(end, 20) - Math.max(a, 8) >= 4) out.push("day"); if (Math.min(end, 32) - Math.max(a, 20) >= 4 || Math.min(end, 8) - a >= 4) out.push("night"); return out.length ? out : [a >= 8 && a < 20 ? "day" : "night"]; }
   return [];
 }
-const toAssign = date => staffActive().filter(p => rcode(rcell(p.id, date)?.c).k === "pending");
-const onShift = (date, sh) => staffActive().filter(p => cellShifts(rcell(p.id, date)).includes(sh));
+const toAssign = date => rosterStaff().filter(p => rcode(rcell(p.id, date)?.c).k === "pending");
+const onShift = (date, sh) => rosterStaff().filter(p => cellShifts(rcell(p.id, date)).includes(sh));
 const rated = (p, t) => !!(p.ratings || {})[t];
 const hasI = (p, t) => ratingHas(p, t, "I");
 const anyI = p => Object.keys(p.ratings || {}).some(t => hasI(p, t));
@@ -41,7 +41,7 @@ function coverage(date) {
     out.push({ sh, t: "I", n: ppl.filter(anyI).length, total: ppl.length }); }
   return out;
 }
-const planned = date => staffActive().some(p => rcell(p.id, date));
+const planned = date => rosterStaff().some(p => rcell(p.id, date));
 function rosterGaps(days = 7) {
   const out = [];
   for (let i = 0; i < days; i++) { const d = addDays(today(), i); if (!planned(d)) continue;
@@ -69,7 +69,7 @@ VIEWS.roster = {
   }
 };
 function rosterMonth() {
-  const ym = UI.rmonth, ppl = staffActive().sort(staffSort), ed = isOffice() && !readOnly;
+  const ym = UI.rmonth, ppl = rosterStaff().sort(staffSort), ed = isOffice() && !readOnly;
   if (!S.staff.length) return `<div class="panel pad">Ajoutez d'abord les personnes dans <a href="#personnel">Personnel</a>.</div>`;
   const months = UI.r2 ? [ym, ymAdd(ym, 1)] : [ym];
   const dates = months.flatMap(mm => Array.from({ length: ymDays(mm) }, (_, i) => `${mm}-${pad(i + 1)}`)), wd = d => new Date(d + "T12:00:00").getDay();
@@ -95,7 +95,7 @@ function rosterToday() {
     return `<div class="panel pad stack"><h3>${sh === "day" ? "Équipe de jour (08-20)" : "Équipe de nuit (20-08)"}</h3>${ppl.map(p => { const x = rcell(p.id, d); return `<div class="list-row click" data-a="staff-open" data-id="${p.id}"><span><b>${esc(p.name)}</b><div class="muted small">${esc(STAFF_FN[p.function] || "")}</div></span><span>${ratingChips(p)} ${rcode(x.c).k === "custom" ? `<span class="chip">${esc(cellTxt(x))}</span>` : ""}</span></div>`; }).join("") || `<div class="muted">Personne de prévu.</div>`}
       <div class="row-g wrap">${cov.filter(x => x.sh === sh).map(x => `<span class="chip ${x.n ? "good" : "bad"}">${x.t === "I" ? "I (4X-)" : esc(x.t)} : ${x.n}</span>`).join("")}</div></div>`; };
   const pend = toAssign(d).sort(staffSort);
-  const away = staffActive().map(p => [p, rcell(p.id, d)]).filter(([, x]) => x && !cellShifts(x).length && rcode(x.c).k !== "pending").sort((a, b) => staffSort(a[0], b[0]));
+  const away = rosterStaff().map(p => [p, rcell(p.id, d)]).filter(([, x]) => x && !cellShifts(x).length && rcode(x.c).k !== "pending").sort((a, b) => staffSort(a[0], b[0]));
   return `${pend.length ? `<div class="banner warn">${plural(pend.length, "personne")} en D/N aujourd'hui, équipe à affecter : ${pend.map(p => esc(p.name)).join(", ")}</div>` : ""}<div class="grid2 grid-even">${list("day")}${list("night")}</div>${away.length ? `<div class="panel pad stack" style="margin-top:16px"><h3>Hors équipe aujourd'hui</h3>${away.map(([p, x]) => `<div class="list-row"><span>${esc(p.name)}</span><span class="rcode rc-${rcode(x.c).col}">${esc(x.c)}</span><span class="muted small">${esc(tr(rcode(x.c).l))}</span></div>`).join("")}</div>` : ""}`;
 }
 function rosterCodes() {
@@ -184,13 +184,13 @@ ACTIONS["roster-copy"] = () => {
   const ym = UI.rmonth, prev = ymAdd(ym, -1), n = ymDays(ym), np = ymDays(prev);
   confirmBox(`Reprendre le planning de ${MONTHS[+prev.slice(5) - 1]} jour pour jour dans les cases encore vides de ce mois ?`, async () => {
     const ch = [];
-    for (const p of staffActive()) { const src = rosterDoc(p.id, prev)?.days || {}, cur = rosterDoc(p.id, ym)?.days || {};
+    for (const p of rosterStaff()) { const src = rosterDoc(p.id, prev)?.days || {}, cur = rosterDoc(p.id, ym)?.days || {};
       for (let i = 1; i <= n; i++) if (!cur[i] && src[Math.min(i, np)]) ch.push([p.id, `${ym}-${pad(i)}`, Object.assign({}, src[Math.min(i, np)])]); }
     await rosterSet(ch);
   }, "Reprendre");
 };
 ACTIONS["roster-export"] = async () => {
-  const ym = UI.rmonth, n = ymDays(ym), ppl = staffActive().sort(staffSort);
+  const ym = UI.rmonth, n = ymDays(ym), ppl = rosterStaff().sort(staffSort);
   try { await loadScript("https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"); } catch { toast("Export Excel indisponible pour l'instant."); return; }
   const dates = Array.from({ length: n }, (_, i) => `${ym}-${pad(i + 1)}`);
   const rows = [[tr("Nom"), tr("Fonction"), tr("Licences"), ...acTypes(), ...dates.map(d => +d.slice(8))]];

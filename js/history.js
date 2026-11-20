@@ -7,7 +7,7 @@ const LOG_ACT = {
   archive: ["Archivage", ""], unarchive: ["Désarchivage", ""], reply: ["Réponse Peppol", "info"], falco: ["Envoi à Falco", "warn"],
   mail: ["E-mail préparé", "warn"], pdf: ["PDF téléchargé", ""], print: ["Impression", ""], login: ["Connexion", ""]
 };
-const LOG_MOD = { staff: "Personnel", roster: "Roster", handovers: "Shift", shiftItems: "Shift", chargeLines: "Charge Sheet", partMoves: "Pièces", needs: "Station Needs", situations: "Situations ouvertes", travel: "Voyages", hotels: "Voyages", aircraft: "Avions", clients: "Clients", products: "Articles et prix",
+const LOG_MOD = { staff: "Personnel", roster: "Roster", handovers: "Shift", shiftItems: "Shift", chargeLines: "Charge Sheet", partMoves: "Pièces", needs: "Station Needs", expiries: "Expirations", situations: "Situations ouvertes", travel: "Voyages", hotels: "Voyages", aircraft: "Avions", clients: "Clients", products: "Articles et prix",
   vehicles: "Véhicules", vehEvents: "Véhicules", faults: "Véhicules", driverLogs: "Véhicules", tires: "Véhicules", vehDocs: "Véhicules",
   tools: "Outillage", labs: "Outillage", links: "Liens",
   adminDocs: "Administration", adminFolders: "Administration", notes: "Notes", settings: "Paramètres", auth: "Connexions" };
@@ -15,7 +15,7 @@ const LOG_FIELD = { status: "Statut", number: "N°", date: "Date", dueDate: "Éc
   email: "E-mail", phone: "Téléphone", address: "Adresse", vat: "TVA", price: "Prix", notes: "Notes", note: "Note", km: "Kilométrage", matches: "Pièces reliées",
   archived: "Archivé", paymentStatus: "Paiement", response: "Réponse", plate: "Plaque", model: "Modèle", driver: "Pris par", type: "Type", cost: "Coût",
   vehicleId: "Véhicule", ref: "Référence", label: "Libellé", qty: "Quantité", nick: "Nom personnalisé", color: "Couleur", kind: "Type de pièce" };
-const logOpen = { staff: "staff-open", vehicles: "veh-open", tools: "tool-open", partMoves: "pm-open", needs: "nd-open", situations: "sit-open", clients: "client-form", products: "prod-form", faults: "fault-open", aircraft: "ac-form" };
+const logOpen = { staff: "staff-open", vehicles: "veh-open", tools: "tool-open", partMoves: "pm-open", needs: "nd-open", expiries: "ex-form", situations: "sit-open", clients: "client-form", products: "prod-form", faults: "fault-open", aircraft: "ac-form" };
 const logVal = (k, v) => {
   if (k === "clientId" && v && v !== "—") { const c = S.clients.find(x => x.id === v); if (c) return c.name; }
   if (k === "vehicleId" && v && v !== "—") { const x = S.vehicles.find(y => y.id === v); if (x) return x.plate || x.id; }

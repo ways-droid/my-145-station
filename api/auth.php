@@ -63,7 +63,7 @@ function get_user($id) {
 }
 function user_out($u) {
     return ['id' => $u['id'], 'name' => $u['name'], 'email' => $u['email'], 'role' => $u['role'], 'active' => (int) $u['active'] === 1,
-        'tfa' => tfa_on($u['id']), 'tfaRequired' => tfa_required($u), 'sysAdmin' => !empty($u['sysAdmin']), 'sysAdminPending' => !empty($u['sysAdminPending']), 'baseRole' => (string) ($u['baseRole'] ?? $u['role'])];
+        'tfa' => tfa_on($u['id']), 'tfaRequired' => tfa_required($u), 'sysAdmin' => !empty($u['sysAdmin']), 'hq' => !empty($u['hq']), 'sysAdminPending' => !empty($u['sysAdminPending']), 'baseRole' => (string) ($u['baseRole'] ?? $u['role'])];
 }
 function mask_email($e) {
     [$a, $d] = array_pad(explode('@', $e, 2), 2, '');

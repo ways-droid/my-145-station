@@ -155,6 +155,14 @@ ok "administrateur système : modifie les paramètres" "$(curl -s -H "$HT" -X PA
 ok "bureau : ne change pas l'e-mail d'un administrateur système" "$(curl -s -H "$B" -X PATCH -d '{"email":"bea@example.test"}' $U/docs/staff/s1)" 'administrateur'
 curl -s -H "$A" -X PATCH -d '{"sysAdmin":false}' $U/docs/staff/s1 >/dev/null
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("DELETE FROM ways_kv WHERE k = ?")->execute(["tfa:u2"]);' $T/t.db
+ok "bureau : n'octroie pas la fonction Headquarters" "$(curl -s -H "$B" -X PATCH -d '{"function":"hq"}' $U/docs/staff/s1)" 'Headquarters'
+ok "admin : octroie la fonction Headquarters" "$(curl -s -H "$A" -X PATCH -d '{"function":"hq"}' $U/docs/staff/s1)" '"ok":true'
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["tfa:u2",json_encode(["on"=>true,"secret"=>"JBSWY3DPEHPK3PXP"])]);' $T/t.db
+R=$(curl -s -H "$HT" $U/auth/me); ok "Headquarters : droits administrateur" "$R" '"role":"admin"'; ok "Headquarters : signalé" "$R" '"hq":true'
+ok "Headquarters : saisit une échéance de la station" "$(curl -s -H "$HT" -X PUT -d '{"title":"Agrément CAAI","cat":"approval","expires":"2027-03-01"}' $U/docs/expiries/ex1)" '"ok":true'
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("DELETE FROM ways_kv WHERE k = ?")->execute(["tfa:u2"]);' $T/t.db
+curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null
+ok "terrain : ne modifie pas les échéances de la station" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/expiries/ex1)" 'rôle'
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
 echo "> station needs et situations ouvertes"
 ok "terrain : demande un besoin" "$(curl -s -H "$HT" -X PUT -d '{"title":"Gants nitrile","cat":"consumable","status":"asked"}' $U/docs/needs/nd1)" '"ok":true'

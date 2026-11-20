@@ -1048,3 +1048,17 @@ Object.assign(EN, {
   "Non terminée · passée au shift suivant": "Uncompleted · handed over to next shift", "Reprise du shift précédent": "Carried over from previous shift",
   "Fait jusqu'ici": "Done so far", "Tech Log de l'avion": "Aircraft Tech Log"
 });
+/* Headquarters et Expirations */
+Object.assign(EN, {
+  "Headquarters": "Headquarters", "Expirations": "Expiries", "Expirées": "Expired", "Dans les 30 jours": "Within 30 days", "Dans les": "Within", "À traiter": "To handle", "Toutes les échéances": "All due dates",
+  "Formation / document d'une personne": "Training / document of a person", "Échéance de la station": "Station due date", "Nouvelle échéance de la station": "New station due date",
+  "Agrément / approbation": "Approval", "Autorisation aéroport": "Airport authorisation", "Assurance": "Insurance", "GSE / équipement de piste": "GSE / ramp equipment", "Sécurité (extincteurs, premiers secours…)": "Safety (extinguishers, first aid…)",
+  "Contrat": "Contract", "Formation de la station": "Station training", "Station": "Station", "Étalonnage": "Calibration", "Expire le": "Expires on", "Quoi": "What", "Qui / quel objet": "Who / which item", "Module": "Module",
+  "expiré depuis": "expired for", "dans": "in", "Aucune échéance ici.": "No due dates here.", "Personne, licence, outil, véhicule, document…": "Person, licence, tool, vehicle, document…",
+  "Formation ou document d'une personne": "Training or document of a person", "Continuer": "Continue", "Responsable du renouvellement": "Renewal owner", "Délivré par": "Issued by", "Référence / n°": "Reference / no.",
+  "Licences, formations (Human Factors, EWIS…), badges, visas, examens : ils s'enregistrent sur la fiche Personnel.": "Licences, trainings (Human Factors, EWIS…), badges, visas, exams: they are saved on the Staff record.",
+  "Échéance enregistrée": "Due date saved", "Supprimer cette échéance ?": "Delete this due date?", "expirées": "expired", "dans 30 jours": "within 30 days", "à traiter": "to handle",
+  "Licences, formations, badges, étalonnages, véhicules et documents qui expirent.": "Licences, trainings, badges, calibrations, vehicles and documents expiring.",
+  "Expirations : alerte (jours avant l'échéance)": "Expiries: alert (days before due date)", "Ouvrir le fichier": "Open file",
+  "Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station.": "Headquarters function (training manager…): same rights as an administrator, with two-factor authentication on. Not in the station roster."
+});

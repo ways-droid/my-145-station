@@ -62,9 +62,9 @@ function sysadmin_elevate($u) {
     if (($u['role'] ?? '') === 'admin' || !function_exists('coll_docs')) return $u;
     $mail = mb_strtolower(trim((string) ($u['email'] ?? ''))); if ($mail === '') return $u;
     foreach (coll_docs('staff') as $d) {
-        if (!is_array($d) || empty($d['sysAdmin']) || ($d['active'] ?? true) === false || mb_strtolower(trim((string) ($d['email'] ?? ''))) !== $mail) continue;
+        if (!is_array($d) || (empty($d['sysAdmin']) && ($d['function'] ?? '') !== 'hq') || ($d['active'] ?? true) === false || mb_strtolower(trim((string) ($d['email'] ?? ''))) !== $mail) continue;
         if (function_exists('tfa_on') && !tfa_on($u['id'])) { $u['sysAdminPending'] = true; return $u; }
-        $u['baseRole'] = $u['role']; $u['role'] = 'admin'; $u['sysAdmin'] = true; return $u;
+        $u['baseRole'] = $u['role']; $u['role'] = 'admin'; $u['sysAdmin'] = true; if (($d['function'] ?? '') === 'hq') $u['hq'] = true; return $u;
     }
     return $u;
 }
@@ -72,7 +72,7 @@ function sysadmin_elevate($u) {
 // Collections de l'outil : la liste de config.php s'ajoute à celle-ci, pour qu'un module
 // ajouté plus tard fonctionne sans devoir modifier config.php sur le serveur.
 const WAYS_COLLECTIONS = [
-    'staff','roster','handovers','shiftItems','chargeLines','partMoves','needs','situations','travel','hotels','aircraft','clients','products','vehicles','vehEvents','faults','driverLogs','tires','tools','labs',
+    'staff','roster','handovers','shiftItems','chargeLines','partMoves','needs','situations','expiries','travel','hotels','aircraft','clients','products','vehicles','vehEvents','faults','driverLogs','tires','tools','labs',
     'adminDocs','adminFolders','settings','notes','userPrefs','links',
 ];
 function collections() {

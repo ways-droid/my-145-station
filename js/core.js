@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "travel", "hotels", "aircraft", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "expiries", "travel", "hotels", "aircraft", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
@@ -340,11 +340,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["roster", "Roster"], ["shift", "Shift"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["voyages", "Voyages"]]],
+  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["voyages", "Voyages"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", besoins: "yellow", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", besoins: "yellow", expirations: "red", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
@@ -373,9 +373,10 @@ function renderNav() {
   const ready = typeof tOverdue === "function" ? S.tools.filter(tOverdue).length : 0;
   const needsAsk = typeof ndOpen === "function" && typeof canDecideNeeds === "function" && canDecideNeeds() ? S.needs.filter(n => (n.status || "asked") === "asked").length : 0;
   const sits = typeof sitOpen === "function" ? S.situations.filter(sitOpen).length : 0;
-  const badge = { flotte: faults, etalonnage: ready, besoins: needsAsk, situations: sits };
+  const exLate = typeof expiryAll === "function" && isOffice() ? expiryAll().filter(x => x.date < today()).length : 0;
+  const badge = { flotte: faults, etalonnage: ready, besoins: needsAsk, situations: sits, expirations: exLate };
   const badgeTip = { flotte: n => `${plural(n, "panne")} en cours (onglet Pannes)`, etalonnage: n => `${plural(n, "outil")} : étalonnage dépassé (onglet Étalonnage)`,
-    besoins: n => `${plural(n, "besoin")} à approuver`, situations: n => `${plural(n, "situation")} ouverte(s) à ramener à la normale` };
+    besoins: n => `${plural(n, "besoin")} à approuver`, situations: n => `${plural(n, "situation")} ouverte(s) à ramener à la normale`, expirations: n => `${plural(n, "échéance")} expirée(s)` };
   document.getElementById("nav").innerHTML =
     `<a href="#dashboard" class="brand-wrap" aria-label="Tableau de bord"><span class="logo-tile">${logoSvg()}</span><span><span class="brand">my<i>-</i>145<i>-</i>station</span><span class="brand-sub">${esc([settings().stationCode, settings().name].filter(Boolean).join(" · "))}</span></span></a>` +
     `<div class="lang-switch" role="group" aria-label="Langue / Language" data-noi18n><button data-a="set-lang" data-l="fr" class="${UI_LANG === "fr" ? "on" : ""}" aria-pressed="${UI_LANG === "fr"}">Français</button><button data-a="set-lang" data-l="en" class="${UI_LANG === "en" ? "on" : ""}" aria-pressed="${UI_LANG === "en"}">English</button></div>` +
