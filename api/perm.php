@@ -144,7 +144,13 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
         return $new;
     }
     if ($coll === 'tools') return tools_terrain_write($op, $old, $new);
-    if ($coll === 'partMoves' && $op === 'delete') deny();   // le magasinier saisit et met à jour, le bureau supprime
+    if ($coll === 'partMoves' && $op === 'delete') deny();
+    if (($coll === 'needs' || $coll === 'situations') && $op === 'delete') deny();   // le bureau supprime ; une situation résolue se clôture
+    if ($coll === 'needs' && (string) ((me_staff() ?? [])['function'] ?? '') !== 'lead') {   // approuver, refuser, commander : Station Lead ou bureau
+        $a = (string) (($old ?? [])['status'] ?? 'asked'); $b = (string) (($new ?? [])['status'] ?? 'asked');
+        if ($a !== $b && !($b === 'received' && $a === 'ordered')) deny('Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.');
+        if (!is_array($old) && $b !== 'asked') deny('Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.');
+    }   // le magasinier saisit et met à jour, le bureau supprime
     if (in_array($coll, TERRAIN_HIDDEN, true) || in_array($coll, TERRAIN_READONLY, true)) deny();
     return $new;
 }

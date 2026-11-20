@@ -64,6 +64,7 @@ VIEWS.shift = {
         : `<div class="banner warn">✏️ ${esc(tr("Modification réactivée par"))} ${esc(h.reopen.by || "?")} (${fmtDT(h.reopen.at)}). ${!readOnly ? `<button class="btn sm" data-a="ho-relock">${esc(tr("Terminer et reverrouiller"))}</button>` : ""}</div>`) : "") +
       (hoClosed(h) ? `<div class="banner good">Handover terminé : remis par ${esc(h.out?.by || "?")} et repris par ${esc(h.in.by)} (${fmtDT(h.in.at)}).</div>` : "") +
       (bad ? `<div class="banner warn">${plural(bad, "avion")} sans CRS qualifié affecté : voir la section 2.</div>` : "") +
+      (typeof shiftSituations === "function" ? shiftSituations() : "") +
       `<div class="${prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + (hoEd(id) ? shiftChecks(id, h) + shiftCrew(id, date, sh, h)
         : (shiftChecks(id, h) + shiftCrew(id, date, sh, h)).replace('id="ho-ckn"', 'id="ho-ckn" disabled').replace('id="ho-fm"', 'id="ho-fm" disabled')) + `</div>`;
   }

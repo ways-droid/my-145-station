@@ -35,6 +35,8 @@ function log_label($coll, $d) {
     if ($coll === 'chargeLines') return trim('Charge Sheet ' . ($d['rotation'] ?? '') . ' ' . ($d['workType'] ?? ''));
     if ($coll === 'travel') { $n = (string) (coll_docs('staff')[(string) ($d['staffId'] ?? '')]['name'] ?? ''); return trim((($d['kind'] ?? '') === 'hotel' ? 'Hôtel ' . ($d['checkIn'] ?? '') : 'Vol ' . ($d['date'] ?? '') . ' ' . ($d['from'] ?? '') . '→' . ($d['to'] ?? '')) . ' ' . $n); }
     if ($coll === 'partMoves') return trim(($d['dir'] ?? '') === 'in' ? 'Réception' : 'Envoi') . ' ' . ($d['pn'] ?? '') . ' ' . ($d['from'] ?? '') . '→' . ($d['to'] ?? '');
+    if ($coll === 'needs') return trim('Besoin ' . mb_substr((string) ($d['title'] ?? ''), 0, 80));
+    if ($coll === 'situations') return trim('Situation ' . mb_substr((string) ($d['title'] ?? $d['party'] ?? ''), 0, 80));
     if ($coll === 'aircraft') return trim('Avion ' . ($d['reg'] ?? ''));
     if ($coll === 'tools') return trim('Outil ' . ($d['toolNo'] ?? $d['serial'] ?? '') . ' ' . ($d['name'] ?? ''));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));
