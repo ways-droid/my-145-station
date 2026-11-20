@@ -25,7 +25,7 @@ const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble de
 const AI_HIDDEN = ['settings', 'userPrefs'];
 const AI_NAME = 'Sindri';
 // collections que Sindri peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
-const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'needs', 'situations', 'expiries', 'forms', 'travel', 'hotels', 'aircraft', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
+const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'needs', 'situations', 'expiries', 'forms', 'instructions', 'travel', 'hotels', 'aircraft', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
     'staff' => "personnel de la station (name, function, employer, email, phone, licences [{cat, number, expires}], ratings {type d'avion: niveau}, docs [{type, number, expires}] = visas, permis de travail, badges, examens…)",
@@ -40,6 +40,7 @@ const AI_LABELS = [
     'situations' => "situations anormales à ramener à la normale (kind toolLoan|toolBorrow|equipment|facility|vehicle|staff|other, title, toolId, party = à qui / de qui, contact, by = staffId, since, dueBack, status open|closed, showInShift = affichée dans la page Shift, history [{at, by, text}], closedAt, closeNote)",
     'expiries' => 'échéances de la station hors personnel, outillage et véhicules (title, cat approval|airport|insurance|gse|safety|contract|training|other, expires, ref, issuer, owner = staffId responsable du renouvellement, notes)',
     'forms' => 'formulaires approuvés par l\'autorité (no = n° du formulaire, title, rev, revDate, cat moe|maint|quality|hr|tools|stores|station|other, approval, url = lien OneDrive, file, notes = quand l\'utiliser, active)',
+    'instructions' => 'consignes du Station Lead (title, body, fns = fonctions visées, vide = tout le monde, important, due, at, by, archived, acks {staffId: {at, name}} = signatures « lu et compris » ; ne jamais signer à la place de quelqu\'un)',
     'chargeLines' => 'lignes de Charge Sheet (date, company, reg, rotation, type, workType, description, qty, unit, price, currency, reviewed, invoiced) ; montant = qty × price',
     'clients' => 'clients (compagnies aériennes servies par la station)', 'products' => 'articles et prix (tarifs des Charge Sheets)',
     'vehicles' => 'véhicules', 'vehEvents' => 'entretiens et événements véhicules', 'faults' => 'pannes signalées sur les véhicules', 'driverLogs' => 'prises en charge de véhicules', 'tires' => 'pneus',

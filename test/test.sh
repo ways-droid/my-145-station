@@ -183,6 +183,16 @@ ok "terrain : masque la situation du shift" "$(curl -s -H "$HT" -X PATCH -d '{"s
 ok "terrain : clôture la situation" "$(curl -s -H "$HT" -X PATCH -d '{"status":"closed"}' $U/docs/situations/si1)" '"ok":true'
 ok "terrain : ne supprime pas une situation" "$(curl -s -H "$HT" -X DELETE $U/docs/situations/si1)" 'rôle'
 ok "bureau : supprime une situation" "$(curl -s -H "$B" -X DELETE $U/docs/situations/si1)" '"ok":true'
+echo "> consignes du Station Lead"
+ok "terrain : ne publie pas de consigne" "$(curl -s -H "$HT" -X PUT -d '{"title":"X","body":"y"}' $U/docs/instructions/in1)" 'Station Lead'
+curl -s -H "$A" -X PATCH -d '{"function":"lead"}' $U/docs/staff/s1 >/dev/null
+ok "Station Lead : publie une consigne" "$(curl -s -H "$HT" -X PUT -d '{"title":"Gilets obligatoires","body":"Sur la piste, toujours.","acks":{}}' $U/docs/instructions/in1)" '"ok":true'
+curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null
+ok "terrain : signe pour soi" "$(curl -s -H "$HT" -X PATCH -d '{"acks":{"s1":{"at":"2026-11-20T09:00:00Z","name":"Marc"}}}' $U/docs/instructions/in1)" '"ok":true'
+ok "terrain : ne signe pas pour un autre" "$(curl -s -H "$HT" -X PATCH -d '{"acks":{"s2":{"at":"2026-11-20T09:00:00Z","name":"Autre"}}}' $U/docs/instructions/in1)" 'vous-même'
+ok "terrain : ne change pas sa signature" "$(curl -s -H "$HT" -X PATCH -d '{"acks":{"s1":{"at":"2026-11-21T09:00:00Z","name":"Marc"}}}' $U/docs/instructions/in1)" 'vous-même'
+ok "terrain : ne modifie pas la consigne" "$(curl -s -H "$HT" -X PATCH -d '{"body":"autre"}' $U/docs/instructions/in1)" 'Station Lead'
+ok "historique : signature tracée" "$(curl -s -H "$A" "$U/log?coll=instructions")" 'acks'
 echo "> outillage"
 F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
 ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'

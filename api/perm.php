@@ -92,6 +92,7 @@ function perm_out($role, $out) {
    (handover.reopen = {by, at}) par le Station Lead (fonction « lead » dans Personnel, même e-mail) ou un administrateur,
    ou par un Shift Foreman si le Station Lead l'a autorisé (paramètre reopenForemen). Restent permis sur un shift verrouillé :
    la reprise (in) par l'équipe suivante, l'envoi Notion et la mise à jour Flightradar24. La clé d'API (sauvegardes) passe. */
+function me_staff_id() { foreach (coll_docs('staff') as $id => $d) if (is_array($d) && staff_mine($d)) return (string) $id; return ''; }
 function me_staff() { static $p = false; if ($p !== false) return $p; $p = null; foreach (coll_docs('staff') as $d) if (is_array($d) && staff_mine($d)) { $p = $d; break; } return $p; }
 function can_reopen_shift($role) {
     if ($role === 'admin') return true;
@@ -146,7 +147,15 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
     }
     if ($coll === 'tools') return tools_terrain_write($op, $old, $new);
     if ($coll === 'partMoves' && $op === 'delete') deny();
-    if (($coll === 'needs' || $coll === 'situations') && $op === 'delete') deny();   // le bureau supprime ; une situation résolue se clôture
+    if (($coll === 'needs' || $coll === 'situations') && $op === 'delete') deny();
+    if ($coll === 'instructions' && (string) ((me_staff() ?? [])['function'] ?? '') !== 'lead') {   // consignes : le Station Lead (ou le bureau) les écrit ; chacun signe « lu et compris » pour lui-même
+        $me = me_staff_id(); if ($op === 'delete' || !is_array($old) || $me === '') deny('Seul le Station Lead ou le bureau publie les consignes.');
+        $o = $old; $n = $new ?? []; $oa = (array) ($o['acks'] ?? []); $na = (array) ($n['acks'] ?? []); unset($o['acks'], $n['acks']);
+        if (json_encode($o) !== json_encode($n)) deny('Seul le Station Lead ou le bureau modifie les consignes.');
+        $oo = $oa; $nn = $na; unset($oo[$me], $nn[$me]);
+        if (json_encode($oo) !== json_encode($nn) || (isset($oa[$me]) && json_encode($oa[$me]) !== json_encode($na[$me] ?? null))) deny('Vous ne pouvez signer que pour vous-même, une seule fois.');
+        return $new;
+    }   // le bureau supprime ; une situation résolue se clôture
     if ($coll === 'needs' && (string) ((me_staff() ?? [])['function'] ?? '') !== 'lead') {   // approuver, refuser, commander : Station Lead ou bureau
         $a = (string) (($old ?? [])['status'] ?? 'asked'); $b = (string) (($new ?? [])['status'] ?? 'asked');
         if ($a !== $b && !($b === 'received' && $a === 'ordered')) deny('Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.');
