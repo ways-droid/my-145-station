@@ -982,3 +982,11 @@ Object.assign(EN, {
 });
 Object.assign(EN, { "Oui, supprimer": "Yes, delete" });
 Object.assign(EN, { "Fuseau horaire de la station (vide = déduit du code station)": "Station time zone (empty = from the station code)" });
+Object.assign(EN, {
+  "Crée une ligne à remplir dans la section 3 · Équipement et matériel": "Creates a line to fill in section 3 · Equipment and materials", "Équipement utilisé": "Equipment used",
+  "Équipement à renseigner pour": "Equipment to fill in for", "du Tech Log : le shift ne peut pas être remis tant que ces lignes sont vides.": "of the Tech Log: the shift cannot be handed over while these lines are empty.",
+  "À remplir": "To fill in", "Tâche": "Task", "Shift pas encore remis": "Shift not handed over yet", "Équipement à renseigner (section 3) pour :": "Equipment to fill in (section 3) for:",
+  "Lié à la tâche du Tech Log": "Linked to Tech Log task",
+});
+Object.assign(EN, { "tâche": "task", "tâches": "tasks" });
+Object.assign(EN, { "Station Control à cocher (section 4) :": "Station Control to tick (section 4):", "Tous les contrôles doivent être cochés avant de remettre le shift.": "All checks must be ticked before handing over the shift.", "restants": "left", "restant": "left" });
