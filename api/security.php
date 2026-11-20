@@ -148,7 +148,7 @@ function auth_after_code($u, $master) {
         out(['ok' => true, 'tfa' => 'enroll', 'ticket' => tfa_ticket($u, $master, $secret), 'secret' => $secret, 'uri' => tfa_uri($u, $secret)]);
     }
     if (function_exists('log_event')) log_event('auth', $u['id'], 'login', 'Connexion à l\'outil', null, $u['name']);
-    out(['ok' => true, 'token' => new_session($u), 'user' => user_out($u), 'hours' => SESSION_HOURS]);
+    out(['ok' => true, 'token' => new_session($u), 'user' => user_out(sysadmin_elevate($u)), 'hours' => SESSION_HOURS]);
 }
 function auth_step2($b) {
     sec_ip_guard();
@@ -171,7 +171,7 @@ function auth_step2($b) {
     tfa_ticket_drop($v);
     if (function_exists('log_event')) log_event('auth', $u['id'], 'login', $how === 'recovery' ? 'Connexion à l\'outil (code de secours)' : ($how === 'activation' ? 'Connexion à l\'outil · second facteur activé' : 'Connexion à l\'outil'), null, $u['name']);
     if ($how === 'recovery') sec_alert_admins('Code de secours utilisé', "« {$u['name']} » s'est connecté avec un code de secours du second facteur. Il lui en reste " . count(tfa_get($u['id'])['rec'] ?? []) . '.');
-    $o = ['ok' => true, 'token' => new_session($u), 'user' => user_out($u), 'hours' => SESSION_HOURS];
+    $o = ['ok' => true, 'token' => new_session($u), 'user' => user_out(sysadmin_elevate($u)), 'hours' => SESSION_HOURS];
     if ($rec) $o['recovery'] = $rec;
     out($o);
 }

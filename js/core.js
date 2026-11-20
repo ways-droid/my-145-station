@@ -270,7 +270,7 @@ async function connectServer() {
     const mkS = t => mk(t, () => { if (lsGet(SESSION_LS) === t) { lsSet(SESSION_LS, ""); lsSet("st-expired", "1"); location.reload(); } });
     if (token) { try { const api = mkS(token), me = await api.call("GET", "auth/me"); ME = me.user; API = api; SBX = me.sandbox || null; if (typeof SESS !== "undefined") SESS = me.session || null; return api; } catch (e) { lsSet(SESSION_LS, ""); } }
     const r = await loginGate();
-    lsSet(SESSION_LS, r.token); ME = r.user; API = mkS(r.token); if (typeof SESS !== "undefined") SESS = { since: Date.now(), expires: Date.now() + (r.hours || 8) * 3600000 }; return API;
+    lsSet(SESSION_LS, r.token); ME = r.user; if (ME && ME.sysAdminPending) setTimeout(() => toast(tr("Droit Administrateur système en attente : activez la double authentification (Sécurité) puis reconnectez-vous.")), 1500); API = mkS(r.token); if (typeof SESS !== "undefined") SESS = { since: Date.now(), expires: Date.now() + (r.hours || 8) * 3600000 }; return API;
   }
   /* connexion par code pas encore configurée : clé d'accès provisoire */
   let key = lsGet(KEY_LS), msg = "";

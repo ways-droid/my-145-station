@@ -145,6 +145,17 @@ ok "foreman autorisé : réactive le shift" "$(curl -s -H "$HT" -X PATCH -d '{"r
 ok "shift réactivé : modification permise" "$(curl -s -H "$HT" -X PATCH -d '{"done":"corrigé"}' $U/docs/shiftItems/vl)" '"ok":true'
 ok "historique : réactivation tracée" "$(curl -s -H "$A" "$U/log?coll=handovers")" 'reopen'
 curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null; curl -s -H "$A" -X PATCH -d '{"reopenForemen":false}' $U/docs/settings/company >/dev/null
+echo "> droit Administrateur système (en plus de la fonction)"
+ok "bureau : n'octroie pas le droit Administrateur système" "$(curl -s -H "$B" -X PATCH -d '{"sysAdmin":true}' $U/docs/staff/s1)" 'administrateur'
+ok "admin : octroie le droit Administrateur système" "$(curl -s -H "$A" -X PATCH -d '{"sysAdmin":true}' $U/docs/staff/s1)" '"ok":true'
+R=$(curl -s -H "$HT" $U/auth/me); ok "sans double authentification : droit en attente" "$R" '"sysAdminPending":true'; ok "sans double authentification : rôle inchangé" "$R" '"role":"terrain"'
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["tfa:u2",json_encode(["on"=>true,"secret"=>"JBSWY3DPEHPK3PXP"])]);' $T/t.db
+R=$(curl -s -H "$HT" $U/auth/me); ok "avec double authentification : administrateur" "$R" '"role":"admin"'; ok "fonction gardée (rôle de base)" "$R" '"baseRole":"terrain"'
+ok "administrateur système : modifie les paramètres" "$(curl -s -H "$HT" -X PATCH -d '{"stationName":"Tel Aviv"}' $U/docs/settings/company)" '"ok":true'
+ok "bureau : ne change pas l'e-mail d'un administrateur système" "$(curl -s -H "$B" -X PATCH -d '{"email":"bea@example.test"}' $U/docs/staff/s1)" 'administrateur'
+curl -s -H "$A" -X PATCH -d '{"sysAdmin":false}' $U/docs/staff/s1 >/dev/null
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("DELETE FROM ways_kv WHERE k = ?")->execute(["tfa:u2"]);' $T/t.db
+ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
 echo "> outillage"
 F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
 ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'

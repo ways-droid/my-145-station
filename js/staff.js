@@ -6,7 +6,7 @@
    documents avec échéance (passeport, visa, permis de travail, badges piste, examens, run-up…).
    Le serveur réduit les fiches pour le rôle terrain : la sienne en entier, celles des autres sans
    documents ni coordonnées. Rien ici ne vaut autorisation de signer : les CRS restent dans AMOS. */
-const STAFF_FN = { lead: "Station Lead", admin: "Admin", foreman: "Shift Foreman", engineer: "Engineer", mechanic: "Mechanic", storekeeper: "Store Keeper", helper: "Helper" };
+const STAFF_FN = { lead: "Station Lead", admin: "Admin (assistant administratif)", foreman: "Shift Foreman", engineer: "Engineer", mechanic: "Mechanic", storekeeper: "Store Keeper", helper: "Helper" };
 const STAFF_FN_ORDER = Object.keys(STAFF_FN);
 const LIC_CATS = ["B1", "B2", "B1+B2", "A", "C", "FAA A&P", "Autre"];
 const SDOC_TYPES = { passport: "Passeport", visa: "Visa", workPermit: "Permis de travail", ramp: "Badge piste / aéroport", exam: "Examen (CAAI…)", runup: "Autorisation run-up",
@@ -49,7 +49,7 @@ function staffTeam() {
   const filt = [["tous", "Tous"], ...used.map(k => [k, STAFF_FN[k]]), ...(S.staff.some(p => p.active === false) ? [["anciens", "Anciens"]] : [])];
   return `<div class="panel">${searchBar("Rechercher un nom, une licence, un type d'avion…", filt)}
     <div class="tablewrap"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Licences</th><th>Qualifications</th><th>Prochaine échéance</th></tr></thead><tbody>
-    ${rows.map(p => { const n = nextDate(p); return `<tr class="click" data-a="staff-open" data-id="${p.id}"><td><b>${esc(p.name)}</b>${demoTag(p)}<div class="muted small">${esc(p.employer || "")}</div></td>
+    ${rows.map(p => { const n = nextDate(p); return `<tr class="click" data-a="staff-open" data-id="${p.id}"><td><b>${esc(p.name)}</b>${demoTag(p)}${p.sysAdmin ? ` <span class="chip sm info" title="${esc(tr("Administrateur système"))}">${esc(tr("Admin système"))}</span>` : ""}<div class="muted small">${esc(p.employer || "")}</div></td>
       <td>${esc(STAFF_FN[p.function] || p.function || "—")}</td><td class="mono">${esc(licText(p) || "—")}</td><td>${ratingChips(p) || `<span class="muted">—</span>`}</td>
       <td>${n ? dueChip(n.date, 60) + `<div class="muted small">${esc(n.label)}</div>` : `<span class="muted">—</span>`}</td></tr>`; }).join("")}
     </tbody></table>${rows.length ? "" : `<div class="empty">${S.staff.length ? "Personne ne correspond." : "Aucune personne pour l'instant."}</div>`}</div></div>`;
@@ -111,6 +111,8 @@ ACTIONS["staff-form"] = el => {
   <div><h3>Qualifications par type d'avion</h3>${types.length ? `<table class="small rating-edit"><thead><tr><th>Type</th>${Object.entries(RATING_CODES).map(([c, l]) => `<th class="c" title="${esc(tr(l))}">${c} · ${esc(tr(l))}</th>`).join("")}</tr></thead><tbody>
     ${types.map((t, i) => `<tr><td><b>${esc(t)}</b></td>${Object.keys(RATING_CODES).map(c => `<td class="c"><input type="checkbox" class="st-r" data-t="${i}" data-c="${c}" ${ratingHas(p, t, c) ? "checked" : ""} aria-label="${esc(t + " " + c)}"></td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="hint">Ajoutez d'abord les types d'avion dans Paramètres (Station).</div>`}</div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
+  ${isAdmin() ? `<label class="chk sysadm"><input type="checkbox" id="st-sysadm" ${p.sysAdmin ? "checked" : ""}> <b>${esc(tr("Administrateur système"))}</b> <span class="muted small">${esc(tr("— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée."))}</span></label>`
+    : p.sysAdmin ? `<div class="small"><span class="chip info">${esc(tr("Administrateur système"))}</span></div>` : ""}
   ${isNew ? "" : `<label class="chk"><input type="checkbox" id="st-gone" ${p.active === false ? "checked" : ""}> Ne fait plus partie de la station <span class="muted small">(fiche gardée, sortie des listes et des échéances)</span></label>`}
   </div><footer>${isNew ? "" : `<div class="left"><button type="button" class="btn danger" data-a="staff-del" data-id="${p.id}" ${dis()}>Supprimer</button></div>`}
   <button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
@@ -121,6 +123,7 @@ ACTIONS["staff-form"] = el => {
     const gone = m.querySelector("#st-gone")?.checked;
     const data = Object.assign(strip(p), { name: val("st-name"), function: val("st-fn"), employer: val("st-emp"), base: val("st-base").toUpperCase(), email: val("st-email").toLowerCase(), phone: val("st-phone"),
       nationality: val("st-nat"), shift: val("st-shift"), notes: val("st-notes"), ratings, licences, active: !gone, docs: p.docs || [] });
+    if (isAdmin()) data.sysAdmin = !!m.querySelector("#st-sysadm")?.checked;
     const id = await save("staff", p.id, data);
     toast("Fiche enregistrée"); openStaff(id);
   };

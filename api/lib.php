@@ -50,11 +50,24 @@ function auth_who() {
         foreach ((array) cfg('api_tokens') as $t) {
             if (strlen($t) >= 32 && hash_equals($t, $token)) return ['kind' => 'key', 'user' => null, 'label' => 'token:' . substr(hash('sha256', $t), 0, 8)];
         }
-        if ($u = session_user($token)) return ['kind' => 'session', 'user' => $u, 'label' => 'user:' . $u['name']];
+        if ($u = session_user($token)) return ['kind' => 'session', 'user' => sysadmin_elevate($u), 'label' => 'user:' . $u['name']];
     }
     fail(401, 'Non autorisé');
 }
 function auth_user() { return auth_who()['label']; }
+/* droit « Administrateur système » : s'octroie dans Personnel (staff.sysAdmin), en plus de la fonction de la personne
+   (à ne pas confondre avec la fonction « Admin » = assistant administratif). Le compte qui a le même e-mail que la fiche
+   reçoit les droits administrateur, à condition d'avoir activé la double authentification. */
+function sysadmin_elevate($u) {
+    if (($u['role'] ?? '') === 'admin' || !function_exists('coll_docs')) return $u;
+    $mail = mb_strtolower(trim((string) ($u['email'] ?? ''))); if ($mail === '') return $u;
+    foreach (coll_docs('staff') as $d) {
+        if (!is_array($d) || empty($d['sysAdmin']) || ($d['active'] ?? true) === false || mb_strtolower(trim((string) ($d['email'] ?? ''))) !== $mail) continue;
+        if (function_exists('tfa_on') && !tfa_on($u['id'])) { $u['sysAdminPending'] = true; return $u; }
+        $u['baseRole'] = $u['role']; $u['role'] = 'admin'; $u['sysAdmin'] = true; return $u;
+    }
+    return $u;
+}
 
 // Collections de l'outil : la liste de config.php s'ajoute à celle-ci, pour qu'un module
 // ajouté plus tard fonctionne sans devoir modifier config.php sur le serveur.
