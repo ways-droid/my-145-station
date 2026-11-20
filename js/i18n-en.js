@@ -1160,3 +1160,15 @@ Object.assign(EN, {
   "Pompiers de l'aéroport": "Airport fire service", "Service médical de l'aéroport": "Airport medical service", "Police / sûreté de l'aéroport": "Airport police / security", "Opérations aéroport": "Airport operations",
   "Handling / piste": "Handling / ramp",  "Badges aéroport": "Airport badges", "Autorité de l'aviation civile (CAAI)": "Civil Aviation Authority (CAAI)", "Étalonnage de l'outillage": "Tool calibration", "Transport de pièces (AOG)": "Parts transport (AOG)"
 });
+/* mode hors ligne */
+Object.assign(EN, {
+  "Hors ligne": "Offline", "Envoi en cours": "Sending", "en attente": "pending", "Vous pouvez continuer : tout partira automatiquement dès que la connexion revient.": "You can carry on: everything will be sent automatically as soon as the connection is back.",
+  "Les modifications faites hors ligne partent vers le serveur.": "Changes made offline are being sent to the server.", "après la synchronisation : quelqu'un d'autre avait modifié la même fiche.": "after syncing: someone else had changed the same record.",
+  "Connexion revenue": "Connection back", "envoyée(s) au serveur.": "sent to the server.", "Modification hors ligne refusée par le serveur": "Offline change refused by the server",
+  "Conflit : quelqu'un d'autre avait modifié la même fiche pendant que vous étiez hors ligne. Vérifiez.": "Conflict: someone else changed the same record while you were offline. Please check.",
+  "faite(s) hors ligne pas encore envoyée(s) seront perdues.": "made offline and not yet sent will be lost.", "Conflits à vérifier": "Conflicts to check",
+  "Pendant que vous étiez hors ligne, quelqu'un d'autre a modifié ces fiches. Votre version est enregistrée. Comparez, puis gardez la vôtre ou reprenez l'autre.": "While you were offline, someone else changed these records. Your version is saved. Compare, then keep yours or take the other one back.",
+  "votre modification du": "your change of", "L'autre personne avait supprimé cette fiche.": "The other person had deleted this record.", "Champ": "Field", "Avant": "Before", "Changé par l'autre personne": "Changed by the other person",
+  "La fiche a été créée par quelqu'un d'autre en même temps.": "The record was created by someone else at the same time.", "Garder ma version": "Keep my version", "Reprendre l'autre version": "Take the other version",
+  "Aucun conflit.": "No conflicts.", "Version de l'autre personne reprise": "Other person's version restored"
+});

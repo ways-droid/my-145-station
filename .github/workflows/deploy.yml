@@ -67,7 +67,7 @@ jobs:
       - name: Préparation des fichiers
         run: |
           mkdir -p site/api site/client
-          cp index.html confidentialite.html site/
+          cp index.html confidentialite.html sw.js site/
           cp site.htaccess site/.htaccess
           cp -r js site/
           cp api/*.php api/.htaccess api/schema.sql site/api/ && rm -f site/api/config.php

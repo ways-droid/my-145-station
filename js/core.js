@@ -151,7 +151,20 @@ async function saveSettings(data) {
 let API = null;
 const SERVER = !(window.claude && window.claude.use) && /^https?:$/.test(location.protocol);
 const blobUrl = id => API ? API.fileUrl(id) : "/_blob/" + encodeURIComponent(id);
-const KEY_LS = "st-api-key";
+const KEY_LS = "st-api-key", ME_LS = "st-me", CONF_LS = "st-conflicts";
+/* ---- mode hors ligne (copie locale et file d'attente dans client/ways-api.js) ---- */
+const offConflicts = () => { try { const a = JSON.parse(lsGet(CONF_LS) || "[]"); return Array.isArray(a) ? a : []; } catch { return []; } };
+const offConfSave = a => lsSet(CONF_LS, a.length ? JSON.stringify(a.slice(-50)) : "");
+function offSynced(r) {
+  if (r.sent) toast(`${tr("Connexion revenue")} : ${plural(r.sent, "modification")} ${tr("envoyée(s) au serveur.")}`);
+  for (const e of r.errors) toast(`${tr("Modification hors ligne refusée par le serveur")} : ${e.msg}`);
+  if (r.conflicts.length) { offConfSave([...offConflicts(), ...r.conflicts]); toast(tr("Conflit : quelqu'un d'autre avait modifié la même fiche pendant que vous étiez hors ligne. Vérifiez.")); }
+  render(true);
+}
+function offSw() {
+  if (!("serviceWorker" in navigator) || !window.isSecureContext) return;   // HTTPS requis pour ouvrir l'application sans réseau
+  navigator.serviceWorker.register("sw.js").catch(() => { });
+}
 function keyGate(msg) {
   return new Promise(resolve => {
     const w = document.createElement("div"); w.className = "keygate";
@@ -261,16 +274,21 @@ function loginGate() {
 }
 async function connectServer() {
   if (!window.WaysAPI) await loadScript("client/ways-api.js");
-  const mk = (token, onUnauthorized) => WaysAPI({ base: "api/", token, methodOverride: true, onUnauthorized, onStatus: st => { if (st === "offline" && !S.offline) { S.offline = true; render(); } else if (st === "online" && S.offline) { S.offline = false; render(); } } });
+  const mk = (token, onUnauthorized) => WaysAPI({ base: "api/", token, methodOverride: true, onUnauthorized, onStatus: st => { if (st === "offline" && !S.offline) { S.offline = true; render(); } else if (st === "online" && S.offline) { S.offline = false; render(); } },
+    onQueue: n => { if (S.pending !== n) { S.pending = n; render(); } }, onSync: offSynced });
   let configured = false;
-  try { configured = !!(await apiPublic("GET", "auth/status")).configured; } catch (e) { }
+  try { configured = !!(await apiPublic("GET", "auth/status")).configured; lsSet("st-configured", configured ? "1" : ""); } catch (e) { if (!e.status) configured = lsGet("st-configured") === "1"; }
   if (configured) {
     let token = lsGet(SESSION_LS);
     /* session expirée (8 h) pendant l'utilisation : retour à l'écran de connexion */
     const mkS = t => mk(t, () => { if (lsGet(SESSION_LS) === t) { lsSet(SESSION_LS, ""); lsSet("st-expired", "1"); location.reload(); } });
-    if (token) { try { const api = mkS(token), me = await api.call("GET", "auth/me"); ME = me.user; API = api; SBX = me.sandbox || null; if (typeof SESS !== "undefined") SESS = me.session || null; return api; } catch (e) { lsSet(SESSION_LS, ""); } }
+    if (token) { const api = mkS(token);
+      try { const me = await api.call("GET", "auth/me"); ME = me.user; API = api; SBX = me.sandbox || null; if (typeof SESS !== "undefined") SESS = me.session || null; lsSet(ME_LS, JSON.stringify(ME)); return api; }
+      catch (e) { const old = (() => { try { return JSON.parse(lsGet(ME_LS)); } catch { return null; } })();
+        if (!e.status && old) { ME = old; API = api; S.offline = true; return api; }   // pas de réseau : on continue avec la copie locale
+        lsSet(SESSION_LS, ""); } }
     const r = await loginGate();
-    lsSet(SESSION_LS, r.token); ME = r.user; if (ME && ME.sysAdminPending) setTimeout(() => toast(tr("Droit Administrateur système en attente : activez la double authentification (Sécurité) puis reconnectez-vous.")), 1500); API = mkS(r.token); if (typeof SESS !== "undefined") SESS = { since: Date.now(), expires: Date.now() + (r.hours || 8) * 3600000 }; return API;
+    lsSet(SESSION_LS, r.token); ME = r.user; lsSet(ME_LS, JSON.stringify(ME)); if (ME && ME.sysAdminPending) setTimeout(() => toast(tr("Droit Administrateur système en attente : activez la double authentification (Sécurité) puis reconnectez-vous.")), 1500); API = mkS(r.token); if (typeof SESS !== "undefined") SESS = { since: Date.now(), expires: Date.now() + (r.hours || 8) * 3600000 }; return API;
   }
   /* connexion par code pas encore configurée : clé d'accès provisoire */
   let key = lsGet(KEY_LS), msg = "";
@@ -278,7 +296,7 @@ async function connectServer() {
     if (!key) key = await keyGate(msg);
     const api = mk(key);
     try { await api.list("settings"); API = api; lsSet(KEY_LS, key); ME = { name: "Clé d'accès", role: "admin", key: true }; return api; }
-    catch (e) { msg = /autoris|401/i.test(e.message) ? "Clé d'accès refusée." : "Le serveur ne répond pas. Vérifiez la connexion puis réessayez."; key = ""; }
+    catch (e) { if (!e.status && lsGet(KEY_LS) === key) { API = api; ME = { name: "Clé d'accès", role: "admin", key: true }; S.offline = true; return api; } msg = /autoris|401/i.test(e.message) ? "Clé d'accès refusée." : "Le serveur ne répond pas. Vérifiez la connexion puis réessayez."; key = ""; }
   }
 }
 /* Adaptateurs : même interface que les capacités claude.ai utilisées par l'application */
@@ -308,7 +326,9 @@ async function init() {
   if (SERVER) {
     try {
       const api = await connectServer();
+      if (api.offline) api.offline(ME.key ? "key" : ME.id || ME.email);
       db = serverDb(api); assets = serverAssets(api);
+      offSw();
       if (typeof aiStart === "function") aiStart();
       if (typeof dbxStart === "function") dbxStart();
       if (typeof waStart === "function") waStart();
@@ -393,7 +413,9 @@ function banners() {
   let h = "";
   if (mode === "memory") h += `<div class="banner">Aperçu hors ligne : la base de données n'est pas disponible ici, les modifications ne seront pas enregistrées.</div>`;
   if (mode === "revoked") h += `<div class="banner">L'accès aux données a été retiré pour cette session.</div>`;
-  if (S.slow) h += `<div class="banner">Les données ne sont pas encore joignables. Ce qui s'affiche peut être incomplet.</div>`;
+  if (SERVER && mode === "db" && (S.offline || S.pending)) h += `<div class="banner ${S.offline ? "warn" : "info"} off-b" role="status">${S.offline ? `📴 <b>${esc(tr("Hors ligne"))}</b>` : `↻ <b>${esc(tr("Envoi en cours"))}</b>`}${S.pending ? ` · ${plural(S.pending, "modification")} ${esc(tr("en attente"))}` : ""}. ${esc(tr(S.offline ? "Vous pouvez continuer : tout partira automatiquement dès que la connexion revient." : "Les modifications faites hors ligne partent vers le serveur."))}</div>`;
+  if (SERVER && offConflicts().length) h += `<div class="banner bad">⚠ ${plural(offConflicts().length, "conflit")} ${esc(tr("après la synchronisation : quelqu'un d'autre avait modifié la même fiche."))} <button class="btn sm" data-a="off-conf">${esc(tr("Vérifier"))}</button></div>`;
+  if (S.slow && !S.offline) h += `<div class="banner">Les données ne sont pas encore joignables. Ce qui s'affiche peut être incomplet.</div>`;
   if (readOnly) h += `<div class="banner info">Accès en lecture seule : demandez au propriétaire un accès « Contributeur » pour modifier.</div>`;
   return h;
 }
@@ -679,7 +701,8 @@ document.addEventListener("click", e => {
 document.addEventListener("input", e => { if (e.target.id === "q") { UI.q = e.target.value; UI.focusQ = true; render(true); } });
 document.addEventListener("keydown", e => { if (e.key === "Escape" && document.getElementById("modal-root").innerHTML) closeModal(); });
 
-ACTIONS["server-logout"] = () => confirmBox(ME && !ME.key ? "Se déconnecter sur cet appareil ?" : "Oublier la clé d'accès dans ce navigateur ? Elle sera redemandée au prochain chargement.", async () => {
+ACTIONS["server-logout"] = () => confirmBox((API && API.pending && API.pending() ? `<div class="banner bad">${esc(tr("Attention :"))} ${plural(API.pending(), "modification")} ${esc(tr("faite(s) hors ligne pas encore envoyée(s) seront perdues."))}</div>` : "") + esc(tr(ME && !ME.key ? "Se déconnecter sur cet appareil ?" : "Oublier la clé d'accès dans ce navigateur ? Elle sera redemandée au prochain chargement.")), async () => {
   if (ME && !ME.key && API) { try { await API.call("POST", "auth/logout"); } catch { } }
-  lsSet(SESSION_LS, ""); lsSet(KEY_LS, ""); location.reload();
+  if (API && API.forgetOffline) await API.forgetOffline();
+  lsSet(SESSION_LS, ""); lsSet(KEY_LS, ""); lsSet(ME_LS, ""); lsSet(CONF_LS, ""); location.reload();
 }, "Se déconnecter");
