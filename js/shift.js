@@ -59,13 +59,29 @@ VIEWS.shift = {
         ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
         ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
         ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`) +
-      (prevBlock(id) && !hoClosed(h) ? `<div class="ho-lockbar" role="status">🔒 ${esc(tr("Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent"))} <button class="linkbtn" data-a="shift-go" data-n="-1">${esc(shiftLabel(prevBlock(id)))}</button> ${esc(tr("n'est pas encore remis et repris."))}</div>` : "") +
+      (prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? `<div class="ho-lockbar" role="status">🔒 ${esc(tr("Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent"))} <button class="linkbtn" data-a="shift-go" data-n="-1">${esc(shiftLabel(prevBlock(id)))}</button> ${esc(tr("n'est pas encore remis et repris."))}</div>` : "") +
+      (h.out && h.out.at ? (hoLocked(h) ? `<div class="ho-lockbar ho-done" role="status">🔒 ${esc(tr("Shift remis par"))} ${esc(h.out.by || "?")} (${fmtDT(h.out.at)}) : ${esc(tr("plus aucune modification possible."))} ${canReopenShift() && !readOnly ? `<button class="btn sm" data-a="ho-reopen">${esc(tr("Réactiver la modification"))}</button>` : `<span class="small">${esc(tr("Le Station Lead peut le réactiver."))}</span>`}</div>`
+        : `<div class="banner warn">✏️ ${esc(tr("Modification réactivée par"))} ${esc(h.reopen.by || "?")} (${fmtDT(h.reopen.at)}). ${!readOnly ? `<button class="btn sm" data-a="ho-relock">${esc(tr("Terminer et reverrouiller"))}</button>` : ""}</div>`) : "") +
       (hoClosed(h) ? `<div class="banner good">Handover terminé : remis par ${esc(h.out?.by || "?")} et repris par ${esc(h.in.by)} (${fmtDT(h.in.at)}).</div>` : "") +
       (bad ? `<div class="banner warn">${plural(bad, "avion")} sans CRS qualifié affecté : voir la section 2.</div>` : "") +
-      `<div class="${prevBlock(id) && !hoClosed(h) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + shiftChecks(id, h) + shiftCrew(id, date, sh, h) + `</div>`;
+      `<div class="${prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + (hoEd(id) ? shiftChecks(id, h) + shiftCrew(id, date, sh, h)
+        : (shiftChecks(id, h) + shiftCrew(id, date, sh, h)).replace('id="ho-ckn"', 'id="ho-ckn" disabled').replace('id="ho-fm"', 'id="ho-fm" disabled')) + `</div>`;
   }
 };
-const hoEd = id => !readOnly && (!hoClosed(hoDoc(id)) || isOffice());
+/* shift remis (out) : verrouillé pour tous tant que le Station Lead (ou un Shift Foreman qu'il autorise) ne le réactive pas */
+const hoLocked = h => !!(h && h.out && h.out.at && !(h.reopen && h.reopen.at));
+const canReopenShift = () => { if (isAdmin()) return true; const p = typeof meStaff === "function" ? meStaff() : null; return !!p && (p.function === "lead" || (p.function === "foreman" && !!settings().reopenForemen)); };
+const hoEd = id => !readOnly && !hoLocked(hoDoc(id)) && (!hoClosed(hoDoc(id)) || isOffice());
+function lockCardShell() {
+  const p = typeof meStaff === "function" ? meStaff() : null; if (!SERVER || !(isAdmin() || (p && p.function === "lead"))) return "";
+  return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack"><h3 class="np">${esc(tr("Shifts remis"))}</h3>
+    <div class="muted small">${esc(tr("Un shift remis est verrouillé. Le Station Lead peut le réactiver ; cette option permet aussi aux Shift Foremen de le faire."))}</div>
+    <label class="chk line"><input type="checkbox" data-a="lock-deleg" ${settings().reopenForemen ? "checked" : ""}> ${esc(tr("Autoriser les Shift Foremen à réactiver un shift remis"))}</label></div></div>`;
+}
+ACTIONS["lock-deleg"] = async el => { try { await patch("settings", "company", { reopenForemen: el.checked }); toast(el.checked ? "Shift Foremen autorisés" : "Réservé au Station Lead"); } catch (e) { el.checked = !el.checked; toast(tr(e.message)); } };
+ACTIONS["ho-reopen"] = () => { const id = hoId(...UI.shift);
+  confirmBox(esc(tr("Réactiver la modification de ce shift remis ? L'action est tracée dans l'historique.")), async () => { await hoPatch(id, { reopen: { by: meName(), at: new Date().toISOString() } }); render(true); }, tr("Réactiver")); };
+ACTIONS["ho-relock"] = async () => { await hoPatch(hoId(...UI.shift), { reopen: null }); toast("Shift verrouillé"); render(true); };
 const sec = (n, title, sub, actions, body) => `<section class="panel ho-sec"><div class="pad row-sb"><div><h3><span class="ho-n">${n}</span>${title}</h3>${sub ? `<div class="muted small">${sub}</div>` : ""}</div><div class="row-g">${actions || ""}</div></div>${body}</section>`;
 
 /* 1. travail non terminé */
@@ -396,6 +412,7 @@ const meName = () => (ME && ME.name) || tr("Moi");
 document.addEventListener("change", e => {
   const t = e.target; if (!t.dataset) return;
   if (t.dataset.hock != null) { const ck = Object.assign({}, hoDoc(t.dataset.ho)?.checks || {}); if (t.checked) ck[t.dataset.hock] = { by: meName(), at: new Date().toISOString() }; else delete ck[t.dataset.hock]; hoPatch(t.dataset.ho, { checks: ck }); }
+  if (["ho-ckn", "ho-fm", "ho-add"].includes(t.id) && UI.shift && !hoEd(hoId(...UI.shift))) { toast(tr("Ce shift a été remis : il est verrouillé.")); render(true); return; }
   if (t.id === "ho-ckn") hoPatch(hoId(...UI.shift), { checkNote: t.value.trim() });
   if (t.id === "ho-fm") hoPatch(hoId(...UI.shift), { foreman: t.value });
   if (t.id === "ho-add" && t.value) { const id = hoId(...UI.shift); hoPatch(id, { extra: Array.from(new Set([...(hoDoc(id)?.extra || []), t.value])) }); }
@@ -415,7 +432,7 @@ function shiftCrew(id, date, sh, h) {
       <td class="small">${extra.includes(p) ? `<span class="chip sm">Ajouté</span>${ed ? ` <button class="x" data-a="ho-rm" data-id="${p.id}" aria-label="Retirer">×</button>` : ""}` : x && rcode(x.c).k === "custom" ? esc(cellTxt(x)) : ""}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Personne au roster pour ce shift.</td></tr>`}</tbody></table></div>
     <div class="row-g wrap ho-sign"><div class="panel pad"><b>Remis par</b><div>${h.out?.at ? `${esc(h.out.by)} · ${fmtDT(h.out.at)}` : `<span class="muted">Pas encore</span>`}</div>${ed && !h.out?.at ? `<button class="btn sm" data-a="ho-sign" data-k="out" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je remets le shift</button>` : ""}</div>
       <div class="panel pad"><b>Repris par</b> <span class="muted small">(${esc(shiftName(...nxt))})</span><div>${h.in?.at ? `${esc(h.in.by)} · ${fmtDT(h.in.at)}` : `<span class="muted">Pas encore</span>`}</div>${!readOnly && h.out?.at && !h.in?.at ? `<button class="btn sm primary" data-a="ho-sign" data-k="in" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je reprends le shift</button>` : ""}</div>
-      ${isOffice() && (h.out?.at || h.in?.at) && !readOnly ? `<button class="linkbtn small" data-a="ho-unsign">Annuler les signatures</button>` : ""}</div></div>`);
+      ${canReopenShift() && (h.out?.at || h.in?.at) && !readOnly ? `<button class="linkbtn small" data-a="ho-unsign">Annuler les signatures</button>` : ""}</div></div>`);
 }
 ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
 ACTIONS["ho-sign"] = el => {

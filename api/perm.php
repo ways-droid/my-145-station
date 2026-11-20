@@ -87,7 +87,41 @@ function perm_out($role, $out) {
 // Vérifie une écriture et renvoie les données à enregistrer.
 //   $op : 'put' | 'patch' | 'delete' ; $old : document actuel (null s'il n'existe pas) ;
 //   $new : document final (après fusion pour un patch), $patch : corps brut d'un patch.
+/* ---------- Shift remis (handed over) : verrouillé pour tous ----------
+   Après « Je remets le shift » (out.at), plus aucune modification du shift ni de ses lignes, sauf réactivation
+   (handover.reopen = {by, at}) par le Station Lead (fonction « lead » dans Personnel, même e-mail) ou un administrateur,
+   ou par un Shift Foreman si le Station Lead l'a autorisé (paramètre reopenForemen). Restent permis sur un shift verrouillé :
+   la reprise (in) par l'équipe suivante, l'envoi Notion et la mise à jour Flightradar24. La clé d'API (sauvegardes) passe. */
+function me_staff() { static $p = false; if ($p !== false) return $p; $p = null; foreach (coll_docs('staff') as $d) if (is_array($d) && staff_mine($d)) { $p = $d; break; } return $p; }
+function can_reopen_shift($role) {
+    if ($role === 'admin') return true;
+    $fn = (string) ((me_staff() ?? [])['function'] ?? '');
+    if ($fn === 'lead') return true;
+    return $fn === 'foreman' && !empty((coll_docs('settings')['company'] ?? [])['reopenForemen']);
+}
+const HO_LOCKED_OK = ['in', 'notion', 'fr24At', 'reopen'];
+function shift_lock_write($role, $coll, $op, $old, $new, $patch) {
+    $hoId = $coll === 'handovers' ? null : (string) (($old ?? $new)['ho'] ?? '');
+    $ho = $coll === 'handovers' ? $old : ($hoId !== '' ? (coll_docs('handovers')[$hoId] ?? null) : null);
+    $locked = is_array($ho) && !empty($ho['out']['at']) && empty($ho['reopen']['at']);
+    if ($coll === 'handovers' && is_array($old)) {
+        $keys = array_unique(array_merge(array_keys($old), array_keys($new ?? [])));
+        $changed = array_values(array_filter($keys, fn($k) => json_encode($old[$k] ?? null) !== json_encode(($new ?? [])[$k] ?? null)));
+        if (in_array('reopen', $changed, true) && !empty(($new ?? [])['reopen']['at']) && !can_reopen_shift($role)) deny('Seul le Station Lead (ou un Shift Foreman qu\'il a autorisé) peut réactiver un shift remis.');
+        if (in_array('out', $changed, true) && !empty($old['out']['at']) && !can_reopen_shift($role)) deny('Seul le Station Lead (ou un Shift Foreman qu\'il a autorisé) peut annuler la remise d\'un shift.');
+        if ($locked && array_diff($changed, HO_LOCKED_OK, ['out'])) deny('Ce shift a été remis : il est verrouillé. Le Station Lead peut le réactiver.');
+        return;
+    }
+    if (!$locked) return;
+    if ($coll === 'shiftItems' && $op === 'patch' && is_array($patch) && !array_diff(array_keys($patch), ['fr24'])) return;
+    deny('Ce shift a été remis : il est verrouillé. Le Station Lead peut le réactiver.');
+}
 function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
+    if (($coll === 'handovers' || $coll === 'shiftItems') && ($GLOBALS['ME_UID'] ?? '') !== '*') shift_lock_write($role, $coll, $op, $old, $new, $patch);
+    if ($coll === 'settings' && is_array($old) && !in_array($role, ['admin', 'bureau'], true) && (string) ((me_staff() ?? [])['function'] ?? '') === 'lead' && $op !== 'delete') {
+        $o = $old; $n = $new ?? []; unset($o['reopenForemen'], $n['reopenForemen']);   // le Station Lead règle lui-même la délégation
+        if (json_encode($o) === json_encode($n)) return $new;
+    }
     if ($coll === 'userPrefs') { if ($id === null || !prefs_mine($id)) deny('Préférences d\'un autre utilisateur.'); return $new; }
     if ($coll === 'notes') return notes_write($role, $op, $old, $new);
     if ($role === 'admin') return $new;

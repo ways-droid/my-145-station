@@ -128,6 +128,23 @@ ok "shift repris : nouvel avion refusé au terrain" "$(curl -s -H "$HT" -X PUT -
 ok "shift repris : fiche du shift verrouillée" "$(curl -s -H "$HT" -X PATCH -d '{"checkNote":"x"}' $U/docs/handovers/2026-11-19-day)" 'clôturé'
 ok "shift repris : le bureau corrige encore" "$(curl -s -H "$B" -X PATCH -d '{"done":"Transit OK, roue changée"}' $U/docs/shiftItems/v1)" '"ok":true'
 ok "historique : shift nommé" "$(curl -s -H "$A" "$U/log?coll=shiftItems")" 'Avion 9H-ABC'
+echo "> shift remis : verrouillé, réactivation par le Station Lead"
+curl -s -H "$HT" -X PUT -d '{"ho":"2026-11-20-day","kind":"visit","reg":"9H-LCK"}' $U/docs/shiftItems/vl >/dev/null
+curl -s -H "$HT" -X PUT -d '{"date":"2026-11-20","shift":"day","out":{"by":"Marc","at":"2026-11-20T18:00:00Z"}}' $U/docs/handovers/2026-11-20-day >/dev/null
+ok "shift remis : fiche verrouillée (terrain)" "$(curl -s -H "$HT" -X PATCH -d '{"checkNote":"x"}' $U/docs/handovers/2026-11-20-day)" 'verrouillé'
+ok "shift remis : avion verrouillé (bureau aussi)" "$(curl -s -H "$B" -X PATCH -d '{"done":"x"}' $U/docs/shiftItems/vl)" 'verrouillé'
+ok "shift remis : nouvelle ligne refusée" "$(curl -s -H "$B" -X PUT -d '{"ho":"2026-11-20-day","kind":"visit","reg":"OO-Y"}' $U/docs/shiftItems/vl2)" 'verrouillé'
+ok "shift remis : mise à jour FR24 permise" "$(curl -s -H "$HT" -X PATCH -d '{"fr24":{"at":"2026-11-20T18:10:00Z"}}' $U/docs/shiftItems/vl)" '"ok":true'
+ok "shift remis : un mécano ne réactive pas" "$(curl -s -H "$HT" -X PATCH -d '{"reopen":{"by":"Marc","at":"2026-11-20T18:20:00Z"}}' $U/docs/handovers/2026-11-20-day)" 'Station Lead'
+ok "shift remis : un foreman non autorisé ne réactive pas" "$(curl -s -H "$A" -X PATCH -d '{"function":"foreman"}' $U/docs/staff/s1 >/dev/null; curl -s -H "$HT" -X PATCH -d '{"reopen":{"by":"Marc","at":"2026-11-20T18:20:00Z"}}' $U/docs/handovers/2026-11-20-day)" 'Station Lead'
+curl -s -H "$A" -X PATCH -d '{"function":"lead"}' $U/docs/staff/s1 >/dev/null
+ok "Station Lead : autorise les foremen (ses paramètres)" "$(curl -s -H "$HT" -X PATCH -d '{"reopenForemen":true}' $U/docs/settings/company)" '"ok":true'
+ok "Station Lead : rien d'autre dans les paramètres" "$(curl -s -H "$HT" -X PATCH -d '{"stationCode":"XXX"}' $U/docs/settings/company)" 'rôle'
+curl -s -H "$A" -X PATCH -d '{"function":"foreman"}' $U/docs/staff/s1 >/dev/null
+ok "foreman autorisé : réactive le shift" "$(curl -s -H "$HT" -X PATCH -d '{"reopen":{"by":"Marc","at":"2026-11-20T18:20:00Z"}}' $U/docs/handovers/2026-11-20-day)" '"ok":true'
+ok "shift réactivé : modification permise" "$(curl -s -H "$HT" -X PATCH -d '{"done":"corrigé"}' $U/docs/shiftItems/vl)" '"ok":true'
+ok "historique : réactivation tracée" "$(curl -s -H "$A" "$U/log?coll=handovers")" 'reopen'
+curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null; curl -s -H "$A" -X PATCH -d '{"reopenForemen":false}' $U/docs/settings/company >/dev/null
 echo "> outillage"
 F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
 ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'
