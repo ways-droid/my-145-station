@@ -974,3 +974,10 @@ Object.assign(EN, {
 Object.assign(EN, { "Non trouvé chez Flightradar24": "Not found at Flightradar24", "non trouvé": "not found", "vol ?": "flight ?" });
 Object.assign(EN, { "Masquer les données des autres shifts": "Hide other shifts' data", "Afficher les données des autres shifts": "Show other shifts' data" });
 rule(/^(\d+) autres? shifts?$/, (m, n) => `${n} other shift${n > 1 ? "s" : ""}`);
+Object.assign(EN, {
+  "Êtes-vous sûr de vouloir retirer cette ligne ?": "Are you sure you want to remove this line?", "Oui, retirer": "Yes, remove",
+  "Êtes-vous sûr de vouloir supprimer l'avion": "Are you sure you want to delete aircraft", "de ce shift ?": "from this shift?",
+  "Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.": "Its empty rows on other shifts are removed too; rows with work entered stay.",
+  "Le Tech Log de ce shift sera perdu.": "This shift's Tech Log will be lost.", "Êtes-vous sûr de vouloir supprimer cette ligne ?": "Are you sure you want to delete this line?",
+});
+Object.assign(EN, { "Oui, supprimer": "Yes, delete" });
