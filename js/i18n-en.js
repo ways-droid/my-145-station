@@ -972,3 +972,5 @@ Object.assign(EN, {
   "Cet avion est déjà dans ce shift. Est-ce une erreur, ou un autre vol ?": "This aircraft is already on this shift. Is it a mistake, or another flight?", "C'est une erreur": "It's a mistake", "Autre vol : enregistrer": "Another flight: save",
 });
 Object.assign(EN, { "Non trouvé chez Flightradar24": "Not found at Flightradar24", "non trouvé": "not found", "vol ?": "flight ?" });
+Object.assign(EN, { "Masquer les données des autres shifts": "Hide other shifts' data", "Afficher les données des autres shifts": "Show other shifts' data" });
+rule(/^(\d+) autres? shifts?$/, (m, n) => `${n} other shift${n > 1 ? "s" : ""}`);

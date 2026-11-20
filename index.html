@@ -377,6 +377,8 @@ b.reg.reg-air { color: #1f6fe0; } b.reg.reg-in { color: #138a3e; }
 table.visits tr.vo-other td { color: var(--muted); font-size: 12px; cursor: default; }
 table.visits tr.vo-g1 td { background: rgba(120,128,140,.08); } table.visits tr.vo-g2 td { background: rgba(120,128,140,.17); }
 tbody tr.vo-other:hover td { background: inherit; }
+.vo-tog { display: inline-flex; align-items: center; gap: 3px; margin: 3px 0; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); font-family: inherit; font-weight: 600; font-size: 11px; line-height: 1.6; cursor: pointer; white-space: nowrap; }
+.vo-tog.on { background: var(--accent); color: #fff; } .vo-n { opacity: .75; font-weight: 500; } .vo-tog:hover { filter: brightness(.95); }
 .vo-lbl { font-size: 11px; font-style: italic; opacity: .85; } .vo-lbl b { font-style: normal; }
 /* un avion = un bloc : ses lignes des autres shifts restent collées à lui, avec un liseré à gauche */
 table.visits tbody.vgrp { border-top: 2px solid var(--line); } table.visits tbody.vgrp:first-of-type { border-top: 0; }
