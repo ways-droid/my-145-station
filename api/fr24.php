@@ -86,7 +86,7 @@ function fr24_routes($route, $parts, $method, $who, $role) {
             out(['reg' => $reg, 'results' => $res, 'at' => gmdate('c')]);
         }
         if ($act === 'track' && $method === 'POST') {
-            $regs = array_slice(array_map('strval', (array) ($b['regs'] ?? [])), 0, 30);
+            $regs = array_slice(array_map('strval', (array) ($b['regs'] ?? [])), 0, 60);
             if (!$regs) fail(400, 'Aucune immatriculation');
             $c = get_doc('settings', 'company'); $set = $c ? (json_decode($c['data'], true) ?: []) : [];
             $items = fr24_provider_track($regs, (string) ($b['station'] ?? $set['stationCode'] ?? ''));

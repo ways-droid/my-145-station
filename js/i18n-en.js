@@ -942,7 +942,7 @@ Object.assign(EN, {
 rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
 /* ---- Flightradar24 : heures remplies ---- */
 Object.assign(EN, { "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)": "No flight in the last 72 h (FR24 does not provide scheduled flights)" });
-rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures connues pour (\d+))?\.$/, (m, a, b, c) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times known for ${c}` : ""}.`);
+rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures connues pour (\d+))?\.(?: Ajouté\(s\) au shift, en vol vers la station : (.+))?$/, (m, a, b, c, d) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times known for ${c}` : ""}.${d ? ` Added to the shift, flying to the station: ${d}` : ""}`);
 /* ---- roster : affichage ; FR24 : diagnostic ---- */
 Object.assign(EN, {
   "Griser toute la colonne des week-ends": "Shade the whole weekend column", " et vendredis": " and Fridays", "Intensité du moucheté du vendredi": "Friday speckle intensity",
@@ -958,3 +958,17 @@ Object.assign(EN, {
   "Heure invalide : format HH:MM (UTC).": "Invalid time: HH:MM format (UTC).", "Heures Flightradar24 (réelles, ou estimée en vol)": "Flightradar24 times (actual, or estimate while airborne)",
 });
 Object.assign(EN, { "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.": "Remove this aircraft from this shift? Its empty rows on other shifts are removed too; rows with work entered stay." });
+Object.assign(EN, {
+  "Tech Log : défaut / tâche → action": "Tech Log: defect / task → action", "LogBook n° d'arrivée": "Arrival LogBook no.", "Tech Log : défauts / tâches et actions": "Tech Log: defects / tasks and actions",
+  "Défaut / tâche": "Defect / task", "Action / travail fait": "Action taken", "Vide = à faire": "Empty = to do", "Techniciens et MHRS": "Technicians and MHRS", "technicien": "technician",
+  "ou total": "or total", "Ligne": "Line", "Total MHRS": "Total MHRS", "À faire": "To do", "Tâches ouvertes des shifts précédents": "Open tasks from previous shifts", "Reprendre": "Take over",
+  "Cet avion est déjà dans ce shift. Enregistrer quand même ? (cliquez encore sur Enregistrer)": "This aircraft is already on this shift. Save anyway? (click Save again)",
+  "Tech Log : tâches pré-encodées (une par ligne)": "Tech Log: preset tasks (one per line)",
+});
+Object.assign(EN, { "Reprise par un shift suivant": "Taken over by a later shift" });
+Object.assign(EN, {
+  "Ajouté(s) au shift, en vol vers la station": "Added to the shift, flying to the station", "ETA prévue (UTC)": "Planned ETA (UTC)", "ETD prévue (UTC)": "Planned ETD (UTC)",
+  "Rempli par Flightradar24, vos champs ne sont pas modifiés.": "Filled by Flightradar24; your fields are not changed.", "N° de vol / rotation (prévu)": "Flight no. / rotation (planned)",
+  "Cet avion est déjà dans ce shift. Est-ce une erreur, ou un autre vol ?": "This aircraft is already on this shift. Is it a mistake, or another flight?", "C'est une erreur": "It's a mistake", "Autre vol : enregistrer": "Another flight: save",
+});
+Object.assign(EN, { "Non trouvé chez Flightradar24": "Not found at Flightradar24", "non trouvé": "not found", "vol ?": "flight ?" });
