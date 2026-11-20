@@ -144,24 +144,29 @@ const shiftLabel = ho => `${fmtDate(ho.slice(0, 10))} · ${tr(SHIFTS[ho.slice(11
 const stationIata = () => (settings().stationCode || "TLV").toUpperCase();
 /* état FR24 de l'avion : en vol (bleu) ou posé à la station (vert) */
 function regState(v) {
-  const f = v.fr24; if (!f) return "";
-  if (f.live) return "reg-air";
-  const st = stationIata(); if (!f.arr && f.last && f.last.to === st && f.last.landed && (!f.dep || !f.dep.at || Date.parse(f.dep.at) < Date.parse(f.last.landed))) return "reg-in";
-  if (f.arr && f.arr.at && (!f.dep || !f.dep.at || Date.parse(f.dep.at) < Date.parse(f.arr.at))) return "reg-in";
-  return "";
+  const r = fr24Rot(v); if (!r) return "";
+  if (r.live) return "reg-air";
+  return r.arr && !r.dep ? "reg-in" : "";
 }
-/* heures FR24 (réelles, ou ETA) affichées en bleu à côté des heures saisies, seulement si connues */
+/* rotation FR24 de la ligne : le vol en cours vers la station (ETA) prime ; sinon l'atterrissage à la station pendant le shift
+   (ou dans les 12 h avant) et le décollage de la station qui suit. Les vols plus anciens (nuit passée…) sont ignorés. */
+function fr24Rot(v) {
+  const f = v.fr24; if (!f) return null;
+  const st = stationIata(), [a, b] = shiftWindow(v.ho), ms = iso => { const x = Date.parse(iso || ""); return isNaN(x) ? null : x; };
+  const r = { arr: null, dep: null, live: !!f.live };
+  if (f.live && f.live.to === st) { r.arr = { ms: ms(f.live.eta), fl: f.live.flight || "", eta: true }; return r; }
+  const lands = [f.arr && { ms: ms(f.arr.at), fl: f.arr.flight || "" }, f.last && f.last.to === st && { ms: ms(f.last.landed), fl: f.last.flight || "" }]
+    .filter(x => x && x.ms != null && x.ms >= a - 12 * 3600000 && x.ms <= b).sort((x, y) => y.ms - x.ms);
+  r.arr = lands[0] || null;
+  const d = f.dep && ms(f.dep.at);
+  if (d != null && (r.arr ? d > r.arr.ms : d >= a && d <= b + 12 * 3600000)) r.dep = { ms: d, fl: f.dep.flight || "" };
+  return r;
+}
 function fr24Times(v) {
-  const f = v.fr24; if (!f) return "";
-  const st = stationIata(), [a, b] = shiftWindow(v.ho);
-  const near = iso => { const x = Date.parse(iso); return !isNaN(x) && x >= a - 36 * 3600000 && x <= b + 72 * 3600000; };
-  let arr = "", dep = "", fl = "";
-  const P = f.last && f.last.to === st && f.last.landed ? f.last.landed : "";
-  if (f.arr && f.arr.at && near(f.arr.at)) { arr = utcHM(f.arr.at); fl = f.arr.flight || ""; }
-  else if (P && near(P)) arr = utcHM(P);
-  else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) { arr = "ETA " + utcHM(f.live.eta); fl = f.live.flight || ""; }
-  if (!fl && f.live && f.live.to === st) fl = f.live.flight || "";
-  if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) { dep = utcHM(f.dep.at); if (f.dep.flight) fl = fl ? fl + " / " + f.dep.flight : f.dep.flight; }
+  const r = fr24Rot(v); if (!r) return "";
+  const hm = x => utcHM(new Date(x).toISOString());
+  const arr = r.arr && r.arr.ms != null ? (r.arr.eta ? "ETA " : "") + hm(r.arr.ms) : "", dep = r.dep ? hm(r.dep.ms) : "";
+  const fl = [r.arr && r.arr.fl, r.dep && r.dep.fl].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(" / ");
   /* valeur non trouvée chez FR24 : en magenta */
   const nf = `<span class="fr-nf" title="${esc(tr("Non trouvé chez Flightradar24"))}">${esc(tr("non trouvé"))}</span>`;
   return `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${fl ? esc(fl) : `<span class="fr-nf">${esc(tr("vol ?"))}</span>`} · ${arr ? esc(arr) : nf} / ${dep ? esc(dep) : nf}</div>`;
@@ -409,12 +414,16 @@ const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === 
    et n'est pas encore dans le shift y est ajouté (ligne créée automatiquement). La mise à jour automatique ne crée rien. */
 async function fr24Run(id, quiet, create = !quiet) {
   let vs = hoItems(id, "visit").filter(v => v.reg);
-  const fleet = !create ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
+  const isCur = id === hoId(...currentShift());   // les avions ne sont ajoutés que dans le shift en cours
+  const fleet = !create || !isCur ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
   if (!vs.length && !fleet.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
   const r = await API.call("POST", "fr24/track", { regs: [...vs.map(v => v.reg), ...fleet.map(a => a.reg)], station: stationIata() });
   const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
   const added = [];
-  for (const a of fleet) { const x = r.items[key(a.reg)]; if (!x || !x.live || x.live.to !== stationIata()) continue;
+  /* avion suivi à ajouter : en vol vers la station, ou posé à la station pendant ce shift et pas encore reparti */
+  for (const a of fleet) { const x = r.items[key(a.reg)]; if (!x) continue;
+    const rot = fr24Rot({ ho: id, fr24: x }), inbound = x.live && x.live.to === stationIata(), here = !x.live && rot && rot.arr && !rot.dep;
+    if (!inbound && !here) continue;
     const c = acClient(a), nid = await save("shiftItems", null, { kind: "visit", ho: id, reg: normReg(a.reg), acType: a.acType || "", clientId: c ? c.id : "", crs: [], mech: [], auto: "fr24", order: Date.now() });
     added.push(a.reg); vs = [...vs, { id: nid, reg: a.reg }]; }
   let found = 0, filled = 0;
@@ -422,7 +431,7 @@ async function fr24Run(id, quiet, create = !quiet) {
     if (x.arr || x.dep) filled++;
     await patch("shiftItems", v.id, { fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}, x.arr ? { arr: x.arr } : {}, x.dep ? { dep: x.dep } : {}) }); }
   FR24ERR = (r.errors || []).join(" · ");
-  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : ""));
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : fleet.length ? " " + tr("Avions suivis vérifiés") + " : " + fleet.length + ", " + tr("aucun en route vers la station ni posé.") : ""));
   if (quiet && FR24ERR) render(true);
 }
 let FR24ERR = "";

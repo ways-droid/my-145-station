@@ -942,7 +942,7 @@ Object.assign(EN, {
 rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
 /* ---- Flightradar24 : heures remplies ---- */
 Object.assign(EN, { "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)": "No flight in the last 72 h (FR24 does not provide scheduled flights)" });
-rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures connues pour (\d+))?\.(?: Ajouté\(s\) au shift, en vol vers la station : (.+))?$/, (m, a, b, c, d) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times known for ${c}` : ""}.${d ? ` Added to the shift, flying to the station: ${d}` : ""}`);
+rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures connues pour (\d+))?\.(?: Ajouté\(s\) au shift, en vol vers la station : (.+)| Avions suivis vérifiés : (\d+), aucun en route vers la station ni posé\.)?$/, (m, a, b, c, d, e) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times known for ${c}` : ""}.${d ? ` Added to the shift, flying to the station: ${d}` : ""}${e ? ` Tracked aircraft checked: ${e}, none inbound or on ground at the station.` : ""}`);
 /* ---- roster : affichage ; FR24 : diagnostic ---- */
 Object.assign(EN, {
   "Griser toute la colonne des week-ends": "Shade the whole weekend column", " et vendredis": " and Fridays", "Intensité du moucheté du vendredi": "Friday speckle intensity",
