@@ -64,8 +64,8 @@ VIEWS.roster = {
       `<div class="row-g rnav"><button class="btn sm" data-a="roster-month" data-n="-1" aria-label="Mois précédent">‹</button><b class="rmonth">${MONTHS[+m - 1]}${UI.r2 ? ` ${y !== ymAdd(ym, 1).slice(0, 4) ? y + " " : ""}– ${MONTHS[+ymAdd(ym, 1).slice(5) - 1]} ${ymAdd(ym, 1).slice(0, 4)}` : ` ${y}`}</b><button class="btn sm" data-a="roster-month" data-n="1" aria-label="Mois suivant">›</button>`
         + `<button class="btn sm ${UI.r2 ? "primary" : ""}" data-a="roster-two" title="${esc(tr("Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre"))}">2 mois</button>`
         + `<button class="btn sm" data-a="roster-month" data-n="0" ${ym === ymOf(today()) ? `style="visibility:hidden" tabindex="-1" aria-hidden="true"` : ""}>Aujourd'hui</button></div>`) +
-      tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["codes", "Codes"]]) +
-      ({ mois: rosterMonth, jour: rosterToday, codes: rosterCodes })[tab]();
+      tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["fatigue", "Fatigue et repos"], ["codes", "Codes"]]) +
+      ({ mois: rosterMonth, jour: rosterToday, fatigue: rosterFatigue, codes: rosterCodes })[tab]();
   }
 };
 function rosterMonth() {
@@ -80,13 +80,14 @@ function rosterMonth() {
     <button class="rcode rc-white ${brush === "" ? "on" : ""}" data-a="roster-brush" data-c="" title="${esc(tr("Effacer"))}">⌫</button>
     <span class="muted small">${brush != null ? "Cliquez ou glissez sur les cases pour appliquer. Cliquez à nouveau sur le code pour arrêter." : "Choisissez un code puis cliquez ou glissez sur les cases. Sans code choisi, un clic ouvre le détail de la case."}</span></div>` : "";
   const cov = dates.map(d => planned(d) ? coverage(d) : null);
+  const fat = typeof fatMap === "function" ? fatMap(ppl, dates[0], dates[dates.length - 1]) : {};
   const covRows = ["day", "night"].flatMap(sh => [...acTypes(), "I"].map(t => `<tr class="rcov"><th class="rname small">${SH_LBL[sh]} · ${t === "I" ? "I (4X-)" : esc(t)}</th>${cov.map(c => { if (!c) return `<td></td>`; const x = c.find(z => z.sh === sh && z.t === t);
     return `<td class="${x.n ? "" : "gap"}${mcls(dates[cov.indexOf(c)])}" title="${esc(x.n + " " + (t === "I" ? tr("avec I") : tr("qualifiés")))}">${x.n}</td>`; }).join("")}</tr>`)).join("");
   const view = `<div class="rbar rview"><label class="chk line small"><input type="checkbox" data-a="roster-col" ${UI.rcol ? "checked" : ""}> ${esc(tr("Griser toute la colonne des week-ends"))}${fridayOff() ? esc(tr(" et vendredis")) : ""}</label>
     ${fridayOff() ? `<label class="small row-g">${esc(tr("Vendredi"))} <input type="range" id="r-fri" min="0" max="100" step="5" value="${UI.rfri}" style="width:110px" aria-label="${esc(tr("Intensité du moucheté du vendredi"))}"></label>` : ""}</div>`;
   return `${bar}${view}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}" style="--fri-a:${(UI.rfri / 100 * 0.6).toFixed(3)}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
     ${ppl.map(p => `<tr><th class="rname"><a href="#" data-a="staff-open" data-id="${p.id}">${esc(p.name)}</a><div class="muted small">${esc([STAFF_FN[p.function], Object.entries(p.ratings || {}).map(([t, l]) => t.replace(/^B/, "") + " " + l).join(" · ")].filter(Boolean).join(" · "))}</div></th>
-      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; return `<td class="rc ${c ? "rc-" + c.col : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}" data-rc="${p.id}|${d}" title="${esc(c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "")}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
+      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; const fa = (fat[p.id] || {})[d]; return `<td class="rc ${c ? "rc-" + c.col : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}${fa ? " rfat" : ""}" data-rc="${p.id}|${d}" title="${esc([c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "", ...(fa || []).map(a => "⚠ " + a)].filter(Boolean).join("\n"))}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
     ${covRows}<tr class="rcov"><th class="rname small">D/N à affecter</th>${dates.map((d, i) => { const k = cov[i] ? toAssign(d).length : 0; return `<td class="${k ? "todo" : ""}">${k || ""}</td>`; }).join("")}</tr></tbody></table></div><div class="pad hint">Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
 }
 function rosterToday() {

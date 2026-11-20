@@ -113,6 +113,10 @@ VIEWS.parametres = {
       ${field("s-checks", "Station Control : contrôles de fin de shift (un par ligne)", s.stationChecks || (typeof STATION_CHECKS !== "undefined" ? STATION_CHECKS.join("\n") : ""), { type: "textarea", wide: true })}
       ${field("s-icao", "Code OACI de la station (météo)", s.stationIcao || "", { cls: "mono", ph: "LLBG" })}${field("s-gust", "Alerte rafales au-dessus de (kt)", s.gustKt || 45, { type: "number", min: 20 })}
       ${field("s-notam", "Lien NOTAM (facultatif)", s.notamUrl || "", { ph: "https://…" })}
+      <div class="wide hint"><b>${esc(tr("Fatigue et temps de repos (alertes du roster)"))}</b></div>
+      ${field("s-f-duty", "Service maximum (heures)", fatCfg().maxDuty, { type: "number", min: 6 })}${field("s-f-rest", "Repos minimum entre deux services (heures)", fatCfg().minRest, { type: "number", min: 6 })}
+      ${field("s-f-days", "Jours de travail d'affilée maximum", fatCfg().maxDays, { type: "number", min: 2 })}${field("s-f-nights", "Nuits d'affilée maximum", fatCfg().maxNights, { type: "number", min: 1 })}
+      ${field("s-f-7", "Heures maximum sur 7 jours glissants", fatCfg().max7, { type: "number", min: 20 })}
       ${field("s-expd", "Expirations : alerte (jours avant l'échéance)", s.expiryDays || 60, { type: "number", min: 7 })}
       ${field("s-ind", "Formation station : points à valider (un par ligne)", s.inductionItems || (typeof IND_DEFAULT !== "undefined" ? IND_DEFAULT.join("\n") : ""), { type: "textarea", wide: true })}
       ${field("s-tasks", "Tech Log : tâches pré-encodées (une par ligne)", s.taskPresets || (typeof TASK_PRESETS !== "undefined" ? TASK_PRESETS.join("\n") : ""), { type: "textarea", wide: true })}
@@ -147,7 +151,7 @@ VIEWS.parametres = {
     f.onsubmit = async e => {
       e.preventDefault();
       await saveSettings({ name: val("s-name") || DEFAULT_SETTINGS.name, approval: val("s-approval"), vat: val("s-vat"), email: val("s-email"), phone: val("s-phone"), address: val("s-address"),
-        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60, inductionItems: val("s-ind"), stationIcao: val("s-icao").trim().toUpperCase(), gustKt: +val("s-gust") || 45, notamUrl: /^https:\/\//i.test(val("s-notam").trim()) ? val("s-notam").trim() : "" });
+        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60, inductionItems: val("s-ind"), stationIcao: val("s-icao").trim().toUpperCase(), gustKt: +val("s-gust") || 45, fatigue: { maxDuty: +val("s-f-duty") || FAT_DEF.maxDuty, minRest: +val("s-f-rest") || FAT_DEF.minRest, maxDays: +val("s-f-days") || FAT_DEF.maxDays, maxNights: +val("s-f-nights") || FAT_DEF.maxNights, max7: +val("s-f-7") || FAT_DEF.max7 }, notamUrl: /^https:\/\//i.test(val("s-notam").trim()) ? val("s-notam").trim() : "" });
       toast("Paramètres enregistrés");
     };
   }
