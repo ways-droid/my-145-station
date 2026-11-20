@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "expiries", "forms", "instructions", "induction", "travel", "hotels", "aircraft", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "expiries", "forms", "contacts", "instructions", "induction", "travel", "hotels", "aircraft", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;
@@ -340,11 +340,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["consignes", "Consignes"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["voyages", "Voyages"]]],
+  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["consignes", "Consignes"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["contacts", "Contacts de la station"], ["voyages", "Voyages"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["headquarters", "Headquarters"], ["rapport", "Rapport mensuel"], ["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", rapport: "grey", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", rapport: "grey", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", contacts: "red", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }

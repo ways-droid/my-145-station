@@ -167,6 +167,16 @@ ok "bureau : ajoute un formulaire" "$(curl -s -H "$B" -X PUT -d '{"no":"CT-F-001
 ok "terrain : lit les formulaires" "$(curl -s -H "$HT" $U/docs/forms/fm1)" 'Occurrence report'
 ok "terrain : ne modifie pas un formulaire" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/forms/fm1)" 'rôle'
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
+echo "> contacts de la station"
+ok "bureau : ajoute un contact" "$(curl -s -H "$B" -X PUT -d '{"cat":"emergency","org":"Airport fire","phone":"+972 3 000"}' $U/docs/contacts/ct1)" '"ok":true'
+ok "terrain : lit les contacts" "$(curl -s -H "$HT" $U/docs/contacts/ct1)" 'Airport fire'
+ok "terrain : ne modifie pas un contact" "$(curl -s -H "$HT" -X PATCH -d '{"phone":"1"}' $U/docs/contacts/ct1)" 'rôle'
+curl -s -H "$A" -X PATCH -d '{"function":"lead"}' $U/docs/staff/s1 >/dev/null
+ok "Station Lead : modifie un contact" "$(curl -s -H "$HT" -X PATCH -d '{"phone":"+972 3 111"}' $U/docs/contacts/ct1)" '"ok":true'
+ok "Station Lead : en-tête du formulaire" "$(curl -s -H "$HT" -X PUT -d '{"kind":"form","no":"CT-F-020","rev":"1"}' $U/docs/contacts/form)" '"ok":true'
+ok "Station Lead : ne supprime pas un contact" "$(curl -s -H "$HT" -X DELETE $U/docs/contacts/ct1)" 'rôle'
+curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null
+ok "historique : contact tracé" "$(curl -s -H "$A" "$U/log?coll=contacts")" 'Contact Airport fire'
 echo "> station needs et situations ouvertes"
 ok "terrain : demande un besoin" "$(curl -s -H "$HT" -X PUT -d '{"title":"Gants nitrile","cat":"consumable","status":"asked"}' $U/docs/needs/nd1)" '"ok":true'
 ok "terrain : n'approuve pas un besoin" "$(curl -s -H "$HT" -X PATCH -d '{"status":"approved"}' $U/docs/needs/nd1)" 'Station Lead'
