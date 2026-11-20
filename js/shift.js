@@ -292,7 +292,7 @@ function shiftVisits(id) {
       const tog = other.length ? `<button type="button" class="vo-tog ${open ? "on" : ""}" data-a="vo-toggle" data-g="${esc(gid)}" title="${esc(tr(open ? "Masquer les données des autres shifts" : "Afficher les données des autres shifts"))}">${open ? "▾" : "▸"} ${esc(tr(plural(other.length, "autre shift", "autres shifts")))} <span class="vo-n">(${[prev.length ? "↑" + prev.length : "", next.length ? "↓" + next.length : ""].filter(Boolean).join(" ")})</span></button>` : "";
       if (!open) { prev.length = 0; next.length = 0; }
       return `<tbody class="vgrp${open ? " multi" : ""}">` + prev.map((x, i) => ghost(x, prev.length - 1 - i, "prev")).join("") + `<tr class="vo-main ${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono reg ${regState(v)}">${esc(v.reg || "")}</b>${tog ? " " + tog : ""} <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
-        <td class="mono small">${esc(zHM(v.arr))} / ${esc(zHM(v.dep))}${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
+        <td class="mono small">${esc(zHM(v.arr))}${v.arrDate && v.arrDate !== v.ho.slice(0, 10) ? ` <span class="muted">(${esc(fmtDate(v.arrDate))})</span>` : ""} / ${esc(zHM(v.dep))}${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small">${techLogHtml(v)}${v.notes ? `<div class="muted">${esc(v.notes)}</div>` : ""}</td><td class="mono small">${fmtH(visitH(v))}</td><td class="mono small">${esc(v.atl || "")}</td></tr>` + next.map((x, i) => ghost(x, i, "next")).join("") + `</tbody>`; }).join("")}</table></div>`
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
@@ -308,7 +308,7 @@ ACTIONS["visit-form"] = el => {
   const certs = crew.filter(p => (p.licences || []).length || Object.keys(p.ratings || {}).length);
   const m = modal(`${mHead(v.id ? "Avion · " + esc(v.reg) : "Nouvel avion")}<form><div class="body stack"><div class="fields">
     ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}<datalist id="vi-regs">${(S.aircraft || []).filter(a => a.active !== false).map(a => `<option value="${esc(a.reg)}">${esc([a.acType, a.variant].filter(Boolean).join(" "))}</option>`).join("")}</datalist>${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
-    ${field("vi-arr", "ETA prévue (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "ETD prévue (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}
+    ${field("vi-arr", "ETA prévue (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-arrd", "Date d'arrivée (UTC)", v.arrDate || "", { type: "date" })}${field("vi-dep", "ETD prévue (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}
     <div class="hint" id="vi-span" style="grid-column:1/-1"></div>
     ${v.fr24 ? `<div style="grid-column:1/-1">${fr24Times(v) || ""}${fr24Line(v)}<div class="muted small">${esc(tr("Rempli par Flightradar24, vos champs ne sont pas modifiés."))}</div></div>` : ""}
     ${field("vi-flt", "N° de vol / rotation (prévu)", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-atl", "LogBook n° d'arrivée", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
@@ -322,14 +322,17 @@ ACTIONS["visit-form"] = el => {
     <footer>${v.id ? `<div class="left"><button type="button" class="btn danger" data-a="item-del" data-id="${v.id}">Supprimer</button></div>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   const cur = () => ({ reg: val("vi-reg").toUpperCase(), acType: val("vi-ac"), crs: picked(m, "vi-crs") });
   /* date de départ proposée : première occurrence de l'heure DEP après l'arrivée (23:00 → 05:00 = le lendemain) ; modifiable */
-  let depTouched = !!v.depDate;
-  const times = () => ({ ho: v.ho, arr: val("vi-arr"), dep: val("vi-dep"), arrDate: v.arrDate || "", depDate: val("vi-depd"), fr24: v.fr24 });
+  let depTouched = !!v.depDate, arrTouched = !!v.arrDate;
+  const times = () => ({ ho: v.ho, arr: val("vi-arr"), dep: val("vi-dep"), arrDate: val("vi-arrd"), depDate: val("vi-depd"), fr24: v.fr24 });
   const spanUpd = () => {
+    /* date d'arrivée proposée : l'heure ETA placée dans le shift (03:35Z sur la nuit du 20 = le 21) ; modifiable */
+    if (!arrTouched) { const t = visitTimes(Object.assign(times(), { arrDate: "", depDate: "" })); m.querySelector("#vi-arrd").value = t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : ""; }
     if (!depTouched) { const t = visitTimes(Object.assign(times(), { depDate: "" })); m.querySelector("#vi-depd").value = t.dep != null ? new Date(t.dep).toISOString().slice(0, 10) : ""; }
     const s = visitShifts(times()); m.querySelector("#vi-span").textContent = s.length > 1 ? tr("L'avion apparaîtra sur") + " " + plural(s.length, "shift") + " : " + s.map(shiftLabel).join(", ") : "";
   };
   m.querySelector("#vi-depd").onchange = () => { depTouched = !!val("vi-depd"); spanUpd(); };
-  m.querySelector("#vi-arr").oninput = spanUpd; m.querySelector("#vi-dep").oninput = spanUpd; spanUpd();
+  m.querySelector("#vi-arrd").onchange = () => { arrTouched = !!val("vi-arrd"); spanUpd(); };
+  m.querySelector("#vi-arr").oninput = () => { arrTouched = false; spanUpd(); }; m.querySelector("#vi-dep").oninput = spanUpd; spanUpd();
   const upd = () => { const c = clientOfReg(val("vi-reg")); m.querySelector("#vi-client").textContent = c ? tr("Client") + " : " + c.name + (c.code ? " (" + c.code + ")" : "") : "";
     const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg); };
   if (v.id) odWire(m, v);
@@ -391,7 +394,7 @@ ACTIONS["visit-form"] = el => {
       w.querySelector("[data-dupok]").onclick = () => { m.dataset.dupOk = "1"; m.querySelector("form").requestSubmit(); }; return; }
     if ((val("vi-arr") && !hmOk(val("vi-arr"))) || (val("vi-dep") && !hmOk(val("vi-dep")))) { m.querySelector("#vi-warn").textContent = tr("Heure invalide : format HH:MM (UTC)."); return; }
     const t = visitTimes(times());
-    const arrDate = val("vi-arr") ? (v.arrDate || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
+    const arrDate = val("vi-arr") ? (val("vi-arrd") || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
     const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), atl: val("vi-atl"), cht: val("vi-cht"),
       mech: picked(m, "vi-mech"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() });
     /* Tech Log : lignes vides retirées ; textes prévu / fait et total MHRS recalculés pour la Charge Sheet, Notion et Sindri */
