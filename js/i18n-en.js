@@ -1062,3 +1062,19 @@ Object.assign(EN, {
   "Expirations : alerte (jours avant l'échéance)": "Expiries: alert (days before due date)", "Ouvrir le fichier": "Open file",
   "Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station.": "Headquarters function (training manager…): same rights as an administrator, with two-factor authentication on. Not in the station roster."
 });
+/* Formulaires et page Headquarters */
+Object.assign(EN, {
+  "Formulaires": "Forms", "Les formulaires approuvés par l'autorité, toujours dans leur dernière révision. Cliquez pour ouvrir ou télécharger.": "Authority-approved forms, always in their latest revision. Click to open or download.",
+  "Ajouter un formulaire": "Add a form", "Nouveau formulaire": "New form", "Formulaire": "Form", "N° ou titre du formulaire…": "Form no. or title…", "Retirés": "Withdrawn", "Révision": "Revision",
+  "Approuvé": "Approved", "Télécharger": "Download", "Pas de fichier": "No file", "Aucun formulaire ne correspond.": "No matching form.",
+  "Aucun formulaire pour l'instant. Headquarters les ajoute ici (fichier PDF / Word, ou lien OneDrive).": "No forms yet. Headquarters adds them here (PDF / Word file, or OneDrive link).",
+  "N° du formulaire": "Form no.", "Titre": "Title", "Date de révision": "Revision date", "Approuvé par / référence (autorité, MOE)": "Approved by / reference (authority, MOE)",
+  "Lien (OneDrive, SharePoint…) si pas de fichier": "Link (OneDrive, SharePoint…) if no file", "Quand l'utiliser": "When to use it", "Remplacer le fichier (nouvelle révision)": "Replace file (new revision)",
+  "Fichier du formulaire (PDF, Word, Excel)": "Form file (PDF, Word, Excel)", "Formulaire retiré (plus utilisé)": "Form withdrawn (no longer used)", "Le lien doit commencer par https://": "The link must start with https://",
+  "Format non accepté.": "Format not accepted.", "Joignez le fichier ou indiquez un lien.": "Attach the file or give a link.", "Formulaire enregistré": "Form saved",
+  "Supprimer ce formulaire ? Pour une ancienne révision, cochez plutôt « Formulaire retiré ».": "Delete this form? For an old revision, tick “Form withdrawn” instead.",
+  "MOE / procédures": "MOE / procedures", "Qualité / occurrence reporting": "Quality / occurrence reporting", "Personnel / formation": "Staff / training", "Magasin / pièces": "Stores / parts",
+  "Personnel, licences et formations, échéances et formulaires approuvés de la station.": "Staff, licences and trainings, due dates and approved forms of the station.",
+  "Formation / document": "Training / document", "Personnel de la station": "Station staff", "Échéances expirées": "Expired due dates", "à venir": "upcoming", "Sans licence encodée": "No licence recorded",
+  "Engineers, foremen, lead": "Engineers, foremen, lead", "Personnel et licences": "Staff and licences", "Échéances du personnel": "Staff due dates"
+});

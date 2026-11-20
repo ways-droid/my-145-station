@@ -163,6 +163,9 @@ ok "Headquarters : saisit une échéance de la station" "$(curl -s -H "$HT" -X P
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("DELETE FROM ways_kv WHERE k = ?")->execute(["tfa:u2"]);' $T/t.db
 curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null
 ok "terrain : ne modifie pas les échéances de la station" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/expiries/ex1)" 'rôle'
+ok "bureau : ajoute un formulaire" "$(curl -s -H "$B" -X PUT -d '{"no":"CT-F-001","title":"Occurrence report","url":"https://example.sharepoint.com/f.pdf"}' $U/docs/forms/fm1)" '"ok":true'
+ok "terrain : lit les formulaires" "$(curl -s -H "$HT" $U/docs/forms/fm1)" 'Occurrence report'
+ok "terrain : ne modifie pas un formulaire" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/forms/fm1)" 'rôle'
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
 echo "> station needs et situations ouvertes"
 ok "terrain : demande un besoin" "$(curl -s -H "$HT" -X PUT -d '{"title":"Gants nitrile","cat":"consumable","status":"asked"}' $U/docs/needs/nd1)" '"ok":true'
