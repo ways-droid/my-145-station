@@ -11,7 +11,7 @@ const STAFF_FN_ORDER = Object.keys(STAFF_FN);
 const LIC_CATS = ["B1", "B2", "B1+B2", "A", "C", "FAA A&P", "Autre"];
 const SDOC_TYPES = { passport: "Passeport", visa: "Visa", workPermit: "Permis de travail", ramp: "Badge piste / aéroport", exam: "Examen (CAAI…)", runup: "Autorisation run-up",
   training: "Formation (Human Factors, EWIS…)", medical: "Aptitude médicale", driving: "Permis de conduire / piste", other: "Autre" };
-const SHIFT_LBL = { day: "Jour (08-20)", night: "Nuit (20-08)", custom: "Horaire libre" };
+const SHIFT_LBL = { day: "Jour (08-20 LT)", night: "Nuit (20-08 LT)", custom: "Horaire libre" };
 const splitList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
 const acTypes = () => splitList(settings().acTypes);
 const RATING_CODES = { E: "EASA", I: "Approbation israélienne", F: "FAA" };

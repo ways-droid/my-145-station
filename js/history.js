@@ -21,7 +21,7 @@ const logVal = (k, v) => {
   if (k === "vehicleId" && v && v !== "—") { const x = S.vehicles.find(y => y.id === v); if (x) return x.plate || x.id; }
   return v;
 };
-const logWhen = at => { const d = new Date(at); return `${fmtDate(d.toISOString().slice(0, 10))} ${d.toLocaleTimeString(LANG === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" })}`; };
+const logWhen = at => fmtLT(at, { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 function logDetail(x) {
   const d = x.details || {}, out = [];
   if (d.changes) out.push(d.changes.filter(c => c[0] !== "…").slice(0, 6).map(([k, a, b]) => `<span class="lg-ch"><b>${esc(tr(LOG_FIELD[k] || k))}</b> ${a !== "—" && k !== "lines" ? `${esc(String(logVal(k, a)))} → ` : ""}${esc(String(logVal(k, b)))}</span>`).join("") + (d.changes.length > 6 ? `<span class="muted"> +${d.changes.length - 6}</span>` : ""));
@@ -74,7 +74,7 @@ VIEWS.historique = { title: "Historique", render: () => {
   const rows = items.map(x => {
     const day = new Date(x.at).toISOString().slice(0, 10), sep = day !== lastDay ? `<tr class="lg-day"><td colspan="5">${esc(fmtDate(day))}</td></tr>` : ""; lastDay = day;
     const lbl = x.label || x.id, a = logOpen[x.coll];
-    return `${sep}<tr class="hov"><td class="num nowrap muted">${new Date(x.at).toLocaleTimeString(LANG === "en" ? "en-GB" : "fr-BE", { hour: "2-digit", minute: "2-digit" })}</td><td class="nowrap">${logWho(x)}</td><td>${logActChip(x.action)}</td>
+    return `${sep}<tr class="hov"><td class="num nowrap muted">${fmtLT(x.at, { hour: "2-digit", minute: "2-digit" })}</td><td class="nowrap">${logWho(x)}</td><td>${logActChip(x.action)}</td>
       <td>${a && x.action !== "delete" ? `<button class="linkbtn" data-a="${a}" data-id="${esc(x.id)}">${esc(lbl)}</button>` : esc(lbl)}<div class="muted small">${esc(tr(LOG_MOD[x.coll] || x.coll))}</div></td><td class="small">${logDetail(x)}</td></tr>`;
   }).join("");
   return head("Historique", "Qui a fait quoi, et quand · créations, modifications, suppressions, validations, envois, rapprochements, connexions") +
@@ -109,7 +109,7 @@ function profilePill() {
 }
 ACTIONS["prof-open"] = async () => {
   if (!SESS && API && !ME.key) { try { SESS = (await API.call("GET", "auth/me")).session; } catch { } }
-  const t = ms => new Date(ms).toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const t = ms => fmtLT(ms, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const left = SESS ? Math.max(0, SESS.expires - Date.now()) : 0, h = Math.floor(left / 3600000), mn = Math.floor(left / 60000) % 60;
   modal(`${mHead("Profil")}<div class="body stack">
     <div class="row-g" style="align-items:center"><span class="prof-av big r-${esc(ME.role)}">${esc(initials(ME.name))}</span><div><div style="font-size:18px;font-weight:700">${esc(ME.name)}</div><div class="muted">${esc(tr(ROLE_LBL[ME.role] || ME.role))}${ME.email ? ` · ${esc(ME.email)}` : ""}</div></div></div>

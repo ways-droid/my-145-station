@@ -238,7 +238,7 @@ function ai_system($who, $role) {
     $r = get_doc('settings', 'company'); if ($r && !$r['deleted']) $set = json_decode($r['data'], true) ?: [];
     $lines = []; foreach (ai_colls($role) as $c) $lines[] = "- $c : " . AI_LABELS[$c];
     return "Tu es " . AI_NAME . ", collègue de l'équipe de " . ($set['name'] ?? 'la station') . " (station de maintenance en ligne, organisme Part 145), et tu travailles dans son outil de gestion de station avec les droits de la personne qui te parle (au plus ceux d'un employé du bureau). Tu parles à " . (isset($who['label']) ? preg_replace('/^(user|token):/', '', $who['label']) : 'un membre de l\'équipe') . " (rôle : $role).\n"
-        . "Nous sommes le " . date('Y-m-d') . " (heure locale de la station ; les horaires des vols sont en UTC). Réponds dans la langue de la question, en français par défaut, comme un collègue : bref, concret, tutoiement si on te tutoie.\n\n"
+        . "Nous sommes le " . date('Y-m-d') . " (heure locale de la station ; les horaires des vols sont en UTC). Chaque heure que tu écris porte son repère : « Z » pour UTC (ex. 20:30Z), « LT » pour l'heure locale de la station (ex. 22:30 LT) ; ne donne jamais une heure sans repère. Réponds dans la langue de la question, en français par défaut, comme un collègue : bref, concret, tutoiement si on te tutoie.\n\n"
         . (($GLOBALS['AI_VIA'] ?? '') === 'whatsapp' ? "Cette conversation passe par WhatsApp : réponses courtes, sans tableau ni titre (listes simples, *gras* WhatsApp). Pour une suppression, demande la confirmation ici (réponds « oui » pour confirmer) ; tout reste annulable depuis le panneau Sindri de l'outil. Tu ne peux pas écouter les messages vocaux.\n\n" : '')
         . "Données consultables avec tes outils :\n" . implode("\n", $lines) . "\n\n"
         . "Repères : les données avion et maintenance (CRS, cartes de travail, traçabilité des pièces) sont dans AMOS, pas ici : si on te les demande, dis-le. Tu ne signes ni ne valides aucune maintenance.
@@ -781,7 +781,7 @@ function ai_shift_summary($who, $role, $b) {
     $lang = ($b['lang'] ?? 'en') === 'fr' ? 'French' : 'English';
     $prompt = "You write the short shift handover summary of an aviation line maintenance station (EASA Part-145). Shift: $ho. Shift Foreman: " . $nm($h['foreman'] ?? '') . ".\n"
         . "Write in $lang, 3 to 8 short bullet lines, factual, no invention, no greeting: aircraft handled, defects or tasks still open and what the next shift must do first, open situations, anything unusual. "
-        . "Never state that an aircraft is airworthy or released: the CRS is done in AMOS.\n\nShift data:\n" . (implode("\n", $lines) ?: '(nothing entered)');
+        . "Every time you write must carry its reference: Z for UTC (e.g. 20:30Z) or LT for station local time. Never state that an aircraft is airworthy or released: the CRS is done in AMOS.\n\nShift data:\n" . (implode("\n", $lines) ?: '(nothing entered)');
     try { $d = ai_request(['model' => ai_model(), 'max_tokens' => 600, 'messages' => [['role' => 'user', 'content' => $prompt]]]); }
     catch (Throwable $e) { fail($e->getCode() === 429 ? 429 : 502, $e->getMessage()); }
     $txt = trim(implode('', array_map(fn($c) => ($c['type'] ?? '') === 'text' ? (string) $c['text'] : '', (array) ($d['content'] ?? []))));

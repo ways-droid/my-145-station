@@ -65,7 +65,7 @@ function fatPerson(pid, from, to, idx = fatIdx()) {
 function fatMap(ppl, from, to) { const idx = fatIdx(), m = {}; for (const p of ppl) { m[p.id] = {}; for (const x of fatPerson(p.id, from, to, idx)) if (x.alerts.length) m[p.id][x.date] = x.alerts; } return m; }
 const fatHM = ms => { try { return new Intl.DateTimeFormat("fr-BE", { timeZone: stationTz() || undefined, hour: "2-digit", minute: "2-digit" }).format(new Date(ms)); } catch { return ""; } };
 const fatYMD = ms => { try { return new Intl.DateTimeFormat("en-CA", { timeZone: stationTz() || undefined }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); } };
-const fatSpan = x => x.spans.map(s => { const n = Math.round((Date.parse(fatYMD(s[1])) - Date.parse(fatYMD(s[0]))) / 864e5); return `${fatHM(s[0])}–${fatHM(s[1])}${n > 0 ? ` (+${n} j)` : ""}`; }).join(", ");
+const fatSpan = x => x.spans.map(s => { const n = Math.round((Date.parse(fatYMD(s[1])) - Date.parse(fatYMD(s[0]))) / 864e5); return `${fatHM(s[0])}–${fatHM(s[1])} LT${n > 0 ? ` (+${n} j)` : ""}`; }).join(", ");
 
 /* onglet Roster → Fatigue */
 function rosterFatigue() {

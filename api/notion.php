@@ -60,7 +60,7 @@ function nt_append($pageId, array $blocks) { if ($blocks) notion_http('PATCH', "
 /* heure de la station (fuseau des paramètres) */
 function nt_when($iso, $tz) {
     if (!$iso) return '';
-    try { $d = new DateTime((string) $iso); if ($tz) $d->setTimezone(new DateTimeZone($tz)); return $d->format('d/m/Y H:i'); } catch (Throwable $e) { return (string) $iso; }
+    try { $d = new DateTime((string) $iso); if ($tz) $d->setTimezone(new DateTimeZone($tz)); return $d->format('d/m/Y H:i') . ($tz ? ' LT' : 'Z'); } catch (Throwable $e) { return (string) $iso; }
 }
 
 /* écrit la page du handover sous la page parente ; renvoie [url, pageId] */

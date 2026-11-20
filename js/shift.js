@@ -6,7 +6,7 @@
    handovers/<AAAA-MM-JJ>-<day|night> = { date, shift, foreman, extra[], checks{}, out{by,at}, in{by,at} }
    shiftItems/<id> = { ho, kind: todo|visit|equip, … } (une ligne = un document : plusieurs personnes saisissent en même temps)
    Le bouton Notion écrit la page du shift sous la page Notion choisie dans Paramètres (api/notion.php). Rien ici ne remplace la CRS dans AMOS. */
-const SHIFTS = { day: "Jour (08-20)", night: "Nuit (20-08)" };
+const SHIFTS = { day: "Jour (08-20 LT)", night: "Nuit (20-08 LT)" };
 /* contrôles du handover approuvé (modifiables dans Paramètres), écrits dans Notion deux par ligne */
 const STATION_CHECKS = ["Tool Check Per MOE 2.6.5", "Temp / Humidity Per MOE 2.3.1", "Cleanliness of Office", "Line Vans Cleaned and Restocked"];
 const stationChecks = () => { const s = String(settings().stationChecks || "").split("\n").map(x => x.trim()).filter(Boolean); return s.length ? s : STATION_CHECKS; };
@@ -227,7 +227,7 @@ function fr24Rot(v) {
 }
 function fr24Times(v) {
   const r = fr24Rot(v); if (!r) return "";
-  const hm = x => utcHM(new Date(x).toISOString());
+  const hm = x => utcHM(new Date(x).toISOString()) + "Z";
   const arr = r.arr && r.arr.ms != null ? (r.arr.eta ? "ETA " : "") + hm(r.arr.ms) : "", dep = r.dep ? hm(r.dep.ms) : "";
   const fl = [r.arr && r.arr.fl, r.dep && r.dep.fl].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(" / ");
   /* valeur non trouvée chez FR24 : en magenta */
@@ -292,7 +292,7 @@ function shiftVisits(id) {
       const tog = other.length ? `<button type="button" class="vo-tog ${open ? "on" : ""}" data-a="vo-toggle" data-g="${esc(gid)}" title="${esc(tr(open ? "Masquer les données des autres shifts" : "Afficher les données des autres shifts"))}">${open ? "▾" : "▸"} ${esc(tr(plural(other.length, "autre shift", "autres shifts")))} <span class="vo-n">(${[prev.length ? "↑" + prev.length : "", next.length ? "↓" + next.length : ""].filter(Boolean).join(" ")})</span></button>` : "";
       if (!open) { prev.length = 0; next.length = 0; }
       return `<tbody class="vgrp${open ? " multi" : ""}">` + prev.map((x, i) => ghost(x, prev.length - 1 - i, "prev")).join("") + `<tr class="vo-main ${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono reg ${regState(v)}">${esc(v.reg || "")}</b>${tog ? " " + tog : ""} <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
-        <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
+        <td class="mono small">${esc(zHM(v.arr))} / ${esc(zHM(v.dep))}${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small">${techLogHtml(v)}${v.notes ? `<div class="muted">${esc(v.notes)}</div>` : ""}</td><td class="mono small">${fmtH(visitH(v))}</td><td class="mono small">${esc(v.atl || "")}</td></tr>` + next.map((x, i) => ghost(x, i, "next")).join("") + `</tbody>`; }).join("")}</table></div>`
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
@@ -565,20 +565,21 @@ setInterval(() => { try { if (!UI.shift || UI.shiftPinned || document.getElement
 WIDGETS.shift_now = { h: 8, t: "Shift en cours", ic: "✈", c: "blue", m: "shift", size: "m", d: "Avions du shift en cours, travail non terminé, CRS manquants.",
   r() { const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit"), todo = hoItems(id, "todo").filter(x => !x.done), bad = vs.filter(v => !visitCheck(v).ok);
     return `<div class="w-stats">${wStat(vs.length, "avions")}${wStat(todo.length, "non terminés", todo.length ? "warn" : "")}${wStat(bad.length, "sans CRS qualifié", bad.length ? "bad" : "")}</div>
-      <div class="w-list">${vs.slice(0, 5).map(v => `<div class="list-row"><span><b class="mono">${esc(v.reg)}</b> <span class="muted small">${esc(v.acType || "")} · ${esc(v.arr || "—")}/${esc(v.dep || "—")} UTC</span></span><span class="small">${(v.crs || []).map(s => esc(sName(s))).join(", ")}</span></div>`).join("") || wEmpty("Aucun avion pour ce shift.")}</div>${wLink("shift", "Ouvrir le shift")}`; },
+      <div class="w-list">${vs.slice(0, 5).map(v => `<div class="list-row"><span><b class="mono">${esc(v.reg)}</b> <span class="muted small">${esc(v.acType || "")} · ${esc(zHM(v.arr))}/${esc(zHM(v.dep))} UTC</span></span><span class="small">${(v.crs || []).map(s => esc(sName(s))).join(", ")}</span></div>`).join("") || wEmpty("Aucun avion pour ce shift.")}</div>${wLink("shift", "Ouvrir le shift")}`; },
   go() { UI.shiftPinned = false; UI.shift = currentShift(); } };
 
 /* ---- Flightradar24 (facultatif : clé de l'offre API FR24 ; sans clé, les heures se saisissent à la main) ---- */
 let FR24 = null;
 async function fr24Status() { if (!SERVER || !API || !ME) return null; if (FR24) return FR24; try { FR24 = await API.call("GET", "fr24/status"); } catch { FR24 = { configured: false }; } return FR24; }
 const utcHM = iso => { if (!iso) return ""; const d = new Date(iso); return isNaN(d) ? "" : `${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}`; };
+const zHM = t => t ? t + "Z" : "—";   /* heure saisie en UTC, affichée avec son repère */
 function fr24Line(v) {
   const f = v.fr24; if (!f) return "";
   const st = stationIata(), L = f.live, P = f.last;
   let t = "";
-  if (L) t = `En vol ${L.from || "?"} → ${L.to || "?"}${L.eta ? " · ETA " + utcHM(L.eta) : ""}`;
-  else if (P && P.landed) t = `Atterri ${utcHM(P.landed)}${P.to ? " à " + P.to : ""}${P.from ? " (de " + P.from + ")" : ""}`;
-  else if (P && P.takeoff) t = `Parti ${utcHM(P.takeoff)}${P.from ? " de " + P.from : ""}${P.to ? " vers " + P.to : ""}`;
+  if (L) t = `En vol ${L.from || "?"} → ${L.to || "?"}${L.eta ? " · ETA " + utcHM(L.eta) + "Z" : ""}`;
+  else if (P && P.landed) t = `Atterri ${utcHM(P.landed)}Z${P.to ? " à " + P.to : ""}${P.from ? " (de " + P.from + ")" : ""}`;
+  else if (P && P.takeoff) t = `Parti ${utcHM(P.takeoff)}Z${P.from ? " de " + P.from : ""}${P.to ? " vers " + P.to : ""}`;
   else t = "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)";
   return `<div class="small ${L && st && L.to && L.to !== st ? "txt-warn" : "muted"}" title="Flightradar24 · ${esc(fmtDT(f.at))}">FR24 · ${esc(tr(t))}</div>`;
 }
