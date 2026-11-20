@@ -144,24 +144,29 @@ const shiftLabel = ho => `${fmtDate(ho.slice(0, 10))} · ${tr(SHIFTS[ho.slice(11
 const stationIata = () => (settings().stationCode || "TLV").toUpperCase();
 /* état FR24 de l'avion : en vol (bleu) ou posé à la station (vert) */
 function regState(v) {
-  const f = v.fr24; if (!f) return "";
-  if (f.live) return "reg-air";
-  const st = stationIata(); if (!f.arr && f.last && f.last.to === st && f.last.landed && (!f.dep || !f.dep.at || Date.parse(f.dep.at) < Date.parse(f.last.landed))) return "reg-in";
-  if (f.arr && f.arr.at && (!f.dep || !f.dep.at || Date.parse(f.dep.at) < Date.parse(f.arr.at))) return "reg-in";
-  return "";
+  const r = fr24Rot(v); if (!r) return "";
+  if (r.live) return "reg-air";
+  return r.arr && !r.dep ? "reg-in" : "";
 }
-/* heures FR24 (réelles, ou ETA) affichées en bleu à côté des heures saisies, seulement si connues */
+/* rotation FR24 de la ligne : le vol en cours vers la station (ETA) prime ; sinon l'atterrissage à la station pendant le shift
+   (ou dans les 12 h avant) et le décollage de la station qui suit. Les vols plus anciens (nuit passée…) sont ignorés. */
+function fr24Rot(v) {
+  const f = v.fr24; if (!f) return null;
+  const st = stationIata(), [a, b] = shiftWindow(v.ho), ms = iso => { const x = Date.parse(iso || ""); return isNaN(x) ? null : x; };
+  const r = { arr: null, dep: null, live: !!f.live };
+  if (f.live && f.live.to === st) { r.arr = { ms: ms(f.live.eta), fl: f.live.flight || "", eta: true }; return r; }
+  const lands = [f.arr && { ms: ms(f.arr.at), fl: f.arr.flight || "" }, f.last && f.last.to === st && { ms: ms(f.last.landed), fl: f.last.flight || "" }]
+    .filter(x => x && x.ms != null && x.ms >= a - 12 * 3600000 && x.ms <= b).sort((x, y) => y.ms - x.ms);
+  r.arr = lands[0] || null;
+  const d = f.dep && ms(f.dep.at);
+  if (d != null && (r.arr ? d > r.arr.ms : d >= a && d <= b + 12 * 3600000)) r.dep = { ms: d, fl: f.dep.flight || "" };
+  return r;
+}
 function fr24Times(v) {
-  const f = v.fr24; if (!f) return "";
-  const st = stationIata(), [a, b] = shiftWindow(v.ho);
-  const near = iso => { const x = Date.parse(iso); return !isNaN(x) && x >= a - 36 * 3600000 && x <= b + 72 * 3600000; };
-  let arr = "", dep = "", fl = "";
-  const P = f.last && f.last.to === st && f.last.landed ? f.last.landed : "";
-  if (f.arr && f.arr.at && near(f.arr.at)) { arr = utcHM(f.arr.at); fl = f.arr.flight || ""; }
-  else if (P && near(P)) arr = utcHM(P);
-  else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) { arr = "ETA " + utcHM(f.live.eta); fl = f.live.flight || ""; }
-  if (!fl && f.live && f.live.to === st) fl = f.live.flight || "";
-  if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) { dep = utcHM(f.dep.at); if (f.dep.flight) fl = fl ? fl + " / " + f.dep.flight : f.dep.flight; }
+  const r = fr24Rot(v); if (!r) return "";
+  const hm = x => utcHM(new Date(x).toISOString());
+  const arr = r.arr && r.arr.ms != null ? (r.arr.eta ? "ETA " : "") + hm(r.arr.ms) : "", dep = r.dep ? hm(r.dep.ms) : "";
+  const fl = [r.arr && r.arr.fl, r.dep && r.dep.fl].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(" / ");
   /* valeur non trouvée chez FR24 : en magenta */
   const nf = `<span class="fr-nf" title="${esc(tr("Non trouvé chez Flightradar24"))}">${esc(tr("non trouvé"))}</span>`;
   return `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${fl ? esc(fl) : `<span class="fr-nf">${esc(tr("vol ?"))}</span>`} · ${arr ? esc(arr) : nf} / ${dep ? esc(dep) : nf}</div>`;
