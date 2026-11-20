@@ -954,7 +954,7 @@ Object.assign(EN, { "Flightradar24 renvoie des données de démonstration : la c
 
 Object.assign(EN, {
   "Données de shift précédent": "Previous shift data", "Données de shift suivant": "Next shift data", "Escale": "Stay",
-  "Date de départ (UTC)": "Departure date (UTC)", "L'avion apparaîtra sur": "The aircraft will appear on",
+  "Date de départ (UTC)": "Departure date (UTC)", "Date d'arrivée (UTC)": "Arrival date (UTC)", "L'avion apparaîtra sur": "The aircraft will appear on",
   "Heure invalide : format HH:MM (UTC).": "Invalid time: HH:MM format (UTC).", "Heures Flightradar24 (réelles, ou estimée en vol)": "Flightradar24 times (actual, or estimate while airborne)",
 });
 Object.assign(EN, { "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.": "Remove this aircraft from this shift? Its empty rows on other shifts are removed too; rows with work entered stay." });
