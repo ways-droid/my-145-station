@@ -971,3 +971,4 @@ Object.assign(EN, {
   "Rempli par Flightradar24, vos champs ne sont pas modifiés.": "Filled by Flightradar24; your fields are not changed.", "N° de vol / rotation (prévu)": "Flight no. / rotation (planned)",
   "Cet avion est déjà dans ce shift. Est-ce une erreur, ou un autre vol ?": "This aircraft is already on this shift. Is it a mistake, or another flight?", "C'est une erreur": "It's a mistake", "Autre vol : enregistrer": "Another flight: save",
 });
+Object.assign(EN, { "Non trouvé chez Flightradar24": "Not found at Flightradar24", "non trouvé": "not found", "vol ?": "flight ?" });

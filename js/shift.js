@@ -162,7 +162,9 @@ function fr24Times(v) {
   else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) { arr = "ETA " + utcHM(f.live.eta); fl = f.live.flight || ""; }
   if (!fl && f.live && f.live.to === st) fl = f.live.flight || "";
   if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) { dep = utcHM(f.dep.at); if (f.dep.flight) fl = fl ? fl + " / " + f.dep.flight : f.dep.flight; }
-  return arr || dep || fl ? `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24${fl ? " " + esc(fl) : ""} · ${esc(arr || "—")} / ${esc(dep || "—")}</div>` : "";
+  /* valeur non trouvée chez FR24 : en magenta */
+  const nf = `<span class="fr-nf" title="${esc(tr("Non trouvé chez Flightradar24"))}">${esc(tr("non trouvé"))}</span>`;
+  return `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${fl ? esc(fl) : `<span class="fr-nf">${esc(tr("vol ?"))}</span>`} · ${arr ? esc(arr) : nf} / ${dep ? esc(dep) : nf}</div>`;
 }
 
 /* ---- Tech Log de l'avion ----
@@ -405,9 +407,9 @@ function stationUtc(date, hour) {
 const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === "night", a = stationUtc(d, night ? 20 : 8); return [a, a + 12 * 3600000]; };
 /* clic sur Flightradar24 : les avions du shift, plus ceux de la section Avions ; un avion suivi qui vole vers la station
    et n'est pas encore dans le shift y est ajouté (ligne créée automatiquement). La mise à jour automatique ne crée rien. */
-async function fr24Run(id, quiet) {
+async function fr24Run(id, quiet, create = !quiet) {
   let vs = hoItems(id, "visit").filter(v => v.reg);
-  const fleet = quiet ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
+  const fleet = !create ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
   if (!vs.length && !fleet.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
   const r = await API.call("POST", "fr24/track", { regs: [...vs.map(v => v.reg), ...fleet.map(a => a.reg)], station: stationIata() });
   const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
@@ -425,15 +427,21 @@ async function fr24Run(id, quiet) {
 }
 let FR24ERR = "";
 ACTIONS["fr24-track"] = async el => { el.disabled = true; try { await fr24Run(el.dataset.ho); } catch (e) { toast(tr(e.message)); } el.disabled = false; };
-/* shift en cours : mise à jour automatique à l'ouverture, au plus toutes les 15 minutes (chaque appel consomme des crédits FR24) */
+/* shift en cours : le bouton Flightradar24 se lance tout seul toutes les heures (avions du shift + avions suivis en vol vers
+   la station ajoutés), tant que l'application est ouverte quelque part. L'heure du dernier passage est partagée (fiche du shift),
+   donc deux navigateurs ouverts ne doublent pas les appels (chaque appel consomme des crédits FR24). */
+const FR24_EVERY = 60 * 60000;
 let fr24Auto = {};
 function fr24AutoRun() {
   if (!FR24 || !FR24.configured || readOnly) return;
-  const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit").filter(v => v.reg); if (!vs.length) return;
-  const last = Math.max(fr24Auto[id] || 0, ...vs.map(v => Date.parse(v.fr24 && v.fr24.at) || 0));
-  if (Date.now() - last < 15 * 60000) return;
-  fr24Auto[id] = Date.now(); fr24Run(id, true).catch(e => { FR24ERR = e.message; render(true); });
+  const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit").filter(v => v.reg);
+  if (!vs.length && !(S.aircraft || []).some(a => a.active !== false)) return;
+  const last = Math.max(fr24Auto[id] || 0, Date.parse((hoDoc(id) || {}).fr24At) || 0);
+  if (Date.now() - last < FR24_EVERY) return;
+  fr24Auto[id] = Date.now();
+  fr24Run(id, true, true).then(() => hoPatch(id, { fr24At: new Date().toISOString() })).then(() => render(true)).catch(e => { FR24ERR = e.message; render(true); });
 }
+setInterval(() => { try { if (SERVER && FR24) fr24AutoRun(); } catch { } }, 5 * 60000);
 function fr24CardShell() {
   if (!SERVER || !isAdmin()) return "";
   return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack"><h3 class="np">Flightradar24</h3><div id="fr24-box"><div class="muted">Chargement…</div></div></div></div>`;
