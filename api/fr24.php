@@ -38,15 +38,17 @@ function fr24_provider_track(array $regs, $station = '') {
     $out = []; $byKey = []; foreach ($regs as $r) { $out[$r] = []; $byKey[fr24_key_reg($r)] = $r; }
     if (!$regs) return $out;
     $st = strtoupper(preg_replace('/[^A-Za-z]/', '', (string) $station));
-    $forms = []; foreach ($regs as $r) { $forms[] = $r; if (strpos($r, '-') !== false) $forms[] = str_replace('-', '', $r); }
     $from = gmdate('Y-m-d\TH:i:s\Z', time() - 72 * 3600); $to = gmdate('Y-m-d\TH:i:s\Z');
-    foreach (array_chunk(array_values(array_unique($forms)), 15) as $chunk) {
+    $GLOBALS['FR24_ERRORS'] = [];
+    foreach (array_chunk($regs, 15) as $chunk) {
         $list = implode(',', $chunk);
-        $live = fr24_http('live/flight-positions/full', ['registrations' => $list]);
+        try { $live = fr24_http('live/flight-positions/full', ['registrations' => $list]); }
+        catch (RuntimeException $e) { $GLOBALS['FR24_ERRORS'][] = 'Vols en cours : ' . $e->getMessage(); $live = []; }
         foreach ((array) ($live['data'] ?? []) as $p) { $r = $byKey[fr24_key_reg($p['reg'] ?? '')] ?? null; if ($r === null) continue;
             $out[$r]['live'] = ['flight' => (string) ($p['flight'] ?? $p['callsign'] ?? ''), 'from' => fr24_iata($p, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($p, 'dest_iata', 'dest_icao'),
                 'eta' => (string) ($p['eta'] ?? ''), 'alt' => (int) ($p['alt'] ?? 0), 'gspeed' => (int) ($p['gspeed'] ?? 0), 'type' => (string) ($p['type'] ?? ''), 'at' => (string) ($p['timestamp'] ?? '')]; }
-        $sum = fr24_http('flight-summary/full', ['registrations' => $list, 'flight_datetime_from' => $from, 'flight_datetime_to' => $to, 'limit' => 200]);
+        try { $sum = fr24_http('flight-summary/full', ['registrations' => $list, 'flight_datetime_from' => $from, 'flight_datetime_to' => $to]); }
+        catch (RuntimeException $e) { $GLOBALS['FR24_ERRORS'][] = 'Vols récents : ' . $e->getMessage(); $sum = []; }
         foreach ((array) ($sum['data'] ?? []) as $f) { $r = $byKey[fr24_key_reg($f['reg'] ?? '')] ?? null; if ($r === null) continue;
             $x = ['flight' => (string) ($f['flight'] ?? $f['callsign'] ?? ''), 'from' => fr24_iata($f, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($f, 'dest_iata_actual', 'dest_iata') ?: fr24_iata($f, 'dest_icao_actual', 'dest_icao'),
                 'takeoff' => (string) ($f['datetime_takeoff'] ?? ''), 'landed' => (string) ($f['datetime_landed'] ?? ''), 'type' => (string) ($f['type'] ?? '')];
@@ -71,11 +73,26 @@ function fr24_routes($route, $parts, $method, $who, $role) {
     if (fr24_key() === '') fail(400, "Flightradar24 n'est pas configuré : saisissez les heures à la main, ou ajoutez une clé API FR24 dans Paramètres.");
     try {
         if ($act === 'test' && $method === 'POST') { if ($role !== 'admin') fail(403, 'Réservé aux administrateurs'); fr24_http('live/flight-positions/full', ['registrations' => 'TEST-REG']); out(['ok' => true]); }
+        if ($act === 'diag' && $method === 'POST') {
+            if ($role !== 'admin') fail(403, 'Réservé aux administrateurs');
+            $reg = fr24_norm_reg($b['reg'] ?? ''); if ($reg === '') fail(400, 'Immatriculation manquante');
+            $from = gmdate('Y-m-d\TH:i:s\Z', time() - 72 * 3600); $to = gmdate('Y-m-d\TH:i:s\Z'); $res = [];
+            foreach ([['live/flight-positions/full', ['registrations' => $reg]], ['flight-summary/full', ['registrations' => $reg, 'flight_datetime_from' => $from, 'flight_datetime_to' => $to]]] as [$path, $q]) {
+                try { $d = fr24_http($path, $q); $rows = (array) ($d['data'] ?? []);
+                    $res[] = ['endpoint' => $path, 'params' => $q, 'ok' => true, 'count' => count($rows), 'keys' => $rows ? array_keys((array) $rows[0]) : array_keys($d),
+                        'sample' => array_map(fn($r) => array_intersect_key((array) $r, array_flip(['reg', 'flight', 'callsign', 'orig_iata', 'orig_icao', 'dest_iata', 'dest_icao', 'dest_iata_actual', 'eta', 'datetime_takeoff', 'datetime_landed', 'first_seen', 'timestamp', 'alt'])), array_slice($rows, -3))]; }
+                catch (RuntimeException $e) { $res[] = ['endpoint' => $path, 'params' => $q, 'ok' => false, 'error' => $e->getMessage()]; }
+            }
+            out(['reg' => $reg, 'results' => $res, 'at' => gmdate('c')]);
+        }
         if ($act === 'track' && $method === 'POST') {
             $regs = array_slice(array_map('strval', (array) ($b['regs'] ?? [])), 0, 30);
             if (!$regs) fail(400, 'Aucune immatriculation');
             $c = get_doc('settings', 'company'); $set = $c ? (json_decode($c['data'], true) ?: []) : [];
-            out(['items' => fr24_provider_track($regs, (string) ($b['station'] ?? $set['stationCode'] ?? '')), 'at' => gmdate('c')]);
+            $items = fr24_provider_track($regs, (string) ($b['station'] ?? $set['stationCode'] ?? ''));
+            $errs = $GLOBALS['FR24_ERRORS'] ?? [];
+            if ($errs && count($errs) >= 2 * (int) ceil(count($regs) / 15)) fail(502, $errs[0]);   // tout a échoué : on le dit
+            out(['items' => $items, 'errors' => $errs, 'at' => gmdate('c')]);
         }
     } catch (RuntimeException $e) { fail(502, $e->getMessage()); }
     fail(404, 'Route inconnue');

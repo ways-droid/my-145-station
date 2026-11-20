@@ -817,7 +817,8 @@ fieldset.plain { border: 0; padding: 0; margin: 0; min-width: 0; } table.occ th,
 table.roster th, table.roster td { padding: 0; border: 1px solid var(--line); text-align: center; min-width: 30px; height: 30px; }
 table.roster thead th { font-weight: 600; font-size: 11px; } table.roster thead th span { display: block; color: var(--ink-3); font-weight: 400; }
 table.roster th.we { background: #c9ced6; } table.roster td.we:not([class*="rc-"]) { background: #d5d9df; } table.roster td.we[class*="rc-"] { background-image: linear-gradient(rgba(40, 50, 70, .14), rgba(40, 50, 70, .14)); }
-table.roster th.fri, table.roster td.fri { background-image: radial-gradient(rgba(40, 50, 70, .38) 1px, transparent 1.4px); background-size: 5px 5px; } table.roster th.fri, table.roster td.fri:not([class*="rc-"]) { background-color: #eceef1; }
+table.roster th.fri, table.roster td.fri { background-image: radial-gradient(rgba(40, 50, 70, var(--fri-a, .24)) 1px, transparent 1.4px); background-size: 5px 5px; } table.roster th.fri, table.roster td.fri:not([class*="rc-"]) { background-color: rgba(40, 50, 70, calc(var(--fri-a, .24) * .2)); }
+.rview { gap: 18px; } .rview input[type=range] { accent-color: var(--blue); }
 .rnav .rmonth { display: inline-block; min-width: 12.5em; text-align: center; white-space: nowrap; }
 table.roster .mstart { border-left: 3px solid var(--ink-3); } table.roster thead .rmlbl { display: block; font-style: normal; font-size: 9px; color: var(--ink-3); text-transform: uppercase; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) table.roster th.we, :root:not([data-theme="light"]) table.roster td.we:not([class*="rc-"]) { background: #3a404a; } :root:not([data-theme="light"]) table.roster th.fri, :root:not([data-theme="light"]) table.roster td.fri:not([class*="rc-"]) { background-color: #2b3038; } }

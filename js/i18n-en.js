@@ -943,3 +943,10 @@ rule(/^(\S+) : aucun CRS avec ([EIF]) sur (.+)$/, "$1: no CRS with $2 on $3");
 /* ---- Flightradar24 : heures remplies ---- */
 Object.assign(EN, { "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)": "No flight in the last 72 h (FR24 does not provide scheduled flights)" });
 rule(/^Flightradar24 : (\d+) avions? sur (\d+) avec un vol récent(?:, heures remplies pour (\d+))?\.$/, (m, a, b, c) => `Flightradar24: ${a} of ${b} aircraft with a recent flight${c ? `, times filled for ${c}` : ""}.`);
+/* ---- roster : affichage ; FR24 : diagnostic ---- */
+Object.assign(EN, {
+  "Griser toute la colonne des week-ends": "Shade the whole weekend column", " et vendredis": " and Fridays", "Intensité du moucheté du vendredi": "Friday speckle intensity",
+  "Diagnostic : ce que Flightradar24 répond pour une immatriculation": "Diagnostics: what Flightradar24 returns for a registration",
+  "Interrogation de Flightradar24…": "Querying Flightradar24…", "résultat(s)": "result(s)", "Vendredi": "Friday", "erreur": "error", "champs": "fields", "Diagnostiquer": "Run diagnostics"
+});
+rule(/^Vols en cours : (.+)$/, (m, a) => "Live flights: " + tr(a)); rule(/^Vols récents : (.+)$/, (m, a) => "Recent flights: " + tr(a));

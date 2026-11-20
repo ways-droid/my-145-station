@@ -89,11 +89,12 @@ ACTIONS["item-del"] = el => confirmBox("Supprimer cette ligne ?", () => remove("
 function shiftVisits(id) {
   const rows = hoItems(id, "visit"), ed = hoEd(id);
   return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && rows.length ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
-    rows.length ? `<div class="tablewrap"><table><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
+    (FR24ERR && rows.length ? `<div class="banner warn">${esc(tr(FR24ERR))}</div>` : "") +
+    (rows.length ? `<div class="tablewrap"><table><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
       return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm bad">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
         <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${fr24Line(v)}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small pre">${esc(v.planned || "")}</td><td class="small pre">${esc(v.done || "")}</td><td class="mono small">${esc(v.mhrs || "")}</td><td class="mono small">${esc(v.atl || "")}</td></tr>`; }).join("")}</tbody></table></div>`
-      : `<div class="pad muted">Aucun avion pour ce shift.</div>`);
+      : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
 function staffPick(id, label, sel, list) {
   return `<div class="f wide"><span>${label}</span><div class="pick" id="${id}">${list.map(p => `<label class="chk"><input type="checkbox" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${esc(p.name)} <span class="muted small">${esc(Object.entries(p.ratings || {}).map(([t, l]) => t + " " + l).join(" · "))}</span></label>`).join("")}</div></div>`;
@@ -253,8 +254,11 @@ async function fr24Run(id, quiet) {
   for (const v of vs) { const x = r.items[key(v.reg)]; if (!x) continue; if (x.live || x.last) found++;
     const f = fr24Fill(v, x); if (f.arr || f.dep) filled++;
     await patch("shiftItems", v.id, Object.assign({ fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}) }, f)); }
-  if (!quiet) toast(`Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures remplies pour ${filled}` : ""}.`);
+  FR24ERR = (r.errors || []).join(" · ");
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures remplies pour ${filled}` : ""}.`);
+  if (quiet && FR24ERR) render(true);
 }
+let FR24ERR = "";
 ACTIONS["fr24-track"] = async el => { el.disabled = true; try { await fr24Run(el.dataset.ho); } catch (e) { toast(tr(e.message)); } el.disabled = false; };
 /* shift en cours : mise à jour automatique à l'ouverture, au plus toutes les 15 minutes (chaque appel consomme des crédits FR24) */
 let fr24Auto = {};
@@ -263,7 +267,7 @@ function fr24AutoRun() {
   const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit").filter(v => v.reg); if (!vs.length) return;
   const last = Math.max(fr24Auto[id] || 0, ...vs.map(v => Date.parse(v.fr24 && v.fr24.at) || 0));
   if (Date.now() - last < 15 * 60000) return;
-  fr24Auto[id] = Date.now(); fr24Run(id, true).catch(() => {});
+  fr24Auto[id] = Date.now(); fr24Run(id, true).catch(e => { FR24ERR = e.message; render(true); });
 }
 function fr24CardShell() {
   if (!SERVER || !isAdmin()) return "";
@@ -274,8 +278,17 @@ async function loadFr24() {
   FR24 = null; const s = await fr24Status();
   box.innerHTML = `<div class="small">Suivi des avions du shift par immatriculation (en vol, ETA, atterrissage). Il faut une clé de l'<b>offre API</b> de Flightradar24 (fr24api.flightradar24.com), différente de l'abonnement Premium de l'application. Sans clé, les heures ARR / DEP se saisissent à la main.</div>
     <div class="row-g wrap">${s && s.configured ? `<span class="chip good">Clé enregistrée ${esc(s.hint || "")}</span><button class="btn sm" data-a="fr24-test">Tester</button><button class="btn sm" data-a="fr24-off">Retirer la clé</button>` : `<span class="chip">Non configuré</span>`}
-    <input type="password" id="fr24-key" placeholder="${esc(tr("Clé API Flightradar24"))}" autocomplete="off" style="min-width:260px"><button class="btn sm primary" data-a="fr24-save">Enregistrer la clé</button></div>`;
+    <input type="password" id="fr24-key" placeholder="${esc(tr("Clé API Flightradar24"))}" autocomplete="off" style="min-width:260px"><button class="btn sm primary" data-a="fr24-save">Enregistrer la clé</button></div>
+    ${s && s.configured ? `<div class="row-g wrap"><span class="small">Diagnostic : ce que Flightradar24 répond pour une immatriculation</span><input id="fr24-dreg" class="mono" placeholder="9H-CAC" style="width:120px"><button class="btn sm" data-a="fr24-diag">Diagnostiquer</button></div><pre class="small" id="fr24-dout" style="white-space:pre-wrap;max-height:320px;overflow:auto" hidden></pre>` : ""}`;
 }
+ACTIONS["fr24-diag"] = async el => {
+  const reg = val("fr24-dreg"), out = document.getElementById("fr24-dout"); if (!reg) return;
+  el.disabled = true; out.hidden = false; out.textContent = tr("Interrogation de Flightradar24…");
+  try { const r = await API.call("POST", "fr24/diag", { reg });
+    out.textContent = r.results.map(x => `${x.endpoint}  ${JSON.stringify(x.params)}\n` + (x.ok ? `→ ${x.count} ${tr("résultat(s)")}; ${tr("champs")} : ${x.keys.join(", ")}\n${x.sample.map(s => "  " + JSON.stringify(s)).join("\n")}` : `→ ${tr("erreur")} : ${x.error}`)).join("\n\n"); }
+  catch (e) { out.textContent = tr(e.message); }
+  el.disabled = false;
+};
 ACTIONS["fr24-save"] = async () => { const k = val("fr24-key"); if (!k) return; try { await API.call("POST", "fr24/config", { key: k }); toast("Clé Flightradar24 enregistrée"); } catch (e) { toast(tr(e.message)); } loadFr24(); };
 ACTIONS["fr24-off"] = () => confirmBox("Retirer la clé Flightradar24 ?", async () => { await API.call("POST", "fr24/config", { key: "" }); loadFr24(); }, "Retirer");
 ACTIONS["fr24-test"] = async () => { try { await API.call("POST", "fr24/test", {}); toast("Connexion Flightradar24 OK"); } catch (e) { toast(tr(e.message)); } };

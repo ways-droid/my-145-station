@@ -74,6 +74,9 @@ jobs:
           cp -r api/vendor site/api/
           cp client/*.js site/client/
           echo "${GITHUB_SHA::7} $(date -u +%FT%TZ)" > site/version.txt
+          # version dans les liens des scripts : le navigateur recharge le code après chaque déploiement
+          sed -i -E "s#(src=\"(js|client)/[^\"?]+\.js)\"#\1?v=${GITHUB_SHA::7}\"#g" site/index.html
+          grep -c "?v=${GITHUB_SHA::7}" site/index.html
 
       - name: Envoi SFTP
         env:
