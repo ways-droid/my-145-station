@@ -91,7 +91,7 @@ function shiftTodo(id, date, sh) {
   const prevOpen = [...hoItems(pid, "todo").filter(x => !x.done), ...hoItems(pid, "visit").filter(v => v.open)].filter(x => !rows.some(r => r.from === x.id));
   return sec(1, "Travail non terminé", "Ce qui reste à faire, repris par le shift suivant.", ed ? `${prevOpen.length ? `<button class="btn sm" data-a="todo-carry" data-id="${id}" data-prev="${pid}">Reprendre du shift précédent (${prevOpen.length})</button>` : ""}<button class="btn sm" data-a="todo-form" data-ho="${id}">Ajouter</button>` : "",
     rows.length ? `<div class="tablewrap"><table><thead><tr><th style="width:40px"></th><th>Avion</th><th>Travail</th><th>Remarque</th></tr></thead><tbody>${rows.map(x => `<tr class="${ed ? "click" : ""} ${x.done ? "muted" : ""}" ${ed ? `data-a="todo-form" data-ho="${id}" data-id="${x.id}"` : ""}>
-      <td><input type="checkbox" data-a="todo-done" data-id="${x.id}" ${x.done ? "checked" : ""} ${ed ? "" : "disabled"} aria-label="Fait"></td><td class="mono"><b>${esc(x.reg || "")}</b></td><td class="pre">${esc(x.text || "")}</td><td class="small">${esc(x.note || "")}</td></tr>`).join("")}</tbody></table></div>`
+      <td><input type="checkbox" data-a="todo-done" data-id="${x.id}" ${x.done ? "checked" : ""} ${ed ? "" : "disabled"} aria-label="Fait"></td><td class="mono"><b>${esc(x.reg || "")}</b></td><td class="pre">${x.unc ? `<span class="chip sm bad unc-chip">${esc(tr("Uncompleted maintenance task"))}</span> ` : ""}${esc(x.text || "")}${x.unc && x.visitRef && S.shiftItems.some(y => y.id === x.visitRef) ? ` <button class="linkbtn small" data-a="visit-form" data-ho="${id}" data-id="${x.visitRef}">${esc(tr("Tech Log de l'avion"))} ↗</button>` : ""}</td><td class="small">${esc(x.note || "")}</td></tr>`).join("")}</tbody></table></div>`
       : `<div class="pad muted">Rien en attente.</div>`);
 }
 ACTIONS["todo-form"] = el => {
@@ -227,7 +227,7 @@ function techLogHtml(v) {
   if (!ts.length) return `<span class="muted">—</span>`;
   const taken = new Set(S.shiftItems.filter(x => x.kind === "visit" && x.ho !== v.ho && visitGid(x) === visitGid(v)).flatMap(x => (x.tasks || []).map(t => t.from)).filter(Boolean));
   return `<div class="tl">${ts.map(t => { const meta = [t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · "), who = (t.techs || []).map(x => sName(x.id) + (numH(x.h) ? " " + fmtH(numH(x.h)) + "h" : "")).join(", ");
-    return `<div class="tl-row"><div class="tl-d">${esc(t.text || "—")}${meta ? `<div class="mono muted">${esc(meta)}</div>` : ""}</div>
+    return `<div class="tl-row ${t.unc ? "tl-row-unc" : ""}"><div class="tl-d">${t.unc ? `<span class="chip sm bad unc-chip">✔ ${esc(tr("Non terminée · passée au shift suivant"))}</span> ` : ""}${t.from && uncSrc(t.from) ? `<span class="chip sm warn">${esc(tr("Reprise du shift précédent"))}</span> ` : ""}${esc(t.text || "—")}${meta ? `<div class="mono muted">${esc(meta)}</div>` : ""}</div>
       <div class="tl-a ${t.action || taken.has(t.id) ? "" : "tl-open"}">${t.action ? esc(t.action) : taken.has(t.id) ? `<span class="muted">${esc(tr("Reprise par un shift suivant"))}</span>` : esc(tr("À faire"))}${who || taskH(t) ? `<div class="muted">${[who ? esc(who) : "", taskH(t) ? `<b>${fmtH(taskH(t))} h</b>` : ""].filter(Boolean).join(" · ")}</div>` : ""}</div></div>`; }).join("")}</div>`;
 }
 
@@ -306,12 +306,13 @@ ACTIONS["visit-form"] = el => {
           <select data-tadd><option value="">+ ${esc(tr("technicien"))}</option>${people.filter(p => !(t.techs || []).some(x => x.id === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>
           ${(t.techs || []).some(x => numH(x.h)) ? "" : `<label class="tl-tot">${esc(tr("ou total"))} <input class="mono" data-k="mhrs" value="${esc(t.mhrs || "")}" placeholder="h" inputmode="decimal"></label>`}</div></div>
         <label class="chk tl-eq" title="${esc(tr("Crée une ligne à remplir dans la section 3 · Équipement et matériel"))}"><input type="checkbox" data-k="equip" ${t.equip ? "checked" : ""}> ${esc(tr("Équipement utilisé"))}</label>
+        <label class="chk tl-unc ${t.unc ? "on" : ""}" title="${esc(tr("La tâche passe au shift suivant : section 1 et Tech Log de l'avion"))}"><input type="checkbox" data-k="unc" ${t.unc ? "checked" : ""}> ${esc(tr("Uncompleted maintenance task – to hand over"))}</label>
         <button type="button" class="btn sm danger tl-del" data-tidel="${i}">${esc(tr("Retirer"))}</button></div></div>`).join("") +
       `<div class="row-g wrap tl-add"><button type="button" class="btn sm" data-tnew="">+ ${esc(tr("Ligne"))}</button>${taskPresets().map(p => `<button type="button" class="btn sm" data-tnew="${esc(p)}">+ ${esc(p)}</button>`).join("")}
         <span class="muted small" style="margin-left:auto">${esc(tr("Total MHRS"))} : <b>${fmtH(tot) || "0"}</b></span></div>`;
   };
   $t.addEventListener("input", e => { const c = e.target.closest("[data-ti]"); if (!c) return; const t = tasks[+c.dataset.ti];
-    if (e.target.dataset.k === "equip") t.equip = e.target.checked; else if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
+    if (e.target.dataset.k === "equip") t.equip = e.target.checked; else if (e.target.dataset.k === "unc") { t.unc = e.target.checked; e.target.closest(".tl-unc").classList.toggle("on", t.unc); } else if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
     if (e.target.dataset.tj != null || e.target.dataset.k === "mhrs") { const b = $t.querySelector(".tl-add b"); if (b) b.textContent = fmtH(tasks.reduce((a, x) => a + taskH(x), 0)) || "0"; } });
   $t.addEventListener("change", e => { if (e.target.matches("[data-tadd]") && e.target.value) { const t = tasks[+e.target.closest("[data-ti]").dataset.ti]; t.techs = [...(t.techs || []), { id: e.target.value, h: "" }]; drawTasks(); }
     if (e.target.dataset.tj != null) drawTasks(); });
@@ -358,6 +359,7 @@ ACTIONS["visit-form"] = el => {
     closeModal();
     await visitSync(Object.assign({}, data, { id }));
     await taskEquipSync(Object.assign({}, data, { id }));
+    await taskUncSync(Object.assign({}, data, { id }));
     const n = visitShifts(data).length; toast(n > 1 ? tr("Avion enregistré") + " · " + plural(n, "shift") : "Avion enregistré");
   };
 };
@@ -372,6 +374,39 @@ async function taskEquipSync(v) {
   for (const x of have) { const t = want.find(y => y.id === x.taskId);
     if (!t) { if (!x.item) await remove("shiftItems", x.id); }
     else if ((x.task || "") !== (t.text || "") || (x.reg || "") !== (v.reg || "")) await patch("shiftItems", x.id, { task: t.text || "", reg: v.reg || "" }); }
+}
+/* tâche cochée « Uncompleted maintenance task – to hand over » : elle passe automatiquement au shift suivant,
+   dans la section 1 (ligne todo liée : fromTask) ET dans le Tech Log de l'avion de ce shift (tâche liée : from).
+   La ligne d'avion du shift suivant est créée si l'escale n'en a pas encore. Décochée : les copies encore vides sont retirées.
+   Quand la tâche reprise reçoit une action, la ligne de la section 1 est cochée faite. */
+const uncSrc = tid => S.shiftItems.find(x => x.kind === "visit" && (x.tasks || []).some(t => t.id === tid && t.unc));
+async function taskUncSync(v) {
+  const nid = hoId(...nextShift(v.ho.slice(0, 10), v.ho.slice(11))), gid = visitGid(v);
+  const want = (v.tasks || []).filter(t => t.unc && t.text);
+  const todos = S.shiftItems.filter(x => x.kind === "todo" && x.ho === nid && x.fromVisit === v.id);
+  let nv = S.shiftItems.find(x => x.kind === "visit" && x.ho === nid && visitGid(x) === gid);
+  if (want.length && !nv) {
+    const shared = Object.fromEntries(VISIT_SHARED.map(k => [k, v[k] ?? ""]));
+    const nidv = await save("shiftItems", null, Object.assign({ kind: "visit", ho: nid, visitId: gid, crs: [], mech: [], tasks: [], order: v.order || Date.now() }, shared));
+    if (!v.visitId) await patch("shiftItems", v.id, { visitId: gid });
+    nv = await waitFind("shiftItems", nidv) || { id: nidv, ho: nid, tasks: [] };
+  }
+  if (nv) {
+    let nt = visitTasks(nv).filter(t => t.id !== "legacy").map(t => Object.assign({}, t)), ch = false;
+    for (const t of want) { const c = nt.find(y => y.from === t.id);
+      if (!c) { nt.push({ id: uid(), text: t.text, action: "", logPage: t.logPage || "", wo: t.wo || "", techs: [], from: t.id }); ch = true; }
+      else if (!c.action && c.text !== t.text) { c.text = t.text; ch = true; } }
+    const drop = nt.filter(y => y.from && !y.action && !(y.techs || []).length && (v.tasks || []).some(t => t.id === y.from && !t.unc));
+    if (drop.length) { nt = nt.filter(y => !drop.includes(y)); ch = true; }
+    if (ch) { const line = t => [t.text, t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · ");
+      await patch("shiftItems", nv.id, { tasks: nt, planned: nt.map(t => "- " + line(t)).join("\n") }); }
+  }
+  for (const t of want) { const x = todos.find(y => y.fromTask === t.id), note = [t.action ? tr("Fait jusqu'ici") + " : " + t.action : "", t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · ");
+    if (!x) await save("shiftItems", null, { kind: "todo", ho: nid, reg: v.reg || "", text: t.text, note, unc: true, fromVisit: v.id, fromTask: t.id, visitRef: nv ? nv.id : "", order: Date.now() });
+    else if (x.text !== t.text || (x.note || "") !== note || x.reg !== (v.reg || "")) await patch("shiftItems", x.id, { text: t.text, note, reg: v.reg || "" }); }
+  for (const x of todos) if (!want.some(t => t.id === x.fromTask) && !x.done) await remove("shiftItems", x.id);
+  /* tâches reprises de ce shift qui ont reçu une action : la ligne de la section 1 du shift est faite */
+  for (const t of (v.tasks || []).filter(t => t.from && t.action)) for (const x of S.shiftItems.filter(y => y.kind === "todo" && y.ho === v.ho && y.fromTask === t.from && !y.done)) await patch("shiftItems", x.id, { done: true });
 }
 const equipTodo = id => hoItems(id, "equip").filter(x => x.taskId && !String(x.item || "").trim());
 

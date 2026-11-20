@@ -1042,3 +1042,9 @@ Object.assign(EN, {
   "Supprimer cette situation ? Son historique sera perdu. Pour une situation résolue, utilisez plutôt « Revenue à la normale ».": "Delete this situation? Its history will be lost. For a resolved situation, use “Back to normal” instead.",
   "sorti": "out"
 });
+Object.assign(EN, {
+  "Uncompleted maintenance task – to hand over": "Uncompleted maintenance task – to hand over", "Uncompleted maintenance task": "Uncompleted maintenance task",
+  "La tâche passe au shift suivant : section 1 et Tech Log de l'avion": "The task moves to the next shift: section 1 and the aircraft Tech Log",
+  "Non terminée · passée au shift suivant": "Uncompleted · handed over to next shift", "Reprise du shift précédent": "Carried over from previous shift",
+  "Fait jusqu'ici": "Done so far", "Tech Log de l'avion": "Aircraft Tech Log"
+});
