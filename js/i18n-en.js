@@ -1090,3 +1090,4 @@ Object.assign(EN, {
   "avions": "aircraft", "à l'équipe": "on crew", "situations ouvertes": "open situations",
   "Code OACI de la station (météo)": "Station ICAO code (weather)", "Alerte rafales au-dessus de (kt)": "Gust alert above (kt)", "Lien NOTAM (facultatif)": "NOTAM link (optional)"
 });
+Object.assign(EN, { "Mur de la station": "Station wall", "Mur": "Wall", "Plein écran pour la TV du bureau": "Full screen for the office TV", "Local": "Local", "Quitter": "Exit", "à affecter": "to assign", "Mécanos": "Mechanics", "Équipe": "Crew", "libre": "free" });
