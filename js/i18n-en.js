@@ -950,3 +950,4 @@ Object.assign(EN, {
   "Interrogation de Flightradar24…": "Querying Flightradar24…", "résultat(s)": "result(s)", "Vendredi": "Friday", "erreur": "error", "champs": "fields", "Diagnostiquer": "Run diagnostics"
 });
 rule(/^Vols en cours : (.+)$/, (m, a) => "Live flights: " + tr(a)); rule(/^Vols récents : (.+)$/, (m, a) => "Recent flights: " + tr(a));
+Object.assign(EN, { "Flightradar24 renvoie des données de démonstration : la clé enregistrée est une clé de test (sandbox). Créez une clé de production sur fr24api.flightradar24.com et remplacez-la dans Paramètres.": "Flightradar24 returns demo data: the saved key is a test (sandbox) key. Create a production key on fr24api.flightradar24.com and replace it in Settings." });
