@@ -156,6 +156,22 @@ ok "bureau : ne change pas l'e-mail d'un administrateur système" "$(curl -s -H 
 curl -s -H "$A" -X PATCH -d '{"sysAdmin":false}' $U/docs/staff/s1 >/dev/null
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("DELETE FROM ways_kv WHERE k = ?")->execute(["tfa:u2"]);' $T/t.db
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
+echo "> station needs et situations ouvertes"
+ok "terrain : demande un besoin" "$(curl -s -H "$HT" -X PUT -d '{"title":"Gants nitrile","cat":"consumable","status":"asked"}' $U/docs/needs/nd1)" '"ok":true'
+ok "terrain : n'approuve pas un besoin" "$(curl -s -H "$HT" -X PATCH -d '{"status":"approved"}' $U/docs/needs/nd1)" 'Station Lead'
+ok "terrain : ne crée pas un besoin déjà approuvé" "$(curl -s -H "$HT" -X PUT -d '{"title":"X","status":"approved"}' $U/docs/needs/nd2)" 'Station Lead'
+ok "terrain : ne supprime pas un besoin" "$(curl -s -H "$HT" -X DELETE $U/docs/needs/nd1)" 'rôle'
+curl -s -H "$A" -X PATCH -d '{"function":"lead"}' $U/docs/staff/s1 >/dev/null
+ok "Station Lead : approuve" "$(curl -s -H "$HT" -X PATCH -d '{"status":"approved"}' $U/docs/needs/nd1)" '"ok":true'
+curl -s -H "$A" -X PATCH -d '{"function":"mechanic"}' $U/docs/staff/s1 >/dev/null
+ok "bureau : commande" "$(curl -s -H "$B" -X PATCH -d '{"status":"ordered"}' $U/docs/needs/nd1)" '"ok":true'
+ok "terrain : marque reçu un besoin commandé" "$(curl -s -H "$HT" -X PATCH -d '{"status":"received"}' $U/docs/needs/nd1)" '"ok":true'
+ok "historique : besoin tracé" "$(curl -s -H "$A" "$U/log?coll=needs")" 'Gants nitrile'
+ok "terrain : ouvre une situation (outil prêté)" "$(curl -s -H "$HT" -X PUT -d '{"kind":"toolLoan","title":"Clé prêtée","party":"El Al","status":"open","showInShift":true}' $U/docs/situations/si1)" '"ok":true'
+ok "terrain : masque la situation du shift" "$(curl -s -H "$HT" -X PATCH -d '{"showInShift":false}' $U/docs/situations/si1)" '"ok":true'
+ok "terrain : clôture la situation" "$(curl -s -H "$HT" -X PATCH -d '{"status":"closed"}' $U/docs/situations/si1)" '"ok":true'
+ok "terrain : ne supprime pas une situation" "$(curl -s -H "$HT" -X DELETE $U/docs/situations/si1)" 'rôle'
+ok "bureau : supprime une situation" "$(curl -s -H "$B" -X DELETE $U/docs/situations/si1)" '"ok":true'
 echo "> outillage"
 F=$(date -u -d "+90 days" +%F); P=$(date -u -d "-3 days" +%F)
 ok "bureau : outil au registre" "$(curl -s -H "$B" -X PUT -d "{\"toolNo\":\"TLV-T-001\",\"name\":\"Clé dynamométrique\",\"status\":\"service\",\"calRequired\":true,\"nextDue\":\"$F\",\"history\":[]}" $U/docs/tools/tq1)" '"ok":true'
