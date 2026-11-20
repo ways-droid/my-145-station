@@ -171,7 +171,7 @@ const SESSION_LS = "st-session";
 const ROLE_LBL = { admin: "Administrateur", bureau: "Bureau", terrain: "Terrain" };
 const isAdmin = () => !SERVER || !ME || ME.role === "admin";
 /* modules masqués pour le rôle Terrain (pas de clients, de prix ni d'administration) */
-const ROLE_HIDE = { terrain: ["charge", "clients", "produits", "admin", "historique", "parametres", "headquarters"], bureau: ["headquarters"] };
+const ROLE_HIDE = { terrain: ["charge", "clients", "produits", "admin", "historique", "parametres", "headquarters", "rapport"], bureau: ["headquarters"] };
 const isOffice = () => !ME || ME.key || ["admin", "bureau"].includes(ME.role);
 const allowed = r => !ME || !(ROLE_HIDE[ME.role] || []).includes(r);
 const lsGet = k => { try { return localStorage.getItem(k) || ""; } catch { return ""; } };
@@ -342,9 +342,9 @@ const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
   ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["consignes", "Consignes"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["voyages", "Voyages"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
-  ["Management", [["headquarters", "Headquarters"], ["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
+  ["Management", [["headquarters", "Headquarters"], ["rapport", "Rapport mensuel"], ["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", rapport: "grey", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }

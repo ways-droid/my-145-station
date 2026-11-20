@@ -401,6 +401,8 @@ body.wall .app { grid-template-columns: 1fr; } body.wall nav.side, body.wall .to
 .ins { border-left: 4px solid var(--line, #e3e6ec); } .ins.imp { border-left-color: var(--bad); } .ins.todo { box-shadow: 0 0 0 2px var(--warn-bg); } .ins h3 { margin: 0; } .ins-body { margin: 10px 0; font-size: 15px; line-height: 1.5; } .ins-foot { margin-top: 8px; gap: 10px; flex-wrap: wrap; } .ins-list { display: grid; gap: 12px; }
 .ind-bar { display: inline-block; width: 120px; height: 8px; border-radius: 4px; background: var(--mute-bg, #eef0f4); overflow: hidden; vertical-align: middle; margin-right: 8px; } .ind-bar i { display: block; height: 100%; background: var(--good); }
 .ind-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line, #eee); } .ind-row.ok > span:first-child { color: var(--good); font-weight: 600; }
+.rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; } .rp-box { margin: 0; } .rp-box h3 { margin: 0; } .rp-print-h { display: none; }
+@media print { nav.side, .topline, .head .btn, .head button, .tabs { display: none !important; } .app { display: block; } .rp-print-h { display: block; margin-bottom: 10px; font-size: 16px; } .panel { break-inside: avoid; box-shadow: none; } }
 .sit-box { border-left: 4px solid var(--warn); background: var(--warn-bg); margin: 0 0 14px; padding: 10px 14px; } .sit-h { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: var(--warn); }
 .sit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 5px 0; border-top: 1px solid rgba(154,98,0,.18); } .sit-row .btn { margin-left: auto; } .sit-row.late { color: var(--bad); }
 .ho-locked .ho-sec { box-shadow: inset 4px 0 0 rgba(224,150,40,.75); background-image: repeating-linear-gradient(135deg, rgba(224,150,40,.05) 0 10px, transparent 10px 20px); }
@@ -1102,6 +1104,7 @@ table.vlist a.btn { white-space: nowrap; } .wf-tile .val.sm { font-size: 13px; l
 <script src="js/wall.js"></script>
 <script src="js/instructions.js"></script>
 <script src="js/induction.js"></script>
+<script src="js/report.js"></script>
 <script src="js/security.js"></script>
 <script src="js/links.js"></script>
 </body>
