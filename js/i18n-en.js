@@ -1091,3 +1091,17 @@ Object.assign(EN, {
   "Code OACI de la station (météo)": "Station ICAO code (weather)", "Alerte rafales au-dessus de (kt)": "Gust alert above (kt)", "Lien NOTAM (facultatif)": "NOTAM link (optional)"
 });
 Object.assign(EN, { "Mur de la station": "Station wall", "Mur": "Wall", "Plein écran pour la TV du bureau": "Full screen for the office TV", "Local": "Local", "Quitter": "Exit", "à affecter": "to assign", "Mécanos": "Mechanics", "Équipe": "Crew", "libre": "free" });
+/* Consignes du Station Lead */
+Object.assign(EN, {
+  "Consignes": "Instructions", "Les consignes du Station Lead. Chacun les lit et signe « Lu et compris » ; la signature est gardée.": "Station Lead instructions. Everyone reads them and signs “Read and understood”; the signature is kept.",
+  "Nouvelle consigne": "New instruction", "Modifier la consigne": "Edit instruction", "Consigne": "Instruction", "Mes consignes": "My instructions", "Toutes": "All", "Archivées": "Archived", "Aucune consigne ici.": "No instructions here.",
+  "Votre compte n'est relié à aucune fiche Personnel (même e-mail) : vous ne pouvez pas signer les consignes.": "Your account is not linked to a Staff record (same e-mail): you cannot sign instructions.",
+  "Important": "Important", "à lire avant le": "read before", "Toute l'équipe": "Whole team", "ont signé": "signed", "Lu et compris": "Read and understood", "Lu et compris le": "Read and understood on",
+  "Je confirme avoir lu et compris cette consigne.": "I confirm I have read and understood this instruction.", "Ont signé": "Signed", "Pas encore signé": "Not signed yet", "Tout le monde a signé.": "Everyone has signed.",
+  "À lire avant le (facultatif)": "Read before (optional)", "Pour qui": "For whom", "Rien de coché = toute l'équipe.": "Nothing ticked = whole team.", "Important (en tête, en rouge)": "Important (on top, in red)",
+  "Joindre un document (facultatif)": "Attach a document (optional)", "Archiver (plus affichée)": "Archive (no longer shown)", "Déjà signée par": "Already signed by",
+  "personne(s) : si le contenu change vraiment, publiez plutôt une nouvelle consigne.": "person(s): if the content really changes, publish a new instruction instead.", "Publier": "Publish",
+  "Consigne enregistrée": "Instruction saved", "Consigne publiée": "Instruction published", "Supprimer cette consigne et ses signatures ? Pour la retirer en gardant la trace, archivez-la plutôt.": "Delete this instruction and its signatures? To withdraw it and keep the record, archive it instead.",
+  "Consignes du Station Lead à lire et signer « Lu et compris ».": "Station Lead instructions to read and sign “Read and understood”.", "à lire": "to read", "en cours": "active",
+  "pas signée par": "not signed by", "signée par l'équipe": "signed by the crew"
+});

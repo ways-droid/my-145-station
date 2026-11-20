@@ -58,6 +58,8 @@ function shiftBriefing(id, date, sh) {
       : `<div class="pad muted">${esc(tr("Rien à reprendre."))}</div>`) +
     box("Situations ouvertes", sits.length, sits.length ? `<div class="pad">${sits.map(s => `<div class="list-row click" data-a="sit-open" data-id="${s.id}"><span><b>${esc(sitName(s))}</b> <span class="muted small">${esc(sitParty(s))}</span></span>${sitChip(s)}</div>`).join("")}</div>`
       : `<div class="pad muted">${esc(tr("Aucune situation ouverte : tout est normal."))}</div>`) +
+    (typeof insActive === "function" && insActive().length ? box("Consignes", insActive().length, `<div class="pad">${insActive().slice(0, 6).map(i => { const miss = crew.filter(p => insFor(i, p) && !insAcked(i, p.id));
+      return `<div class="list-row click" data-a="ins-go"><span>${i.important ? `<span class="chip sm bad">!</span> ` : ""}<b>${esc(i.title)}</b></span><span class="small ${miss.length ? "txt-warn" : "muted"}">${miss.length ? `${esc(tr("pas signée par"))} ${miss.map(p => esc(p.name)).join(", ")}` : esc(tr("signée par l'équipe"))}</span></div>`; }).join("")}</div>`) : "") +
     (needs.length ? box("Besoins urgents", needs.length, `<div class="pad">${needs.map(n => `<div class="list-row click" data-a="nd-open" data-id="${n.id}"><span>${ndPrio(n)}<b>${esc(n.title)}</b></span>${ndChip(n)}</div>`).join("")}</div>`) : "") +
     `</div>`;
 }

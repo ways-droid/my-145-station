@@ -7,7 +7,7 @@ const LOG_ACT = {
   archive: ["Archivage", ""], unarchive: ["Désarchivage", ""], reply: ["Réponse Peppol", "info"], falco: ["Envoi à Falco", "warn"],
   mail: ["E-mail préparé", "warn"], pdf: ["PDF téléchargé", ""], print: ["Impression", ""], login: ["Connexion", ""]
 };
-const LOG_MOD = { staff: "Personnel", roster: "Roster", handovers: "Shift", shiftItems: "Shift", chargeLines: "Charge Sheet", partMoves: "Pièces", needs: "Station Needs", expiries: "Expirations", forms: "Formulaires", situations: "Situations ouvertes", travel: "Voyages", hotels: "Voyages", aircraft: "Avions", clients: "Clients", products: "Articles et prix",
+const LOG_MOD = { staff: "Personnel", roster: "Roster", handovers: "Shift", shiftItems: "Shift", chargeLines: "Charge Sheet", partMoves: "Pièces", needs: "Station Needs", expiries: "Expirations", forms: "Formulaires", instructions: "Consignes", situations: "Situations ouvertes", travel: "Voyages", hotels: "Voyages", aircraft: "Avions", clients: "Clients", products: "Articles et prix",
   vehicles: "Véhicules", vehEvents: "Véhicules", faults: "Véhicules", driverLogs: "Véhicules", tires: "Véhicules", vehDocs: "Véhicules",
   tools: "Outillage", labs: "Outillage", links: "Liens",
   adminDocs: "Administration", adminFolders: "Administration", notes: "Notes", settings: "Paramètres", auth: "Connexions" };
