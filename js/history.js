@@ -119,3 +119,21 @@ ACTIONS["prof-open"] = async () => {
     <footer>${isOffice() && !ME.key ? `<div class="left"><button class="btn" data-a="prof-hist">Mon historique</button></div>` : ""}<button class="btn" data-close>Fermer</button><button class="btn danger" data-a="server-logout">Se déconnecter</button></footer>`);
 };
 ACTIONS["prof-hist"] = () => { closeModal(); UI.lf = { days: "30", by: ME.name, mod: "", act: "", src: "" }; LOGS = null; location.hash = "#historique"; };
+
+/* ---- conflits après une synchronisation hors ligne ----
+   Pour chaque fiche : ce que l'autre personne avait changé pendant que vous étiez hors ligne (champ par champ).
+   Votre version est déjà enregistrée ; « Reprendre l'autre version » remet celle de l'autre personne (tracé dans l'historique). */
+const offVal = v => v == null || v === "" ? "—" : typeof v === "object" ? JSON.stringify(v).slice(0, 140) : String(v).slice(0, 140);
+const offName = (c, d) => d ? (d.title || d.name || d.reg || d.plate || d.toolNo || d.org || d.text || "") : "";
+ACTIONS["off-conf"] = () => {
+  const list = offConflicts();
+  const m = modal(`${mHead("Conflits à vérifier")}<div class="body stack-s"><div class="hint">${esc(tr("Pendant que vous étiez hors ligne, quelqu'un d'autre a modifié ces fiches. Votre version est enregistrée. Comparez, puis gardez la vôtre ou reprenez l'autre."))}</div>
+    ${list.map((c, i) => { const keys = Array.from(new Set([...Object.keys(c.base || {}), ...Object.keys(c.theirs || {})])).filter(k => JSON.stringify((c.base || {})[k]) !== JSON.stringify((c.theirs || {})[k]));
+      return `<section class="panel pad stack-s"><div class="row-sb"><b>${esc(tr(LOG_MOD[c.coll] || c.coll))} · ${esc(offName(c.coll, c.theirs || c.base) || c.id)}</b><span class="small muted">${esc(tr("votre modification du"))} ${fmtDT(c.at)}</span></div>
+        ${c.theirs == null ? `<div class="small txt-bad">${esc(tr("L'autre personne avait supprimé cette fiche."))}</div>` : keys.length ? `<table class="small"><thead><tr><th>${esc(tr("Champ"))}</th><th>${esc(tr("Avant"))}</th><th>${esc(tr("Changé par l'autre personne"))}</th></tr></thead><tbody>${keys.map(k => `<tr><td class="mono">${esc(k)}</td><td>${esc(offVal((c.base || {})[k]))}</td><td><b>${esc(offVal(c.theirs[k]))}</b></td></tr>`).join("")}</tbody></table>` : `<div class="small muted">${esc(tr("La fiche a été créée par quelqu'un d'autre en même temps."))}</div>`}
+        <div class="row-g"><button class="btn sm" data-a="off-keep" data-i="${i}">${esc(tr("Garder ma version"))}</button>${c.theirs != null ? `<button class="btn sm" data-a="off-theirs" data-i="${i}">${esc(tr("Reprendre l'autre version"))}</button>` : ""}</div></section>`; }).join("") || `<div class="muted">${esc(tr("Aucun conflit."))}</div>`}</div>
+    <footer><button class="btn" data-close>Fermer</button></footer>`, "lg");
+};
+const offDrop = i => { const a = offConflicts(); a.splice(i, 1); offConfSave(a); if (a.length) ACTIONS["off-conf"](); else { closeModal(); render(true); } };
+ACTIONS["off-keep"] = el => offDrop(+el.dataset.i);
+ACTIONS["off-theirs"] = async el => { const c = offConflicts()[+el.dataset.i]; if (!c || !c.theirs) return; await save(c.coll, c.id, c.theirs); toast("Version de l'autre personne reprise"); offDrop(+el.dataset.i); };
