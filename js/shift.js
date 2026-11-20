@@ -37,6 +37,15 @@ function visitCheck(v) {
   return { ok: true, msg: "" };
 }
 const hoClosed = h => !!(h && h.in && h.in.at);
+/* un shift ne peut être remis ni repris que si le shift précédent est entièrement passé (remis ET repris).
+   Un shift précédent jamais utilisé (aucune fiche, aucune ligne) ne bloque pas : c'est le début de l'historique.
+   Renvoie l'id du shift précédent qui bloque, ou "" */
+function prevBlock(id) {
+  const [pd, ps] = prevShift(id.slice(0, 10), id.slice(11)), pid = hoId(pd, ps), P = hoDoc(pid);
+  if (P && P.out && P.out.at && P.in && P.in.at) return "";
+  if (!P && !S.shiftItems.some(x => x.ho === pid)) return "";
+  return pid;
+}
 
 VIEWS.shift = {
   after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) { render(true); fr24AutoRun(); } }); else if (SERVER) fr24AutoRun(); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
@@ -50,9 +59,10 @@ VIEWS.shift = {
         ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
         ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
         ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`) +
+      (prevBlock(id) && !hoClosed(h) ? `<div class="ho-lockbar" role="status">🔒 ${esc(tr("Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent"))} <button class="linkbtn" data-a="shift-go" data-n="-1">${esc(shiftLabel(prevBlock(id)))}</button> ${esc(tr("n'est pas encore remis et repris."))}</div>` : "") +
       (hoClosed(h) ? `<div class="banner good">Handover terminé : remis par ${esc(h.out?.by || "?")} et repris par ${esc(h.in.by)} (${fmtDT(h.in.at)}).</div>` : "") +
       (bad ? `<div class="banner warn">${plural(bad, "avion")} sans CRS qualifié affecté : voir la section 2.</div>` : "") +
-      shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + shiftChecks(id, h) + shiftCrew(id, date, sh, h);
+      `<div class="${prevBlock(id) && !hoClosed(h) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + shiftChecks(id, h) + shiftCrew(id, date, sh, h) + `</div>`;
   }
 };
 const hoEd = id => !readOnly && (!hoClosed(hoDoc(id)) || isOffice());
@@ -403,14 +413,16 @@ function shiftCrew(id, date, sh, h) {
       ${ed && others.length ? `<label class="f">Ajouter au shift<select id="ho-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}</div>
     <div class="tablewrap"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Qualifications</th><th></th></tr></thead><tbody>${crew.map(p => { const x = rcell(p.id, date); return `<tr><td><b>${esc(p.name)}</b></td><td class="small">${esc(STAFF_FN[p.function] || "")}</td><td>${ratingChips(p)}</td>
       <td class="small">${extra.includes(p) ? `<span class="chip sm">Ajouté</span>${ed ? ` <button class="x" data-a="ho-rm" data-id="${p.id}" aria-label="Retirer">×</button>` : ""}` : x && rcode(x.c).k === "custom" ? esc(cellTxt(x)) : ""}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Personne au roster pour ce shift.</td></tr>`}</tbody></table></div>
-    <div class="row-g wrap ho-sign"><div class="panel pad"><b>Remis par</b><div>${h.out?.at ? `${esc(h.out.by)} · ${fmtDT(h.out.at)}` : `<span class="muted">Pas encore</span>`}</div>${ed && !h.out?.at ? `<button class="btn sm" data-a="ho-sign" data-k="out">Je remets le shift</button>` : ""}</div>
-      <div class="panel pad"><b>Repris par</b> <span class="muted small">(${esc(shiftName(...nxt))})</span><div>${h.in?.at ? `${esc(h.in.by)} · ${fmtDT(h.in.at)}` : `<span class="muted">Pas encore</span>`}</div>${!readOnly && h.out?.at && !h.in?.at ? `<button class="btn sm primary" data-a="ho-sign" data-k="in">Je reprends le shift</button>` : ""}</div>
+    <div class="row-g wrap ho-sign"><div class="panel pad"><b>Remis par</b><div>${h.out?.at ? `${esc(h.out.by)} · ${fmtDT(h.out.at)}` : `<span class="muted">Pas encore</span>`}</div>${ed && !h.out?.at ? `<button class="btn sm" data-a="ho-sign" data-k="out" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je remets le shift</button>` : ""}</div>
+      <div class="panel pad"><b>Repris par</b> <span class="muted small">(${esc(shiftName(...nxt))})</span><div>${h.in?.at ? `${esc(h.in.by)} · ${fmtDT(h.in.at)}` : `<span class="muted">Pas encore</span>`}</div>${!readOnly && h.out?.at && !h.in?.at ? `<button class="btn sm primary" data-a="ho-sign" data-k="in" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je reprends le shift</button>` : ""}</div>
       ${isOffice() && (h.out?.at || h.in?.at) && !readOnly ? `<button class="linkbtn small" data-a="ho-unsign">Annuler les signatures</button>` : ""}</div></div>`);
 }
 ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
 ACTIONS["ho-sign"] = el => {
   const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitCheck(v).ok).length;
   /* garde-fou : un équipement coché dans le Tech Log doit être renseigné avant de remettre le shift */
+  const pb = prevBlock(id);
+  if (pb) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body">${esc(tr("Le shift précédent"))} <b>${esc(shiftLabel(pb))}</b> ${esc(tr("doit d'abord être remis et repris."))}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   /* et tous les contrôles Station Control (section 4) doivent être cochés */
   const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]);
   if (k === "out" && (eq.length || miss.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">

@@ -990,3 +990,8 @@ Object.assign(EN, {
 });
 Object.assign(EN, { "tâche": "task", "tâches": "tasks" });
 Object.assign(EN, { "Station Control à cocher (section 4) :": "Station Control to tick (section 4):", "Tous les contrôles doivent être cochés avant de remettre le shift.": "All checks must be ticked before handing over the shift.", "restants": "left", "restant": "left" });
+Object.assign(EN, {
+  "Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent": "This shift can be prepared and filled in, but not handed over or taken over yet: the previous shift",
+  "n'est pas encore remis et repris.": "is not handed over and taken over yet.", "Le shift précédent n'est pas encore remis et repris.": "The previous shift is not handed over and taken over yet.",
+  "Le shift précédent": "The previous shift", "doit d'abord être remis et repris.": "must be handed over and taken over first.",
+});
