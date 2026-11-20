@@ -90,7 +90,8 @@ ACTIONS["item-del"] = el => {
   const v = S.shiftItems.find(x => x.id === el.dataset.id), g = v && v.kind === "visit" ? visitGroup(v).filter(x => x.id !== v.id) : [];
   const msg = v && v.kind === "visit" ? `${esc(tr("Êtes-vous sûr de vouloir supprimer l'avion"))} <b>${esc(v.reg || "")}</b> ${esc(tr("de ce shift ?"))} ${esc(tr("Le Tech Log de ce shift sera perdu."))}${g.length ? " " + esc(tr("Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.")) : ""}`
     : esc(tr("Êtes-vous sûr de vouloir supprimer cette ligne ?"));
-  const go = async () => { await remove("shiftItems", el.dataset.id); for (const x of g) if (!hasWork(x)) await remove("shiftItems", x.id); closeModal(); toast("C'est fait"); };
+  const linked = v && v.kind === "visit" ? S.shiftItems.filter(x => x.kind === "equip" && x.visitId === v.id && x.taskId && !x.item) : [];
+  const go = async () => { await remove("shiftItems", el.dataset.id); for (const x of [...g.filter(x => !hasWork(x)), ...linked]) await remove("shiftItems", x.id); closeModal(); toast("C'est fait"); };
   const box = el.closest(".left");
   if (!box) return confirmBox(msg, go);
   box.innerHTML = `<span class="tl-sure">${msg} <button type="button" class="btn sm" data-dno>${esc(tr("Non"))}</button> <button type="button" class="btn sm danger" data-dyes>${esc(tr("Oui, supprimer"))}</button></span>`;
@@ -277,12 +278,13 @@ ACTIONS["visit-form"] = el => {
         <div class="f tl-techs"><span>${esc(tr("Techniciens et MHRS"))}</span><div class="row-g wrap">${(t.techs || []).map((x, j) => `<span class="tl-tech">${esc(sName(x.id))} <input class="mono" data-tj="${j}" value="${esc(x.h ?? "")}" placeholder="h" inputmode="decimal"> <button type="button" class="x" data-tdel="${j}" aria-label="${esc(tr("Retirer"))}">×</button></span>`).join("")}
           <select data-tadd><option value="">+ ${esc(tr("technicien"))}</option>${people.filter(p => !(t.techs || []).some(x => x.id === p.id)).map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select>
           ${(t.techs || []).some(x => numH(x.h)) ? "" : `<label class="tl-tot">${esc(tr("ou total"))} <input class="mono" data-k="mhrs" value="${esc(t.mhrs || "")}" placeholder="h" inputmode="decimal"></label>`}</div></div>
+        <label class="chk tl-eq" title="${esc(tr("Crée une ligne à remplir dans la section 3 · Équipement et matériel"))}"><input type="checkbox" data-k="equip" ${t.equip ? "checked" : ""}> ${esc(tr("Équipement utilisé"))}</label>
         <button type="button" class="btn sm danger tl-del" data-tidel="${i}">${esc(tr("Retirer"))}</button></div></div>`).join("") +
       `<div class="row-g wrap tl-add"><button type="button" class="btn sm" data-tnew="">+ ${esc(tr("Ligne"))}</button>${taskPresets().map(p => `<button type="button" class="btn sm" data-tnew="${esc(p)}">+ ${esc(p)}</button>`).join("")}
         <span class="muted small" style="margin-left:auto">${esc(tr("Total MHRS"))} : <b>${fmtH(tot) || "0"}</b></span></div>`;
   };
   $t.addEventListener("input", e => { const c = e.target.closest("[data-ti]"); if (!c) return; const t = tasks[+c.dataset.ti];
-    if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
+    if (e.target.dataset.k === "equip") t.equip = e.target.checked; else if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
     if (e.target.dataset.tj != null || e.target.dataset.k === "mhrs") { const b = $t.querySelector(".tl-add b"); if (b) b.textContent = fmtH(tasks.reduce((a, x) => a + taskH(x), 0)) || "0"; } });
   $t.addEventListener("change", e => { if (e.target.matches("[data-tadd]") && e.target.value) { const t = tasks[+e.target.closest("[data-ti]").dataset.ti]; t.techs = [...(t.techs || []), { id: e.target.value, h: "" }]; drawTasks(); }
     if (e.target.dataset.tj != null) drawTasks(); });
@@ -328,17 +330,32 @@ ACTIONS["visit-form"] = el => {
     const id = await save("shiftItems", v.id, data);
     closeModal();
     await visitSync(Object.assign({}, data, { id }));
+    await taskEquipSync(Object.assign({}, data, { id }));
     const n = visitShifts(data).length; toast(n > 1 ? tr("Avion enregistré") + " · " + plural(n, "shift") : "Avion enregistré");
   };
 };
+
+/* tâche du Tech Log cochée « Équipement utilisé » : une ligne liée (taskId) est créée dans la section 3, à remplir.
+   Décochée : la ligne liée est retirée si elle est encore vide. Tant qu'une ligne liée est vide, le shift ne peut pas être remis. */
+async function taskEquipSync(v) {
+  const want = (v.tasks || []).filter(t => t.equip), have = S.shiftItems.filter(x => x.kind === "equip" && x.visitId === v.id && x.taskId);
+  const c = clientOfReg(v.reg);
+  for (const t of want) if (!have.some(x => x.taskId === t.id))
+    await save("shiftItems", null, { kind: "equip", ho: v.ho, visitId: v.id, taskId: t.id, task: t.text || "", reg: v.reg || "", user: c ? (c.code || c.name).toUpperCase() : "", item: "", qty: "", unit: "", order: Date.now() });
+  for (const x of have) { const t = want.find(y => y.id === x.taskId);
+    if (!t) { if (!x.item) await remove("shiftItems", x.id); }
+    else if ((x.task || "") !== (t.text || "") || (x.reg || "") !== (v.reg || "")) await patch("shiftItems", x.id, { task: t.text || "", reg: v.reg || "" }); }
+}
+const equipTodo = id => hoItems(id, "equip").filter(x => x.taskId && !String(x.item || "").trim());
 
 /* 3. équipement et matériel */
 function shiftEquip(id) {
   const rows = hoItems(id, "equip"), ed = hoEd(id);
   return sec(3, "Équipement et matériel", "Équipements et consommables utilisés, par client ou utilisateur.", ed ? `<button class="btn sm" data-a="equip-form" data-ho="${id}">Ajouter</button>` : "",
-    rows.length ? `<div class="tablewrap"><table><thead><tr><th>Client / utilisateur</th><th>Avion</th><th>Équipement ou matériel</th><th class="r">Quantité</th><th>Remarque</th></tr></thead><tbody>${rows.map(x => `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="equip-form" data-ho="${id}" data-id="${x.id}"` : ""}>
-      <td class="mono"><b>${esc(x.user || "")}</b></td><td class="mono">${esc(x.reg || "")}</td><td>${esc(x.item || "")}</td><td class="r num">${esc(x.qty ?? "")} ${esc(x.unit || "")}</td><td class="small">${esc(x.note || "")}</td></tr>`).join("")}</tbody></table></div>`
-      : `<div class="pad muted">Rien de noté.</div>`);
+    (equipTodo(id).length ? `<div class="banner warn">${esc(tr("Équipement à renseigner pour"))} ${equipTodo(id).length} ${esc(tr(equipTodo(id).length > 1 ? "tâches" : "tâche"))} ${esc(tr("du Tech Log : le shift ne peut pas être remis tant que ces lignes sont vides."))}</div>` : "") +
+    (rows.length ? `<div class="tablewrap"><table><thead><tr><th>Client / utilisateur</th><th>Avion</th><th>Équipement ou matériel</th><th class="r">Quantité</th><th>Remarque</th></tr></thead><tbody>${rows.map(x => `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="equip-form" data-ho="${id}" data-id="${x.id}"` : ""}>
+      <td class="mono"><b>${esc(x.user || "")}</b></td><td class="mono">${esc(x.reg || "")}</td><td>${x.taskId && !String(x.item || "").trim() ? `<span class="chip sm bad">${esc(tr("À remplir"))}</span>` : esc(x.item || "")}${x.task ? `<div class="muted small">${esc(tr("Tâche"))} : ${esc(x.task)}</div>` : ""}</td><td class="r num">${esc(x.qty ?? "")} ${esc(x.unit || "")}</td><td class="small">${esc(x.note || "")}</td></tr>`).join("")}</tbody></table></div>`
+      : `<div class="pad muted">Rien de noté.</div>`));
 }
 ACTIONS["equip-form"] = el => {
   const x = S.shiftItems.find(i => i.id === el.dataset.id) || { kind: "equip", ho: el.dataset.ho, qty: 1 };
@@ -346,7 +363,7 @@ ACTIONS["equip-form"] = el => {
   const items = Array.from(new Set([...S.products.filter(p => ["materiel", "autre"].includes(p.kind)).map(p => p.name), ...S.shiftItems.filter(i => i.kind === "equip").map(i => i.item).filter(Boolean)]));
   const m = modal(`${mHead(x.id ? "Équipement et matériel" : "Nouvel équipement ou matériel")}<form><div class="body"><div class="fields">
     <label class="f">Client / utilisateur<input id="eq-user" class="mono" list="eq-users" value="${esc(x.user || "")}" required></label><datalist id="eq-users">${users.map(u => `<option value="${esc(u)}">`).join("")}</datalist>
-    ${field("eq-reg", "Avion (si applicable)", x.reg, { cls: "mono" })}
+    ${x.task ? `<div class="hint wide" style="grid-column:1/-1">${esc(tr("Lié à la tâche du Tech Log"))} : <b>${esc(x.task)}</b></div>` : ""}${field("eq-reg", "Avion (si applicable)", x.reg, { cls: "mono" })}
     <label class="f wide">Équipement ou matériel<input id="eq-item" list="eq-items" value="${esc(x.item || "")}" required></label><datalist id="eq-items">${items.map(u => `<option value="${esc(u)}">`).join("")}</datalist>
     ${field("eq-qty", "Quantité", x.qty, { type: "number", step: "0.01" })}${field("eq-unit", "Unité", x.unit, { ph: "EA, HR…" })}${field("eq-note", "Remarque", x.note, { wide: true })}</div></div>
     <footer>${x.id ? `<div class="left"><button type="button" class="btn danger" data-a="item-del" data-id="${x.id}">Supprimer</button></div>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`);
@@ -356,8 +373,9 @@ ACTIONS["equip-form"] = el => {
 /* 4. Station Control */
 function shiftChecks(id, h) {
   const ed = hoEd(id), ck = h.checks || {};
+  const miss = stationChecks().filter(c => !ck[c]).length;
   return sec(4, "Station Control", "Contrôles de fin de shift.", "",
-    `<div class="pad stack"><div class="ho-checks">${stationChecks().map((c, i) => { const x = ck[c]; return `<label class="chk"><input type="checkbox" data-hock="${esc(c)}" data-ho="${id}" ${x ? "checked" : ""} ${ed ? "" : "disabled"}> ${esc(c)}${x ? ` <span class="muted small">· ${esc(x.by || "")} ${fmtDT(x.at)}</span>` : ""}</label>`; }).join("")}</div>
+    `${miss && !(h.out && h.out.at) ? `<div class="banner warn">${esc(tr("Tous les contrôles doivent être cochés avant de remettre le shift."))} (${miss} ${esc(tr(miss > 1 ? "restants" : "restant"))})</div>` : ""}<div class="pad stack"><div class="ho-checks">${stationChecks().map((c, i) => { const x = ck[c]; return `<label class="chk"><input type="checkbox" data-hock="${esc(c)}" data-ho="${id}" ${x ? "checked" : ""} ${ed ? "" : "disabled"}> ${esc(c)}${x ? ` <span class="muted small">· ${esc(x.by || "")} ${fmtDT(x.at)}</span>` : ""}</label>`; }).join("")}</div>
     ${field("ho-ckn", "Remarque Station Control", h.checkNote, { type: "textarea" })}</div>`);
 }
 async function hoPatch(id, data) {
@@ -392,6 +410,12 @@ function shiftCrew(id, date, sh, h) {
 ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
 ACTIONS["ho-sign"] = el => {
   const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitCheck(v).ok).length;
+  /* garde-fou : un équipement coché dans le Tech Log doit être renseigné avant de remettre le shift */
+  /* et tous les contrôles Station Control (section 4) doivent être cochés */
+  const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]);
+  if (k === "out" && (eq.length || miss.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
+    ${eq.length ? `<div>${esc(tr("Équipement à renseigner (section 3) pour :"))}</div><ul>${eq.map(x => `<li><b class="mono">${esc(x.reg || "")}</b> · ${esc(x.task || "")}</li>`).join("")}</ul>` : ""}
+    ${miss.length ? `<div>${esc(tr("Station Control à cocher (section 4) :"))}</div><ul>${miss.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   confirmBox(`${k === "out" ? "Remettre" : "Reprendre"} le shift ${esc(shiftName(...UI.shift))} au nom de ${esc(meName())} ?${open && k === "out" ? `<div class="banner warn small" style="margin-top:8px">${plural(open, "avion")} sans CRS qualifié affecté.</div>` : ""}`,
     async () => { await hoPatch(id, { [k]: { by: meName(), at: new Date().toISOString() } }); render(true); }, k === "out" ? "Remettre" : "Reprendre");
 };
