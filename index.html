@@ -376,7 +376,20 @@ b.reg.reg-air { color: #1f6fe0; } b.reg.reg-in { color: #138a3e; }
 table.visits tr.vo-other td { color: var(--muted); font-size: 12px; cursor: default; }
 table.visits tr.vo-g1 td { background: rgba(120,128,140,.08); } table.visits tr.vo-g2 td { background: rgba(120,128,140,.17); }
 tbody tr.vo-other:hover td { background: inherit; }
-.vo-lbl { font-size: 11px; font-style: italic; opacity: .85; }
+.vo-lbl { font-size: 11px; font-style: italic; opacity: .85; } .vo-lbl b { font-style: normal; }
+/* un avion = un bloc : ses lignes des autres shifts restent collées à lui, avec un liseré à gauche */
+table.visits tbody.vgrp { border-top: 2px solid var(--line); } table.visits tbody.vgrp:first-of-type { border-top: 0; }
+table.visits tbody.vgrp.multi tr td:first-child { box-shadow: inset 3px 0 0 var(--accent); padding-left: 14px; } table.visits tbody.vgrp.multi tr.vo-other td:first-child { padding-left: 26px; }
+.tl-meta .tl-tot input, .tl-meta .tl-tech input { width: 56px; }
+table.visits tbody.vgrp tr.vo-other td { border-bottom-color: transparent; }
+/* Tech Log : défaut / tâche à gauche, action à droite */
+.tl { display: grid; gap: 4px; min-width: 300px; } .tl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 3px 0; border-top: 1px dashed var(--line); } .tl-row:first-child { border-top: 0; }
+.tl-d, .tl-a { white-space: pre-wrap; } .tl-open { color: var(--orange-ink, #9a4a00); font-style: italic; }
+.tl-ed { display: grid; gap: 10px; } .tl-card { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: grid; gap: 8px; }
+.tl-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 640px) { .tl-2 { grid-template-columns: 1fr; } }
+.tl-meta { align-items: flex-end; } .tl-meta .f input { width: 110px; } .tl-techs { flex: 1; min-width: 240px; }
+.tl-tech { display: inline-flex; align-items: center; gap: 4px; background: var(--accent-soft); border-radius: 8px; padding: 2px 6px; font-size: 13px; } .tl-tech input, .tl-tot input { width: 52px; padding: 3px 5px; }
+.tl-tot { font-size: 13px; display: inline-flex; align-items: center; gap: 4px; } .tl-del { margin-left: auto; } .tl-add { align-items: center; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) b.reg.reg-air, :root:not([data-theme="light"]) .fr-t { color: #6fa8ff; } :root:not([data-theme="light"]) b.reg.reg-in { color: #4cc77a; } }
 :root[data-theme="dark"] b.reg.reg-air, :root[data-theme="dark"] .fr-t { color: #6fa8ff; } :root[data-theme="dark"] b.reg.reg-in { color: #4cc77a; }
 /* opérations gaz */

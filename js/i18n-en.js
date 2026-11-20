@@ -958,3 +958,11 @@ Object.assign(EN, {
   "Heure invalide : format HH:MM (UTC).": "Invalid time: HH:MM format (UTC).", "Heures Flightradar24 (réelles, ou estimée en vol)": "Flightradar24 times (actual, or estimate while airborne)",
 });
 Object.assign(EN, { "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.": "Remove this aircraft from this shift? Its empty rows on other shifts are removed too; rows with work entered stay." });
+Object.assign(EN, {
+  "Tech Log : défaut / tâche → action": "Tech Log: defect / task → action", "LogBook n° d'arrivée": "Arrival LogBook no.", "Tech Log : défauts / tâches et actions": "Tech Log: defects / tasks and actions",
+  "Défaut / tâche": "Defect / task", "Action / travail fait": "Action taken", "Vide = à faire": "Empty = to do", "Techniciens et MHRS": "Technicians and MHRS", "technicien": "technician",
+  "ou total": "or total", "Ligne": "Line", "Total MHRS": "Total MHRS", "À faire": "To do", "Tâches ouvertes des shifts précédents": "Open tasks from previous shifts", "Reprendre": "Take over",
+  "Cet avion est déjà dans ce shift. Enregistrer quand même ? (cliquez encore sur Enregistrer)": "This aircraft is already on this shift. Save anyway? (click Save again)",
+  "Tech Log : tâches pré-encodées (une par ligne)": "Tech Log: preset tasks (one per line)",
+});
+Object.assign(EN, { "Reprise par un shift suivant": "Taken over by a later shift" });
