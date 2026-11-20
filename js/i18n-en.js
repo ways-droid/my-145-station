@@ -1127,3 +1127,11 @@ Object.assign(EN, {
   "MHRS par technicien": "MHRS by technician", "Tâches les plus fréquentes": "Most frequent tasks", "Situations ouvertes ce mois": "Situations opened this month", "Situations revenues à la normale": "Situations back to normal",
   "Besoins demandés": "Needs requested", "Consignes publiées": "Instructions published", "Formations station signées": "Station inductions signed", "Inconnue": "Unknown"
 });
+/* Résumé du shift */
+Object.assign(EN, {
+  "Résumé du shift": "Shift summary", "Rédiger avec Sindri": "Draft with Sindri", "Refaire avec Sindri": "Redraft with Sindri", "Écrire": "Write", "Brouillon de Sindri, relu et validé par": "Sindri draft, reviewed and approved by",
+  "Écrit par": "Written by", "envoyé avec la page Notion": "sent with the Notion page", "Quelques lignes pour le shift suivant : Sindri peut proposer un brouillon à partir du shift, vous le relisez avant de l'enregistrer.": "A few lines for the next shift: Sindri can suggest a draft from the shift, you review it before saving.",
+  "Résumé (relisez et corrigez avant d'enregistrer)": "Summary (review and correct before saving)", "La CRS reste dans AMOS : le résumé ne dit jamais qu'un avion est remis en service.": "The CRS stays in AMOS: the summary never says an aircraft is released to service.",
+  "Proposer avec Sindri": "Suggest with Sindri", "J'ai relu : enregistrer": "Reviewed: save", "Sindri rédige le brouillon…": "Sindri is drafting…", "Brouillon de Sindri : vérifiez chaque ligne avant d'enregistrer.": "Sindri draft: check every line before saving.",
+  "Sindri n'a pas pu répondre.": "Sindri could not answer.", "Résumé enregistré": "Summary saved", "Résumé retiré": "Summary removed"
+});

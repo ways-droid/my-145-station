@@ -434,6 +434,8 @@ ok "réglage admin seulement" "$(curl -s -H "$B" -X POST -d '{"key":"sk-ant-test
 curl -s -H "$A" -X POST -d '{"key":"sk-ant-bad"}' $U/assistant/config >/dev/null
 ok "mauvaise clé" "$(curl -s -H "$A" -X POST -d '{}' $U/assistant/test)" 'clé API'
 curl -s -H "$A" -X POST -d '{"key":"sk-ant-test","model":"claude-haiku-5-5","cap":5}' $U/assistant/config >/dev/null
+ok "résumé du shift : brouillon de Sindri (terrain)" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-11-19-day","lang":"en"}' $U/assistant/shift-summary)" 'data seen'
+ok "résumé du shift : shift inconnu" "$(curl -s -H "$HT" -X POST -d '{"ho":"x"}' $U/assistant/shift-summary)" 'Shift inconnu'
 ok "test connexion" "$(curl -s -H "$A" -X POST -d '{}' $U/assistant/test)" '"ok":true'
 R=$(curl -s -H "$B" $U/assistant/status); ok "état" "$R" '"configured":true'; ok "modèle choisi" "$R" 'claude-haiku-5-5'; no "clé jamais renvoyée" "$R" 'sk-ant-test'
 R=$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Total des factures par client ?"}]}' $U/assistant/chat)

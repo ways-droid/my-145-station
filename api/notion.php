@@ -76,7 +76,8 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
 
     $fm = $nm($h['foreman'] ?? '');
     $page = notion_http('POST', 'pages', ['parent' => ['type' => 'page_id', 'page_id' => $parent], 'properties' => ['title' => nt_title($title)],
-        'children' => [nt_block('paragraph', 'Shift Foreman : ' . ($fm !== '' ? $fm : '—') . ' · écrit par my-145-station (la CRS reste dans AMOS)'), nt_block('heading_2', '1. Uncompleted work')]]);
+        'children' => [nt_block('paragraph', 'Shift Foreman : ' . ($fm !== '' ? $fm : '—') . ' · écrit par my-145-station (la CRS reste dans AMOS)'),
+            ...((string) ($h['summary']['text'] ?? '') !== '' ? [nt_block('paragraph', 'Shift summary : ' . mb_substr((string) $h['summary']['text'], 0, 1900))] : []), nt_block('heading_2', '1. Uncompleted work')]]);
     $pid = str_replace('-', '', (string) ($page['id'] ?? '')); if ($pid === '') throw new RuntimeException('Notion : page non créée.');
 
     // 1. travail non terminé (tâches + avions marqués « non terminé »)
