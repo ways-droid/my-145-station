@@ -380,6 +380,8 @@ tbody tr.vo-other:hover td { background: inherit; }
 /* shift pas encore clôturable (shift précédent pas remis et repris) : bandeau collant + liseré ambré sur chaque section */
 .ho-lockbar { position: sticky; top: 8px; z-index: 5; margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--orange-bg); color: var(--orange-ink, #9a4a00); border: 1px solid rgba(214,140,40,.45); font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.06); }
 .ho-lockbar.ho-done { background: var(--blue-bg, #e8eefc); color: var(--blue-ink, #1d3f8f); border-color: rgba(60,100,200,.35); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .ho-lockbar .linkbtn { color: inherit; font-weight: 700; text-decoration: underline; }
+.tl-unc input { accent-color: var(--bad); width: 16px; height: 16px; } .tl-unc.on { color: var(--bad); font-weight: 700; background: var(--bad-bg); border-radius: 8px; padding: 2px 8px; }
+.tl-row-unc { box-shadow: inset 3px 0 0 var(--bad); } .unc-chip { font-weight: 700; }
 .sit-box { border-left: 4px solid var(--warn); background: var(--warn-bg); margin: 0 0 14px; padding: 10px 14px; } .sit-h { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 6px; color: var(--warn); }
 .sit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 5px 0; border-top: 1px solid rgba(154,98,0,.18); } .sit-row .btn { margin-left: auto; } .sit-row.late { color: var(--bad); }
 .ho-locked .ho-sec { box-shadow: inset 4px 0 0 rgba(224,150,40,.75); background-image: repeating-linear-gradient(135deg, rgba(224,150,40,.05) 0 10px, transparent 10px 20px); }
