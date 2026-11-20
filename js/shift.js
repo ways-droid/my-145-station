@@ -83,17 +83,98 @@ ACTIONS["todo-carry"] = async el => {
   for (const [i, x] of src.entries()) await save("shiftItems", null, Object.assign({ kind: "todo", ho: id, order: Date.now() + i }, x));
   toast(plural(src.length, "travail repris", "travaux repris"));
 };
-ACTIONS["item-del"] = el => confirmBox("Supprimer cette ligne ?", () => remove("shiftItems", el.dataset.id));
+/* un avion sur plusieurs shifts : ses lignes vides des autres shifts partent avec lui ; celles avec du travail restent */
+ACTIONS["item-del"] = el => { const v = S.shiftItems.find(x => x.id === el.dataset.id), g = v && v.kind === "visit" ? visitGroup(v).filter(x => x.id !== v.id) : [];
+  confirmBox(g.length ? "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent." : "Supprimer cette ligne ?",
+    async () => { await remove("shiftItems", el.dataset.id); for (const x of g) if (!hasWork(x)) await remove("shiftItems", x.id); closeModal(); }); };
+
+/* ---- avion sur plusieurs shifts ----
+   Une escale = un groupe de lignes (une par shift, même visitId = id de la première ligne). Les données de l'escale
+   (immatriculation, type, ARR, DEP et leurs dates UTC, vol) sont recopiées sur toutes les lignes du groupe ; le travail
+   (CRS, mécanos, prévu, fait, MHRS, ATL…) appartient au shift de sa ligne et ne se modifie que depuis ce shift. */
+const VISIT_SHARED = ["reg", "acType", "clientId", "arr", "dep", "arrDate", "depDate", "flight"];
+const visitGid = v => v.visitId || v.id;
+const visitGroup = v => S.shiftItems.filter(x => x.kind === "visit" && visitGid(x) === visitGid(v));
+const shKey = id => id.slice(0, 10) + (id.endsWith("night") ? "1" : "0");
+const hasWork = v => !!((v.crs || []).length || (v.mech || []).length || v.planned || v.done || v.notes || v.mhrs || v.atl || v.cht || (v.scans || []).length);
+/* shift (id) qui contient un instant UTC, à l'heure de la station */
+function shiftOfUtc(ms) {
+  const d = new Date(ms); let date = iso(d), h = d.getHours();
+  try { const tz = settings().timeZone; const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz || undefined, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
+    date = `${p.year}-${p.month}-${p.day}`; h = +p.hour % 24; } catch { }
+  return h >= 20 ? hoId(date, "night") : h < 8 ? hoId(addDays(date, -1), "night") : hoId(date, "day");
+}
+const hmOk = s => /^([01]?\d|2[0-3]):?([0-5]\d)$/.test(String(s || "").trim());
+const hmNorm = s => { const m = /^([01]?\d|2[0-3]):?([0-5]\d)$/.exec(String(s || "").trim()); return m ? `${pad(+m[1])}:${m[2]}` : ""; };
+const atUtc = (date, hm) => Date.parse(`${date}T${hmNorm(hm)}:00Z`);
+/* instants UTC d'arrivée et de départ d'une escale. Sans date : l'ARR est l'heure qui tombe dans le shift (ou juste avant),
+   le DEP la première occurrence après l'arrivée (23:00 → 05:00 = le lendemain). Les heures FR24 sont montrées à part (fr24Times). */
+function visitTimes(v, ho) {
+  const [a, b] = shiftWindow(ho || v.ho); let arr = null, dep = null;
+  if (hmOk(v.arr)) { if (v.arrDate) arr = atUtc(v.arrDate, v.arr);
+    else { const d0 = new Date(a).toISOString().slice(0, 10); arr = [d0, addDays(d0, 1), addDays(d0, -1)].map(d => atUtc(d, v.arr)).find(t => t >= a - 6 * 3600000 && t <= b) ?? atUtc(d0, v.arr); } }
+  if (hmOk(v.dep)) { if (v.depDate) dep = atUtc(v.depDate, v.dep);
+    else { const from = arr ?? a, d0 = new Date(from).toISOString().slice(0, 10); dep = [d0, addDays(d0, 1), addDays(d0, 2)].map(d => atUtc(d, v.dep)).find(t => t >= from) ?? null; } }
+  return { arr, dep };
+}
+/* shifts couverts par l'escale : du shift de la ligne (ou de l'arrivée, si plus tôt) au shift du départ, 30 au plus */
+function visitShifts(v) {
+  const t = visitTimes(v), out = [];
+  let cur = v.ho; if (t.arr != null) { const s = shiftOfUtc(t.arr); if (shKey(s) < shKey(cur)) cur = s; }
+  const end = t.dep != null ? shiftOfUtc(t.dep) : v.ho;
+  for (let i = 0; i < 30 && shKey(cur) <= shKey(end); i++) { out.push(cur); const [d, sh] = nextShift(cur.slice(0, 10), cur.slice(11)); cur = hoId(d, sh); }
+  return out.length ? out : [v.ho];
+}
+/* après l'enregistrement d'une ligne : données de l'escale recopiées sur le groupe, lignes créées sur les shifts couverts,
+   lignes vides retirées des shifts qui ne sont plus couverts (une ligne avec du travail est gardée) */
+async function visitSync(v) {
+  if (hmOk(v.arr) && !v.arrDate) { const t = visitTimes(v); if (t.arr != null) { v = Object.assign({}, v, { arrDate: new Date(t.arr).toISOString().slice(0, 10) }); await patch("shiftItems", v.id, { arrDate: v.arrDate }); } }
+  const gid = visitGid(v), shared = Object.fromEntries(VISIT_SHARED.map(k => [k, v[k] ?? ""])), want = visitShifts(v);
+  const group = S.shiftItems.filter(x => x.kind === "visit" && visitGid(x) === gid && x.id !== v.id);
+  for (const x of group) {
+    if (!want.includes(x.ho) && !hasWork(x)) { await remove("shiftItems", x.id); continue; }
+    if (VISIT_SHARED.some(k => (x[k] ?? "") !== shared[k]) || x.visitId !== gid) await patch("shiftItems", x.id, Object.assign({ visitId: gid }, shared));
+  }
+  for (const ho of want) if (ho !== v.ho && !group.some(x => x.ho === ho))
+    await save("shiftItems", null, Object.assign({ kind: "visit", ho, visitId: gid, crs: [], mech: [], order: v.order || Date.now() }, shared));
+  if (!v.visitId && want.length > 1) await patch("shiftItems", v.id, { visitId: gid });
+}
+const shiftLabel = ho => `${fmtDate(ho.slice(0, 10))} · ${tr(SHIFTS[ho.slice(11)])}`;
+/* état FR24 de l'avion : en vol (bleu) ou posé à la station (vert) */
+function regState(v) {
+  const f = v.fr24; if (!f) return "";
+  if (f.live) return "reg-air";
+  if (f.arr && f.arr.at && (!f.dep || !f.dep.at || Date.parse(f.dep.at) < Date.parse(f.arr.at))) return "reg-in";
+  return "";
+}
+/* heures FR24 (réelles, ou ETA) affichées en bleu à côté des heures saisies, seulement si connues */
+function fr24Times(v) {
+  const f = v.fr24; if (!f) return "";
+  const st = (settings().stationCode || "").toUpperCase(), t = visitTimes(v), [a, b] = shiftWindow(v.ho);
+  const near = iso => { const x = Date.parse(iso); return !isNaN(x) && x >= a - 36 * 3600000 && x <= b + 72 * 3600000; };
+  let arr = "", dep = "";
+  if (f.arr && f.arr.at && near(f.arr.at)) arr = utcHM(f.arr.at);
+  else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) arr = "ETA " + utcHM(f.live.eta);
+  if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) dep = utcHM(f.dep.at);
+  return arr || dep ? `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${esc(arr || "—")} / ${esc(dep || "—")}</div>` : "";
+}
 
 /* 2. travail prévu / fait par avion */
 function shiftVisits(id) {
   const rows = hoItems(id, "visit"), ed = hoEd(id);
   return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && rows.length ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
     (FR24ERR && rows.length ? `<div class="banner warn">${esc(tr(FR24ERR))}</div>` : "") +
-    (rows.length ? `<div class="tablewrap"><table><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
-      return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
-        <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${fr24Line(v)}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
-        <td class="small pre">${esc(v.planned || "")}</td><td class="small pre">${esc(v.done || "")}</td><td class="mono small">${esc(v.mhrs || "")}</td><td class="mono small">${esc(v.atl || "")}</td></tr>`; }).join("")}</tbody></table></div>`
+    (rows.length ? `<div class="tablewrap"><table class="visits"><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
+      const other = visitGroup(v).filter(x => x.id !== v.id && hasWork(x)).sort((x, y) => shKey(x.ho).localeCompare(shKey(y.ho)));
+      const prev = other.filter(x => shKey(x.ho) < shKey(id)), next = other.filter(x => shKey(x.ho) > shKey(id));
+      const span = visitShifts(v), t = visitTimes(v);
+      const stay = span.length > 1 ? `<div class="muted small">${esc(tr("Escale"))} : ${t.arr != null ? esc(fmtDate(new Date(t.arr).toISOString().slice(0, 10))) + " " + esc(utcHM(new Date(t.arr).toISOString())) : "?"} → ${t.dep != null ? esc(fmtDate(new Date(t.dep).toISOString().slice(0, 10))) + " " + esc(utcHM(new Date(t.dep).toISOString())) : "?"} UTC · ${esc(plural(span.length, "shift"))}</div>` : "";
+      const ghost = (x, i, kind) => `<tr class="vo-other ${i % 2 ? "vo-g2" : "vo-g1"}"><td colspan="2"><div class="vo-lbl">${esc(tr(kind === "prev" ? "Données de shift précédent" : "Données de shift suivant"))} · ${esc(shiftLabel(x.ho))}</div></td>
+        <td class="small">${(x.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(x.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
+        <td class="small pre">${esc(x.planned || "")}</td><td class="small pre">${esc(x.done || "")}${x.notes ? `<div class="muted">${esc(x.notes)}</div>` : ""}</td><td class="mono small">${esc(x.mhrs || "")}</td><td class="mono small">${esc(x.atl || "")}</td></tr>`;
+      return prev.map((x, i) => ghost(x, prev.length - 1 - i, "prev")).join("") + `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono reg ${regState(v)}">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
+        <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
+        <td class="small pre">${esc(v.planned || "")}</td><td class="small pre">${esc(v.done || "")}</td><td class="mono small">${esc(v.mhrs || "")}</td><td class="mono small">${esc(v.atl || "")}</td></tr>` + next.map((x, i) => ghost(x, i, "next")).join(""); }).join("")}</tbody></table></div>`
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
 function staffPick(id, label, sel, list) {
@@ -108,7 +189,8 @@ ACTIONS["visit-form"] = el => {
   const certs = crew.filter(p => (p.licences || []).length || Object.keys(p.ratings || {}).length);
   const m = modal(`${mHead(v.id ? "Avion · " + esc(v.reg) : "Nouvel avion")}<form><div class="body stack"><div class="fields">
     ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}<datalist id="vi-regs">${(S.aircraft || []).filter(a => a.active !== false).map(a => `<option value="${esc(a.reg)}">${esc([a.acType, a.variant].filter(Boolean).join(" "))}</option>`).join("")}</datalist>${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
-    ${field("vi-arr", "ARR (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "DEP (UTC)", v.dep, { ph: "17:10", cls: "mono" })}
+    ${field("vi-arr", "ARR (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "DEP (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}
+    <div class="hint" id="vi-span" style="grid-column:1/-1"></div>
     ${field("vi-flt", "Vol / rotation", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-mhrs", "MHRS", v.mhrs, { cls: "mono", ph: "1EA, 2.5…" })}${field("vi-atl", "LOG PAGE / ATL n°", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
     <div class="muted small" id="vi-client"></div>
     ${staffPick("vi-crs", "CRS (affectés à cet avion)", v.crs || [], certs.length ? certs : crew)}${staffPick("vi-mech", "Mécanos / aides", v.mech || [], crew)}
@@ -118,6 +200,15 @@ ACTIONS["visit-form"] = el => {
     <div class="err" id="vi-warn"></div>${v.id ? odScansHtml(v) : ""}</div>
     <footer>${v.id ? `<div class="left"><button type="button" class="btn danger" data-a="item-del" data-id="${v.id}">Supprimer</button></div>` : ""}<button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   const cur = () => ({ reg: val("vi-reg").toUpperCase(), acType: val("vi-ac"), crs: picked(m, "vi-crs") });
+  /* date de départ proposée : première occurrence de l'heure DEP après l'arrivée (23:00 → 05:00 = le lendemain) ; modifiable */
+  let depTouched = !!v.depDate;
+  const times = () => ({ ho: v.ho, arr: val("vi-arr"), dep: val("vi-dep"), arrDate: v.arrDate || "", depDate: val("vi-depd"), fr24: v.fr24 });
+  const spanUpd = () => {
+    if (!depTouched) { const t = visitTimes(Object.assign(times(), { depDate: "" })); m.querySelector("#vi-depd").value = t.dep != null ? new Date(t.dep).toISOString().slice(0, 10) : ""; }
+    const s = visitShifts(times()); m.querySelector("#vi-span").textContent = s.length > 1 ? tr("L'avion apparaîtra sur") + " " + plural(s.length, "shift") + " : " + s.map(shiftLabel).join(", ") : "";
+  };
+  m.querySelector("#vi-depd").onchange = () => { depTouched = !!val("vi-depd"); spanUpd(); };
+  m.querySelector("#vi-arr").oninput = spanUpd; m.querySelector("#vi-dep").oninput = spanUpd; spanUpd();
   const upd = () => { const c = clientOfReg(val("vi-reg")); m.querySelector("#vi-client").textContent = c ? tr("Client") + " : " + c.name + (c.code ? " (" + c.code + ")" : "") : "";
     const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg); };
   if (v.id) odWire(m, v);
@@ -128,9 +219,15 @@ ACTIONS["visit-form"] = el => {
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const c = clientOfReg(val("vi-reg"));
-    await save("shiftItems", v.id, Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: val("vi-arr"), dep: val("vi-dep"), flight: val("vi-flt"), mhrs: val("vi-mhrs"), atl: val("vi-atl"), cht: val("vi-cht"),
-      mech: picked(m, "vi-mech"), planned: val("vi-plan"), done: val("vi-done"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() }));
-    closeModal(); toast("Avion enregistré");
+    if ((val("vi-arr") && !hmOk(val("vi-arr"))) || (val("vi-dep") && !hmOk(val("vi-dep")))) { m.querySelector("#vi-warn").textContent = tr("Heure invalide : format HH:MM (UTC)."); return; }
+    const t = visitTimes(times());
+    const arrDate = val("vi-arr") ? (v.arrDate || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
+    const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), mhrs: val("vi-mhrs"), atl: val("vi-atl"), cht: val("vi-cht"),
+      mech: picked(m, "vi-mech"), planned: val("vi-plan"), done: val("vi-done"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() });
+    const id = await save("shiftItems", v.id, data);
+    closeModal();
+    await visitSync(Object.assign({}, data, { id }));
+    const n = visitShifts(data).length; toast(n > 1 ? tr("Avion enregistré") + " · " + plural(n, "shift") : "Avion enregistré");
   };
 };
 
@@ -232,19 +329,6 @@ function stationUtc(date, hour) {
 }
 /* fenêtre UTC d'un shift (jour 08-20, nuit 20-08 heure locale) */
 const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === "night", a = stationUtc(d, night ? 20 : 8); return [a, a + 12 * 3600000]; };
-/* ARR / DEP remplis par FR24 dans les cases vides, ou dans celles que FR24 avait remplies (une saisie à la main n'est jamais écrasée) :
-   ARR = atterrissage à la station pendant le shift (ou jusqu'à 6 h avant), sinon ETA d'un vol en route vers la station ; DEP = décollage de la station pendant le shift */
-function fr24Fill(v, x) {
-  const [a, b] = shiftWindow(v.ho), st = (settings().stationCode || "").toUpperCase(), prev = v.fr24Fill || {}, out = {}, fill = {};
-  const inW = (iso, from, to) => { const t = Date.parse(iso); return !isNaN(t) && t >= from && t <= to; };
-  let arr = "", dep = "";
-  if (x.arr && inW(x.arr.at, a - 6 * 3600000, b)) arr = utcHM(x.arr.at);
-  else if (x.live && st && x.live.to === st && x.live.eta && inW(x.live.eta, a - 6 * 3600000, b + 3600000)) arr = utcHM(x.live.eta);
-  if (x.dep && inW(x.dep.at, a, b + 6 * 3600000) && (!x.arr || Date.parse(x.dep.at) > Date.parse(x.arr.at))) dep = utcHM(x.dep.at);
-  for (const [k, val] of [["arr", arr], ["dep", dep]]) { if (!val) { if (prev[k]) fill[k] = prev[k]; continue; }
-    if (!v[k] || v[k] === prev[k]) { if (v[k] !== val) out[k] = val; fill[k] = val; } }
-  out.fr24Fill = fill; return out;
-}
 async function fr24Run(id, quiet) {
   const vs = hoItems(id, "visit").filter(v => v.reg);
   if (!vs.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
@@ -252,10 +336,10 @@ async function fr24Run(id, quiet) {
   const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
   let found = 0, filled = 0;
   for (const v of vs) { const x = r.items[key(v.reg)]; if (!x) continue; if (x.live || x.last) found++;
-    const f = fr24Fill(v, x); if (f.arr || f.dep) filled++;
-    await patch("shiftItems", v.id, Object.assign({ fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}) }, f)); }
+    if (x.arr || x.dep) filled++;
+    await patch("shiftItems", v.id, { fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}, x.arr ? { arr: x.arr } : {}, x.dep ? { dep: x.dep } : {}) }); }
   FR24ERR = (r.errors || []).join(" · ");
-  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures remplies pour ${filled}` : ""}.`);
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.`);
   if (quiet && FR24ERR) render(true);
 }
 let FR24ERR = "";

@@ -370,6 +370,15 @@ tr.pfrow td:first-child { box-shadow: inset 4px 0 0 var(--pfc); } tr.pfrow.pf-si
 .rm-sum { display: flex; gap: 18px; flex-wrap: wrap; padding: 8px 12px; background: var(--bg); border-radius: 8px; }
 .chip.good { background: var(--green-bg); color: var(--green-ink); } .chip.warn { background: var(--yellow-bg); color: var(--yellow-ink); }
 .chip.bad { background: var(--red-bg); color: var(--red-ink); } .chip.amber { background: var(--orange-bg); color: var(--orange-ink, #9a4a00); } .chip.info { background: var(--blue-bg); color: var(--blue-ink); }
+/* shift : avion en vol (bleu) / posé à la station (vert), heures FR24, données des autres shifts de l'escale (grisées) */
+b.reg.reg-air { color: #1f6fe0; } b.reg.reg-in { color: #138a3e; }
+.fr-t { color: #1f6fe0; font-weight: 600; margin-top: 2px; }
+table.visits tr.vo-other td { color: var(--muted); font-size: 12px; cursor: default; }
+table.visits tr.vo-g1 td { background: rgba(120,128,140,.08); } table.visits tr.vo-g2 td { background: rgba(120,128,140,.17); }
+tbody tr.vo-other:hover td { background: inherit; }
+.vo-lbl { font-size: 11px; font-style: italic; opacity: .85; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) b.reg.reg-air, :root:not([data-theme="light"]) .fr-t { color: #6fa8ff; } :root:not([data-theme="light"]) b.reg.reg-in { color: #4cc77a; } }
+:root[data-theme="dark"] b.reg.reg-air, :root[data-theme="dark"] .fr-t { color: #6fa8ff; } :root[data-theme="dark"] b.reg.reg-in { color: #4cc77a; }
 /* opérations gaz */
 .op { border-left-width: 6px; }
 .op-green { border-left-color: var(--green); } .op-green:hover { background: var(--green-bg); }
