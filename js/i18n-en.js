@@ -1178,3 +1178,4 @@ Object.assign(EN, {
   "du Tech Log encodée(s) par Sindri à vérifier et valider (section 2) :": "of the Tech Log entered by Sindri to check and validate (section 2):",
   "du Tech Log encodée(s) par Sindri : vérifiez chacune et cochez « J'ai vérifié, c'est validé ». Le shift ne peut pas être remis avant.": "of the Tech Log entered by Sindri: check each one and tick \"I checked it, validated\". The shift cannot be handed over before."
 });
+Object.assign(EN, { "Jour (08-20 LT)": "Day (08-20 LT)", "Nuit (20-08 LT)": "Night (20-08 LT)", "Équipe de jour (08-20 LT)": "Day shift (08-20 LT)", "Équipe de nuit (20-08 LT)": "Night shift (20-08 LT)" });

@@ -113,7 +113,7 @@ async function aiToggle(open) {
 function aiRender() {
   const p = document.getElementById("ai-panel"); if (!p || !aiOpen) return;
   const ready = AI && AI.configured, view = (TH && TH.view) || [], topics = (TH && TH.topics) || [];
-  const tAt = ms => new Date(ms).toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  const tAt = ms => fmtLT(ms, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const topicAt = {}; topics.forEach(t => topicAt[t.i] = t);
   const msg = (m, mi) => (topicAt[mi] ? `<div class="ai-topic" id="ai-t-${mi}"><span>${esc(topicAt[mi].title)}</span><span class="muted">${esc(tAt(topicAt[mi].at))}</span></div>` : "") +
     (m.role === "user" ? `<div class="ai-m me" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${(m.files || []).map(f => `<div class="ai-file">📎 ${esc(f.name)}</div>`).join("")}${esc(m.text)}</div>`

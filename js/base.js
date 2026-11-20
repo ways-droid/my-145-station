@@ -162,7 +162,7 @@ let USERS = null;
 function sbxCardShell() {
   if (!SERVER || !ME || !isOffice()) return "";
   return `<div class="panel" style="max-width:820px;margin-bottom:16px"><div class="pad stack-s"><h3 class="np">Environnement de test</h3>
-    ${SBX ? `<div class="banner bad"><b>Le test est actif depuis le ${esc(new Date(SBX.since).toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}.</b> Vos changements ne touchent pas la base principale.</div><div><button class="btn danger" data-a="sbx-stop">Quitter le test</button></div>`
+    ${SBX ? `<div class="banner bad"><b>Le test est actif depuis le ${esc(fmtLT(SBX.since, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }))}.</b> Vos changements ne touchent pas la base principale.</div><div><button class="btn danger" data-a="sbx-stop">Quitter le test</button></div>`
       : `<div>Pour essayer l'outil (créer des fiches, des données d'exemple…) sans toucher aux vraies données. Le test ne concerne que <b>votre session</b> : les autres utilisateurs continuent normalement.</div><div><button class="btn sbx-btn" data-a="sbx-start">Activer l'environnement de test</button></div>`}</div></div>`;
 }
 function usersCardShell() {

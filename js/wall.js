@@ -13,12 +13,12 @@ VIEWS.mur = {
     const sits = typeof sitOpen === "function" ? S.situations.filter(s => sitOpen(s) && s.showInShift).sort(sitSort) : [];
     const todo = hoItems(id, "todo").filter(x => !x.done);
     return `<div class="wall-top"><div><div class="wall-st">${esc(stationIata())} · ${esc(settings().stationName || settings().name || "")}</div><div class="wall-sh">${esc(shiftName(date, sh))}${h.foreman ? ` · ${esc(tr("Shift Foreman"))} ${esc(staff(h.foreman)?.name || h.foreman)}` : ""}</div></div>
-        <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${esc(tr("Local"))}</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC</span></div>
+        <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${esc(tr("Local"))} (LT)</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC (Z)</span></div>
         <button class="btn sm" data-a="wall-exit">${esc(tr("Quitter"))}</button></div></div>` +
       (typeof wxBanner === "function" ? wxBanner() : "") +
       `<div class="wall-grid"><div class="wall-acs">${visits.map(v => { const open = visitTasks(v).filter(t => !t.action && t.text), c = visitCheck(v);
         return `<div class="wall-ac ${c.ok ? "" : "warn"}"><div class="wall-reg"><b class="${regState(v)}">${esc(v.reg || "")}</b><span>${esc(v.acType || "")}</span></div>
-          <div class="wall-t"><span>ARR <b>${esc(v.arr || "—")}</b></span><span>DEP <b>${esc(v.dep || "—")}</b></span></div>${fr24Times(v)}
+          <div class="wall-t"><span>ARR <b>${esc(zHM(v.arr))}</b></span><span>DEP <b>${esc(zHM(v.dep))}</b></span></div>${fr24Times(v)}
           <div class="wall-who"><span class="lbl">CRS</span> ${(v.crs || []).map(sName).map(esc).join(", ") || `<span class="txt-bad">${esc(tr("à affecter"))}</span>`}</div>
           ${(v.mech || []).length ? `<div class="wall-who"><span class="lbl">${esc(tr("Mécanos"))}</span> ${(v.mech || []).map(sName).map(esc).join(", ")}</div>` : ""}
           ${open.length ? `<ul class="wall-tasks">${open.slice(0, 5).map(t => `<li class="${t.from ? "carry" : ""}">${esc(t.text)}</li>`).join("")}${open.length > 5 ? `<li>… +${open.length - 5}</li>` : ""}</ul>` : visitTasks(v).length ? `<div class="wall-done">✓ ${esc(tr("Tout fait"))}</div>` : ""}</div>`; }).join("") || `<div class="wall-empty">${esc(tr("Aucun avion encodé pour ce shift."))}</div>`}</div>

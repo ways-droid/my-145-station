@@ -34,7 +34,10 @@ const today = () => iso(new Date());
 const addDays = (s, n) => { const d = new Date(s + "T12:00:00"); d.setDate(d.getDate() + n); return iso(d); };
 const addMonths = (s, n) => { const d = new Date(s + "T12:00:00"); d.setMonth(d.getMonth() + n); return iso(d); };
 const daysBetween = (a, b) => Math.round((new Date(b + "T12:00:00") - new Date(a + "T12:00:00")) / 86400000);
-const fmtDT = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? iso : d.toLocaleString(LANG === "en" ? "en-IE" : "fr-BE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); };
+/* heures : toujours dites « LT » (heure locale de la station) ou « Z » (UTC), jamais sans repère */
+const stTzOpt = () => { try { const z = typeof stationTz === "function" ? stationTz() : ""; if (z) { new Intl.DateTimeFormat("en", { timeZone: z }); return { timeZone: z }; } } catch { } return {}; };
+const fmtLT = (ms, o) => { const d = new Date(ms); if (isNaN(d)) return ""; try { return d.toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", Object.assign({}, o, stTzOpt())) + " LT"; } catch { return d.toLocaleString() + " LT"; } };
+const fmtDT = iso => { if (!iso) return "—"; const d = new Date(iso); return isNaN(d) ? iso : fmtLT(d, { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }); };
 const fmtDate = s => s ? new Date(s + "T12:00:00").toLocaleDateString(LOCALES[LANG], { day: "2-digit", month: "short", year: "numeric" }) : "—";
 const MONTHS_L = { fr: ["janv.", "févr.", "mars", "avr.", "mai", "juin", "juil.", "août", "sept.", "oct.", "nov.", "déc."], en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] };
 const MONTHS = new Proxy([], { get: (t, k) => MONTHS_L[LANG][k] });
@@ -81,7 +84,7 @@ function toast(msg) {
 }
 function toastLogOpen() {
   const a = toastLog().reverse();
-  const when = at => new Date(at).toLocaleString(LANG === "en" ? "en-GB" : "fr-BE", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
+  const when = at => fmtLT(at, { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", second: "2-digit" });
   const m = modal(`${mHead("Messages système")}<div class="body stack-s"><div class="muted small">${esc(tr("Messages affichés dans ce navigateur au cours des 3 derniers jours."))}</div>
     ${a.length ? `<ol class="toast-log">${a.map(x => `<li><span class="hist-t">${esc(when(x.at))}</span><span>${esc(tr(x.msg))}</span></li>`).join("")}</ol>` : `<div class="empty">${esc(tr("Aucun message."))}</div>`}</div>
     <footer>${a.length ? `<div class="left"><button class="btn" id="tl-clear">Effacer l'historique</button></div>` : ""}<button class="btn primary" data-close>Fermer</button></footer>`);
@@ -378,7 +381,7 @@ window.addEventListener("hashchange", () => { UI.q = ""; UI.filter = "tous"; sta
 const BADGE_KEY = "st-badge-hide";
 const badgeHides = () => { try { return JSON.parse(localStorage.getItem(BADGE_KEY) || "{}"); } catch (e) { return UI.badgeHide || {}; } };
 const badgeHidden = k => (badgeHides()[k] || 0) > Date.now();
-const badgeUntil = k => new Date(badgeHides()[k] || 0).toLocaleString(LANG === "en" ? "en-IE" : "fr-BE", { weekday: "short", hour: "2-digit", minute: "2-digit" });
+const badgeUntil = k => fmtLT(badgeHides()[k] || 0, { weekday: "short", hour: "2-digit", minute: "2-digit" });
 function toggleBadge(k) {
   const h = badgeHides();
   if ((h[k] || 0) > Date.now()) delete h[k]; else h[k] = Date.now() + 8 * 3600 * 1000;

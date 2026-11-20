@@ -6,7 +6,7 @@
    Couverture : pour chaque jour et chaque équipe (jour 08-20, nuit 20-08), nombre de personnes présentes qualifiées
    par type d'avion, et nombre avec I (approbation israélienne, requise pour signer les avions 4X-). */
 const RCODE_DEF = [
-  ["D", "Jour (08-20)", "day", "green"], ["N", "Nuit (20-08)", "night", "blue"], ["D/N", "Jour ou nuit (à affecter)", "pending", "purple"],
+  ["D", "Jour (08-20 LT)", "day", "green"], ["N", "Nuit (20-08 LT)", "night", "blue"], ["D/N", "Jour ou nuit (à affecter)", "pending", "purple"],
   ["C", "Horaire libre", "custom", "teal"], ["T", "Jour de voyage (aller ou retour)", "travel", "orange"], ["TLV", "À la station, sans shift précis", "station", "grey"],
   ["OJT", "Formation sur le terrain (OJT)", "training", "yellow"], ["TRNG", "Formation", "training", "yellow"], ["OFF", "Repos / congé", "off", "white"]];
 const RKIND_LBL = { day: "Équipe de jour", night: "Équipe de nuit", pending: "Présent, équipe à affecter", station: "Présent, sans équipe", custom: "Horaire libre", travel: "Voyage", other: "Autre", training: "Formation", off: "Repos", away: "Autre station (détaché / flight mech)" };
@@ -93,7 +93,7 @@ function rosterMonth() {
 function rosterToday() {
   const d = today(), cov = coverage(d);
   const list = sh => { const ppl = onShift(d, sh).sort(staffSort);
-    return `<div class="panel pad stack"><h3>${sh === "day" ? "Équipe de jour (08-20)" : "Équipe de nuit (20-08)"}</h3>${ppl.map(p => { const x = rcell(p.id, d); return `<div class="list-row click" data-a="staff-open" data-id="${p.id}"><span><b>${esc(p.name)}</b><div class="muted small">${esc(STAFF_FN[p.function] || "")}</div></span><span>${ratingChips(p)} ${rcode(x.c).k === "custom" ? `<span class="chip">${esc(cellTxt(x))}</span>` : ""}</span></div>`; }).join("") || `<div class="muted">Personne de prévu.</div>`}
+    return `<div class="panel pad stack"><h3>${sh === "day" ? "Équipe de jour (08-20 LT)" : "Équipe de nuit (20-08 LT)"}</h3>${ppl.map(p => { const x = rcell(p.id, d); return `<div class="list-row click" data-a="staff-open" data-id="${p.id}"><span><b>${esc(p.name)}</b><div class="muted small">${esc(STAFF_FN[p.function] || "")}</div></span><span>${ratingChips(p)} ${rcode(x.c).k === "custom" ? `<span class="chip">${esc(cellTxt(x))}</span>` : ""}</span></div>`; }).join("") || `<div class="muted">Personne de prévu.</div>`}
       <div class="row-g wrap">${cov.filter(x => x.sh === sh).map(x => `<span class="chip ${x.n ? "good" : "bad"}">${x.t === "I" ? "I (4X-)" : esc(x.t)} : ${x.n}</span>`).join("")}</div></div>`; };
   const pend = toAssign(d).sort(staffSort);
   const away = rosterStaff().map(p => [p, rcell(p.id, d)]).filter(([, x]) => x && !cellShifts(x).length && rcode(x.c).k !== "pending").sort((a, b) => staffSort(a[0], b[0]));
