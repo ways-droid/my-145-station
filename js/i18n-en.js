@@ -1135,3 +1135,13 @@ Object.assign(EN, {
   "Proposer avec Sindri": "Suggest with Sindri", "J'ai relu : enregistrer": "Reviewed: save", "Sindri rédige le brouillon…": "Sindri is drafting…", "Brouillon de Sindri : vérifiez chaque ligne avant d'enregistrer.": "Sindri draft: check every line before saving.",
   "Sindri n'a pas pu répondre.": "Sindri could not answer.", "Résumé enregistré": "Summary saved", "Résumé retiré": "Summary removed"
 });
+/* fatigue et temps de repos */
+Object.assign(EN, {
+  "Fatigue et repos": "Fatigue and rest", "Service de": "Duty of", "Repos de": "Rest of", "seulement avant ce service": "only before this duty", "jours de travail d'affilée": "working days in a row",
+  "nuits d'affilée": "nights in a row", "sur 7 jours": "over 7 days", "Seuils": "Limits", "service": "duty", "repos": "rest", "jours d'affilée": "days in a row", "modifier": "change",
+  "Calcul automatique depuis le roster et les shifts : le service suit l'équipe du roster, prolongée si le dernier avion affecté part après la fin du shift. « Sur avion » va de l'arrivée du premier avion affecté au départ du dernier, temps entre deux avions compris.": "Calculated automatically from the roster and the shifts: duty follows the roster shift, extended when the last assigned aircraft leaves after the end of the shift. \"On aircraft\" runs from the arrival of the first assigned aircraft to the departure of the last one, including the time between two aircraft.",
+  "À corriger dans les 14 prochains jours": "To fix in the next 14 days", "Aucune alerte de fatigue dans les 14 prochains jours.": "No fatigue alert in the next 14 days.", "Jours travaillés": "Days worked",
+  "Heures de service": "Duty hours", "Heures sur avion": "Hours on aircraft", "Repos le plus court": "Shortest rest", "Alertes": "Alerts", "Service (heure locale)": "Duty (local time)", "Sur avion": "On aircraft", "Repos avant": "Rest before",
+  "Fatigue et temps de repos (alertes du roster)": "Fatigue and rest time (roster alerts)", "Service maximum (heures)": "Maximum duty (hours)", "Repos minimum entre deux services (heures)": "Minimum rest between two duties (hours)",
+  "Jours de travail d'affilée maximum": "Maximum working days in a row", "Nuits d'affilée maximum": "Maximum nights in a row", "Heures maximum sur 7 jours glissants": "Maximum hours over 7 rolling days"
+});
