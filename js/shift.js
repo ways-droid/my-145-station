@@ -30,10 +30,10 @@ function visitCheck(v) {
   if (!v.acType) return { ok: true, msg: "" };
   const crs = (v.crs || []).map(staff).filter(Boolean), is4X = /^4X/i.test(v.reg || "");
   if (!crs.length) return { ok: false, msg: "Aucun CRS affecté" };
-  if (!crs.some(p => rated(p, v.acType))) return { ok: false, msg: `Aucun CRS qualifié ${v.acType}` };
-  if (is4X && !crs.some(p => hasI(p, v.acType))) return { ok: false, msg: `4X- : aucun CRS avec I sur ${v.acType}` };
+  if (!crs.some(p => rated(p, v.acType))) return { ok: false, lvl: "amber", msg: `Aucun CRS qualifié ${v.acType}` };
+  if (is4X && !crs.some(p => hasI(p, v.acType))) return { ok: false, lvl: "amber", msg: `4X- : aucun CRS avec I sur ${v.acType}` };
   const ac = typeof aircraftOf === "function" ? aircraftOf(v.reg) : null;
-  if (ac) for (const c of acLic(ac)) if (!crs.some(p => ratingHas(p, v.acType, c))) return { ok: false, msg: `${normReg(v.reg)} : aucun CRS avec ${c} sur ${v.acType}` };
+  if (ac) for (const c of acLic(ac)) if (!crs.some(p => ratingHas(p, v.acType, c))) return { ok: false, lvl: "amber", msg: `${normReg(v.reg)} : aucun CRS avec ${c} sur ${v.acType}` };
   return { ok: true, msg: "" };
 }
 const hoClosed = h => !!(h && h.in && h.in.at);
@@ -91,7 +91,7 @@ function shiftVisits(id) {
   return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && rows.length ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
     (FR24ERR && rows.length ? `<div class="banner warn">${esc(tr(FR24ERR))}</div>` : "") +
     (rows.length ? `<div class="tablewrap"><table><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Prévu</th><th>Fait</th><th>MHRS</th><th>ATL</th></tr></thead><tbody>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
-      return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm bad">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
+      return `<tr class="${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono">${esc(v.reg || "")}</b> <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
         <td class="mono small">${esc(v.arr || "—")} / ${esc(v.dep || "—")}${fr24Line(v)}</td><td class="small">${(v.crs || []).map(s => esc(sName(s))).join("<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small pre">${esc(v.planned || "")}</td><td class="small pre">${esc(v.done || "")}</td><td class="mono small">${esc(v.mhrs || "")}</td><td class="mono small">${esc(v.atl || "")}</td></tr>`; }).join("")}</tbody></table></div>`
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
