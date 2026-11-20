@@ -56,6 +56,7 @@ VIEWS.shift = {
     const top = head("Shift", "Planning des avions et handover : les 5 sections du handover de la station", "",
       `<div class="row-g wrap"><button class="btn sm" data-a="shift-go" data-n="-1" aria-label="Shift précédent">‹</button><b class="rmonth">${esc(shiftName(date, sh))}</b><button class="btn sm" data-a="shift-go" data-n="1" aria-label="Shift suivant">›</button>
         <input type="date" id="shift-date" value="${esc(date)}" aria-label="Date"><div class="seg">${Object.keys(SHIFTS).map(k => `<button data-a="shift-sh" data-sh="${k}" class="${k === sh ? "on" : ""}">${k === "day" ? "Jour" : "Nuit"}</button>`).join("")}</div>
+        <a class="btn sm" href="#mur" title="${esc(tr("Plein écran pour la TV du bureau"))}">📺 ${esc(tr("Mur"))}</a>
         ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
         ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
         ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`);

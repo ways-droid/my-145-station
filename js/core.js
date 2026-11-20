@@ -340,11 +340,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["voyages", "Voyages"]]],
+  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["voyages", "Voyages"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["headquarters", "Headquarters"], ["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", besoins: "yellow", expirations: "red", formulaires: "green", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", besoins: "yellow", expirations: "red", formulaires: "green", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
@@ -416,6 +416,7 @@ function render(force) {
   renderNav();
   const r = route(), v = VIEWS[r];
   document.body.dataset.mod = MOD_COLOR[r] || "blue";
+  document.body.classList.toggle("wall", r === "mur");
   if (v.static && staticDone === r && !force) return;
   const main = document.getElementById("main");
   const ae = document.activeElement;
