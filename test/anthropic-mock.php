@@ -20,6 +20,8 @@ $sig = md5(json_encode($b['system'] ?? ''));
 foreach ($msgs as $i => $m) if (($m['role'] ?? '') === 'assistant' && is_array($m['content'] ?? null)) foreach ($m['content'] as $k => $x)
     if (($x['type'] ?? '') === 'thinking' && ($x['signature'] ?? '') !== $sig) $bad("messages.$i.content.$k: Invalid `signature` in `thinking` block. The block is bound to a different conversation.");
 $question = ''; foreach ($msgs as $m) if ($m['role'] === 'user' && is_string($m['content'])) $question = $m['content'];
+if (str_contains($question, 'shift handover summary')) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'end_turn', 'usage' => ['input_tokens' => 10, 'output_tokens' => 5],
+    'content' => [['type' => 'text', 'text' => "- 9H-ABC : transit done" . (str_contains($question, '9H-ABC') ? ' (data seen)' : '')]]]); exit; }
 $nAsk = 0; $seen = false; foreach ($msgs as $m) { if ($m['role'] === 'user' && is_string($m['content'])) { $seen = true; $nAsk = 0; } elseif ($m['role'] === 'assistant') $nAsk++; }
 $tu = fn($id, $name, $in) => print(json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'tool_use', 'usage' => ['input_tokens' => 10, 'output_tokens' => 5], 'content' => [['type' => 'thinking', 'thinking' => '…', 'signature' => $sig], ['type' => 'tool_use', 'id' => $id, 'name' => $name, 'input' => $in]]]));
 // longue recherche : 35 tours d'outils d'affilée (vérifie que le contexte reste valide)

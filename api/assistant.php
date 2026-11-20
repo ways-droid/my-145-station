@@ -738,9 +738,39 @@ function ai_write($who, $role, $tool, $in, &$actions) {
     return ['error' => 'Outil inconnu'];
 }
 
+/* résumé du shift rédigé par Sindri pour le handover (toute l'équipe) : un brouillon, relu et corrigé par la personne
+   avant d'être enregistré sur la fiche du shift et envoyé avec la page Notion. Rien n'est écrit ici. */
+function ai_shift_summary($who, $role, $b) {
+    if (aik('ai_key') === '') fail(400, "Sindri n'est pas encore configuré : un administrateur doit saisir la clé API dans Paramètres.");
+    $ho = (string) ($b['ho'] ?? ''); if (!preg_match('/^\d{4}-\d{2}-\d{2}-(day|night)$/', $ho)) fail(400, 'Shift inconnu');
+    $us = ai_usage(); if ($us['usd'] >= ai_cap()) fail(429, 'Plafond mensuel de l\'assistant atteint.');
+    $staff = coll_docs('staff'); $nm = fn($id) => (string) ($staff[$id]['name'] ?? '');
+    $h = (array) (coll_docs('handovers')[$ho] ?? []); $lines = [];
+    foreach (coll_docs('shiftItems') as $x) {
+        if (($x['ho'] ?? '') !== $ho) continue;
+        $k = $x['kind'] ?? '';
+        if ($k === 'visit') {
+            $t = []; foreach ((array) ($x['tasks'] ?? []) as $tk) $t[] = '  - ' . ($tk['text'] ?? '') . ' => ' . (($tk['action'] ?? '') !== '' ? $tk['action'] : 'NOT DONE') . (!empty($tk['unc']) ? ' [UNCOMPLETED, handed over]' : '');
+            $lines[] = 'Aircraft ' . ($x['reg'] ?? '') . ' ' . ($x['acType'] ?? '') . ' ARR ' . ($x['arr'] ?? '-') . ' DEP ' . ($x['dep'] ?? '-') . ' CRS: ' . implode(', ', array_map($nm, (array) ($x['crs'] ?? []))) . "\n" . implode("\n", $t) . (($x['notes'] ?? '') !== '' ? "\n  notes: " . $x['notes'] : '');
+        } elseif ($k === 'todo') $lines[] = 'Uncompleted work: ' . ($x['reg'] ?? '') . ' ' . ($x['text'] ?? '') . (!empty($x['done']) ? ' (done)' : '') . (($x['note'] ?? '') !== '' ? ' — ' . $x['note'] : '');
+        elseif ($k === 'equip') $lines[] = 'Equipment: ' . ($x['user'] ?? '') . ' ' . ($x['reg'] ?? '') . ' ' . ($x['item'] ?? '') . ' ' . ($x['qty'] ?? '') . ' ' . ($x['unit'] ?? '');
+    }
+    foreach (coll_docs('situations') as $s) if (($s['status'] ?? 'open') === 'open') $lines[] = 'Open situation: ' . ($s['title'] ?? '') . ' ' . ($s['party'] ?? '') . (($s['dueBack'] ?? '') !== '' ? ' due back ' . $s['dueBack'] : '');
+    if (($h['checkNote'] ?? '') !== '') $lines[] = 'Station Control remark: ' . $h['checkNote'];
+    $lang = ($b['lang'] ?? 'en') === 'fr' ? 'French' : 'English';
+    $prompt = "You write the short shift handover summary of an aviation line maintenance station (EASA Part-145). Shift: $ho. Shift Foreman: " . $nm($h['foreman'] ?? '') . ".\n"
+        . "Write in $lang, 3 to 8 short bullet lines, factual, no invention, no greeting: aircraft handled, defects or tasks still open and what the next shift must do first, open situations, anything unusual. "
+        . "Never state that an aircraft is airworthy or released: the CRS is done in AMOS.\n\nShift data:\n" . (implode("\n", $lines) ?: '(nothing entered)');
+    try { $d = ai_request(['model' => ai_model(), 'max_tokens' => 600, 'messages' => [['role' => 'user', 'content' => $prompt]]]); }
+    catch (Throwable $e) { fail($e->getCode() === 429 ? 429 : 502, $e->getMessage()); }
+    $txt = trim(implode('', array_map(fn($c) => ($c['type'] ?? '') === 'text' ? (string) $c['text'] : '', (array) ($d['content'] ?? []))));
+    log_event('handovers', $ho, 'update', 'Résumé du shift proposé par ' . AI_NAME);
+    out(['ok' => true, 'text' => $txt]);
+}
 function assistant_routes($route, $parts, $method, $who, $role) {
     if ($route !== 'assistant') return;
     auth_tables();
+    if (($parts[1] ?? '') === 'shift-summary' && $method === 'POST') ai_shift_summary($who, $role, body_json());
     if ($role === 'terrain') fail(403, "Dans l'outil, l'assistant est réservé au bureau et aux administrateurs (l'équipe terrain l'utilise sur WhatsApp).");
     @set_time_limit(150);
     $act = $parts[1] ?? '';

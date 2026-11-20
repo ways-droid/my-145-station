@@ -470,10 +470,34 @@ function shiftCrew(id, date, sh, h) {
       ${ed && others.length ? `<label class="f">Ajouter au shift<select id="ho-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}</div>
     <div class="tablewrap"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Qualifications</th><th></th></tr></thead><tbody>${crew.map(p => { const x = rcell(p.id, date); return `<tr><td><b>${esc(p.name)}</b></td><td class="small">${esc(STAFF_FN[p.function] || "")}</td><td>${ratingChips(p)}</td>
       <td class="small">${extra.includes(p) ? `<span class="chip sm">Ajouté</span>${ed ? ` <button class="x" data-a="ho-rm" data-id="${p.id}" aria-label="Retirer">×</button>` : ""}` : x && rcode(x.c).k === "custom" ? esc(cellTxt(x)) : ""}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Personne au roster pour ce shift.</td></tr>`}</tbody></table></div>
+    <div class="ho-sum"><div class="row-sb"><b>${esc(tr("Résumé du shift"))}</b>${ed && !readOnly ? `<span class="row-g">${typeof AI !== "undefined" || SERVER ? `<button class="btn sm" data-a="ho-sum" data-ai="1">✦ ${esc(tr(h.summary?.text ? "Refaire avec Sindri" : "Rédiger avec Sindri"))}</button>` : ""}<button class="btn sm" data-a="ho-sum">${esc(tr(h.summary?.text ? "Modifier" : "Écrire"))}</button></span>` : ""}</div>
+      ${h.summary?.text ? `<div class="pre">${esc(h.summary.text)}</div><div class="small muted">${h.summary.ai ? `✦ ${esc(tr("Brouillon de Sindri, relu et validé par"))}` : esc(tr("Écrit par"))} ${esc(h.summary.by || "")} · ${fmtDT(h.summary.at)} · ${esc(tr("envoyé avec la page Notion"))}</div>`
+        : `<div class="small muted">${esc(tr("Quelques lignes pour le shift suivant : Sindri peut proposer un brouillon à partir du shift, vous le relisez avant de l'enregistrer."))}</div>`}</div>
     <div class="row-g wrap ho-sign"><div class="panel pad"><b>Remis par</b><div>${h.out?.at ? `${esc(h.out.by)} · ${fmtDT(h.out.at)}` : `<span class="muted">Pas encore</span>`}</div>${ed && !h.out?.at ? `<button class="btn sm" data-a="ho-sign" data-k="out" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je remets le shift</button>` : ""}</div>
       <div class="panel pad"><b>Repris par</b> <span class="muted small">(${esc(shiftName(...nxt))})</span><div>${h.in?.at ? `${esc(h.in.by)} · ${fmtDT(h.in.at)}` : `<span class="muted">Pas encore</span>`}</div>${!readOnly && h.out?.at && !h.in?.at ? `<button class="btn sm primary" data-a="ho-sign" data-k="in" ${prevBlock(id) ? `disabled title="${esc(tr("Le shift précédent n'est pas encore remis et repris."))}"` : ""}>Je reprends le shift</button>` : ""}</div>
       ${canReopenShift() && (h.out?.at || h.in?.at) && !readOnly ? `<button class="linkbtn small" data-a="ho-unsign">Annuler les signatures</button>` : ""}</div></div>`);
 }
+/* résumé du shift : brouillon de Sindri (facultatif), toujours relu et enregistré par une personne */
+ACTIONS["ho-sum"] = async el => {
+  const id = hoId(...UI.shift), h = hoDoc(id) || {};
+  const m = modal(`${mHead(esc(tr("Résumé du shift")) + " · " + esc(shiftName(...UI.shift)))}<form><div class="body">
+    <div id="hs-msg"></div>${field("hs-text", "Résumé (relisez et corrigez avant d'enregistrer)", h.summary?.text || "", { type: "textarea", wide: true })}
+    <div class="hint">${esc(tr("La CRS reste dans AMOS : le résumé ne dit jamais qu'un avion est remis en service."))}</div></div>
+    <footer><button type="button" class="btn" data-a="hs-ai">✦ ${esc(tr("Proposer avec Sindri"))}</button><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">${esc(tr("J'ai relu : enregistrer"))}</button></footer></form>`, "lg");
+  m.querySelector("#hs-text").rows = 9;
+  let fromAi = !!h.summary?.ai;
+  const draft = async () => {
+    const box = m.querySelector("#hs-msg"); box.innerHTML = `<div class="banner info small">✦ ${esc(tr("Sindri rédige le brouillon…"))}</div>`;
+    try { const r = await API.call("POST", "assistant/shift-summary", { ho: id, lang: UI_LANG === "fr" ? "fr" : "en" }); m.querySelector("#hs-text").value = r.text || ""; fromAi = true;
+      box.innerHTML = `<div class="banner warn small">${esc(tr("Brouillon de Sindri : vérifiez chaque ligne avant d'enregistrer."))}</div>`; }
+    catch (e) { box.innerHTML = `<div class="banner bad small">${esc(tr(e.message || "Sindri n'a pas pu répondre."))}</div>`; }
+  };
+  m.querySelector("[data-a=hs-ai]").onclick = e => { e.stopPropagation(); draft(); };
+  m.querySelector("form").onsubmit = async e => { e.preventDefault(); const t = val("hs-text").trim();
+    await hoPatch(id, { summary: t ? { text: t, by: meName(), at: new Date().toISOString(), ai: fromAi } : null }); closeModal(); render(true); toast(t ? "Résumé enregistré" : "Résumé retiré"); };
+  if (el.dataset.ai && SERVER && API) draft();
+};
+ACTIONS["hs-ai"] = () => { };
 ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
 ACTIONS["ho-sign"] = el => {
   const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitCheck(v).ok).length;
