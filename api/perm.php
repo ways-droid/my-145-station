@@ -101,10 +101,18 @@ function can_reopen_shift($role) {
     return $fn === 'foreman' && !empty((coll_docs('settings')['company'] ?? [])['reopenForemen']);
 }
 const HO_LOCKED_OK = ['in', 'notion', 'fr24At', 'reopen'];
+/* tâches encodées par Sindri pas encore validées par une personne, dans les avions d'un shift */
+function ai_unverified($ho) {
+    foreach (coll_docs('shiftItems') as $x) if (is_array($x) && ($x['ho'] ?? '') === $ho && ($x['kind'] ?? '') === 'visit')
+        foreach ((array) ($x['tasks'] ?? []) as $t) if (is_array($t) && !empty($t['ai']) && empty($t['ok'])) return true;
+    return false;
+}
 function shift_lock_write($role, $coll, $op, $old, $new, $patch) {
     $hoId = $coll === 'handovers' ? null : (string) (($old ?? $new)['ho'] ?? '');
     $ho = $coll === 'handovers' ? $old : ($hoId !== '' ? (coll_docs('handovers')[$hoId] ?? null) : null);
     $locked = is_array($ho) && !empty($ho['out']['at']) && empty($ho['reopen']['at']);
+    if ($coll === 'handovers' && $op !== 'delete' && !empty(($new ?? [])['out']['at']) && empty(($old ?? [])['out']['at'])
+        && ai_unverified((string) (($new ?? [])['date'] ?? '') . '-' . (string) (($new ?? [])['shift'] ?? ''))) deny('Des tâches du Tech Log encodées par Sindri ne sont pas encore vérifiées : une personne doit les valider avant de remettre le shift.');
     if ($coll === 'handovers' && is_array($old)) {
         $keys = array_unique(array_merge(array_keys($old), array_keys($new ?? [])));
         $changed = array_values(array_filter($keys, fn($k) => json_encode($old[$k] ?? null) !== json_encode(($new ?? [])[$k] ?? null)));

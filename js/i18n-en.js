@@ -1172,3 +1172,9 @@ Object.assign(EN, {
   "La fiche a été créée par quelqu'un d'autre en même temps.": "The record was created by someone else at the same time.", "Garder ma version": "Keep my version", "Reprendre l'autre version": "Take the other version",
   "Aucun conflit.": "No conflicts.", "Version de l'autre personne reprise": "Other person's version restored"
 });
+/* tâches encodées par Sindri */
+Object.assign(EN, {
+  "Vérifié et validé par": "Checked and validated by", "Encodée par Sindri – à vérifier": "Entered by Sindri – to check", "J'ai vérifié, c'est validé": "I checked it, validated", "annuler": "undo",
+  "du Tech Log encodée(s) par Sindri à vérifier et valider (section 2) :": "of the Tech Log entered by Sindri to check and validate (section 2):",
+  "du Tech Log encodée(s) par Sindri : vérifiez chacune et cochez « J'ai vérifié, c'est validé ». Le shift ne peut pas être remis avant.": "of the Tech Log entered by Sindri: check each one and tick \"I checked it, validated\". The shift cannot be handed over before."
+});
