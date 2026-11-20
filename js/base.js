@@ -100,7 +100,7 @@ VIEWS.parametres = {
   render() {
     const s = settings();
     const demo = COLS.reduce((a, c) => a + S[c].filter(x => x.demo).length, 0);
-    return head("Paramètres", "Organisation, station, utilisateurs et services reliés") + sbxCardShell() + usersCardShell() + (typeof dbxCardShell === "function" ? dbxCardShell() : "") + (typeof waCardShell === "function" ? waCardShell() : "") + (typeof fr24CardShell === "function" ? fr24CardShell() : "") + (typeof notionCardShell === "function" ? notionCardShell() : "") + (typeof odCardShell === "function" ? odCardShell() : "") + (typeof aiCardShell === "function" ? aiCardShell() : "") +
+    return head("Paramètres", "Organisation, station, utilisateurs et services reliés") + sbxCardShell() + usersCardShell() + (typeof lockCardShell === "function" ? lockCardShell() : "") + (typeof dbxCardShell === "function" ? dbxCardShell() : "") + (typeof waCardShell === "function" ? waCardShell() : "") + (typeof fr24CardShell === "function" ? fr24CardShell() : "") + (typeof notionCardShell === "function" ? notionCardShell() : "") + (typeof odCardShell === "function" ? odCardShell() : "") + (typeof aiCardShell === "function" ? aiCardShell() : "") +
     `<form class="panel ${isAdmin() ? "" : "hidden"}" id="f-set" style="max-width:820px"><div class="pad stack"><h3>Organisation</h3><div class="fields">
       ${field("s-name", "Nom de l'organisation (Part 145)", s.name)}${field("s-approval", "N° d'agrément Part 145", s.approval, { ph: "XX.145.0000" })}
       ${field("s-vat", "N° d'entreprise / TVA", s.vat)}${field("s-email", "E-mail", s.email)}${field("s-phone", "Téléphone", s.phone)}

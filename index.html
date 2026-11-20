@@ -379,7 +379,7 @@ table.visits tr.vo-g1 td { background: rgba(120,128,140,.08); } table.visits tr.
 tbody tr.vo-other:hover td { background: inherit; }
 /* shift pas encore clôturable (shift précédent pas remis et repris) : bandeau collant + liseré ambré sur chaque section */
 .ho-lockbar { position: sticky; top: 8px; z-index: 5; margin: 0 0 14px; padding: 10px 14px; border-radius: 12px; background: var(--orange-bg); color: var(--orange-ink, #9a4a00); border: 1px solid rgba(214,140,40,.45); font-size: 14px; box-shadow: 0 4px 14px rgba(0,0,0,.06); }
-.ho-lockbar .linkbtn { color: inherit; font-weight: 700; text-decoration: underline; }
+.ho-lockbar.ho-done { background: var(--blue-bg, #e8eefc); color: var(--blue-ink, #1d3f8f); border-color: rgba(60,100,200,.35); display: flex; flex-wrap: wrap; gap: 8px; align-items: center; } .ho-lockbar .linkbtn { color: inherit; font-weight: 700; text-decoration: underline; }
 .ho-locked .ho-sec { box-shadow: inset 4px 0 0 rgba(224,150,40,.75); background-image: repeating-linear-gradient(135deg, rgba(224,150,40,.05) 0 10px, transparent 10px 20px); }
 .vo-tog { display: inline-flex; align-items: center; gap: 3px; margin: 3px 0; padding: 1px 8px; border-radius: 999px; border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent); font-family: inherit; font-weight: 600; font-size: 11px; line-height: 1.6; cursor: pointer; white-space: nowrap; }
 .vo-tog.on { background: var(--accent); color: #fff; } .vo-n { opacity: .75; font-weight: 500; } .vo-tog:hover { filter: brightness(.95); }

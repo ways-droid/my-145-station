@@ -995,3 +995,11 @@ Object.assign(EN, {
   "n'est pas encore remis et repris.": "is not handed over and taken over yet.", "Le shift précédent n'est pas encore remis et repris.": "The previous shift is not handed over and taken over yet.",
   "Le shift précédent": "The previous shift", "doit d'abord être remis et repris.": "must be handed over and taken over first.",
 });
+Object.assign(EN, {
+  "Shifts remis": "Handed-over shifts", "Un shift remis est verrouillé. Le Station Lead peut le réactiver ; cette option permet aussi aux Shift Foremen de le faire.": "A handed-over shift is locked. The Station Lead can reopen it; this option lets Shift Foremen do it too.",
+  "Autoriser les Shift Foremen à réactiver un shift remis": "Allow Shift Foremen to reopen a handed-over shift", "Shift Foremen autorisés": "Shift Foremen allowed", "Réservé au Station Lead": "Station Lead only",
+  "Réactiver la modification de ce shift remis ? L'action est tracée dans l'historique.": "Reopen this handed-over shift for changes? The action is recorded in the history.", "Réactiver": "Reopen",
+  "Shift verrouillé": "Shift locked", "Shift remis par": "Shift handed over by", "plus aucune modification possible.": "no more changes possible.", "Réactiver la modification": "Reopen for changes",
+  "Le Station Lead peut le réactiver.": "The Station Lead can reopen it.", "Modification réactivée par": "Changes reopened by", "Terminer et reverrouiller": "Done, lock again",
+  "Ce shift a été remis : il est verrouillé.": "This shift was handed over: it is locked.",
+});
