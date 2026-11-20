@@ -13,7 +13,7 @@
 //  (Les rôles propres à la station — Station Lead, Shift Foreman, Engineer… — arrivent avec le module Personnel.)
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
-const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel', 'aircraft'];
+const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel', 'aircraft', 'expiries'];
 const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
@@ -126,6 +126,7 @@ function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
     if ($coll === 'notes') return notes_write($role, $op, $old, $new);
     if ($coll === 'staff' && $role !== 'admin') {   // droit Administrateur système : octroyé ou retiré par un administrateur seulement
         if (!empty(($old ?? [])['sysAdmin']) !== !empty(($new ?? [])['sysAdmin']) && $op !== 'delete') deny('Seul un administrateur peut octroyer ou retirer le droit Administrateur système.');
+        if ((($old ?? [])['function'] ?? '') === 'hq' || (($new ?? [])['function'] ?? '') === 'hq') { if ($op === 'delete' || (($old ?? [])['function'] ?? '') !== (($new ?? [])['function'] ?? '') || mb_strtolower(trim((string) (($old ?? [])['email'] ?? ''))) !== mb_strtolower(trim((string) (($new ?? [])['email'] ?? '')))) deny('Fonction Headquarters : seul un administrateur peut l\'octroyer, la retirer ou changer son e-mail.'); }
         if (!empty(($old ?? [])['sysAdmin']) && ($op === 'delete' || mb_strtolower(trim((string) ($old['email'] ?? ''))) !== mb_strtolower(trim((string) (($new ?? [])['email'] ?? ''))))) deny('Fiche d\'un administrateur système : seul un administrateur peut changer son e-mail ou la supprimer.');
     }
     if ($role === 'admin') return $new;
