@@ -243,6 +243,14 @@ curl -s -H "$A" -X POST -d '{"key":"fr24-good"}' $U/fr24/config >/dev/null
 ok "FR24 : diagnostic réservé aux admins" "$(curl -s -H "$B" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag)" 'administrateurs'
 R=$(curl -s -H "$A" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag); ok "FR24 : diagnostic" "$R" '"endpoint":"flight-summary/full","params"'; no "FR24 : diagnostic sans la clé" "$R" 'fr24-good'
 pkill -f "127.0.0.1:8773" || true
+echo "> météo du briefing"
+pkill -f "127.0.0.1:8776" || true
+(php -S 127.0.0.1:8776 "$D/wx-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["wx_base","http://127.0.0.1:8776/api/data"]);' $T/t.db
+R=$(curl -s -H "$HT" "$U/wx/brief?icao=LLBG"); ok "météo : METAR" "$R" 'METAR LLBG'; ok "météo : rafales du TAF" "$R" '"maxGust":48'; ok "météo : alerte rafales > 45 kt" "$R" '"alert":true'
+R=$(curl -s -H "$HT" "$U/wx/brief?icao=LLHA"); ok "météo : pas d'alerte sans rafales" "$R" '"alert":false'
+ok "météo : code OACI exigé" "$(curl -s -H "$HT" "$U/wx/brief?icao=TL")" 'OACI'
+pkill -f "127.0.0.1:8776" || true
 echo "> notion"
 pkill -f "127.0.0.1:8774" || true; rm -rf $T/notion; mkdir -p $T/notion
 (NOTION_MOCK_DIR=$T/notion php -S 127.0.0.1:8774 "$D/notion-mock.php" >/dev/null 2>&1 &); sleep 0.5

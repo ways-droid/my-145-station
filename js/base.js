@@ -111,6 +111,8 @@ VIEWS.parametres = {
       <label class="chk line wide"><input type="checkbox" id="s-fri" ${fridayOff() ? "checked" : ""}> Le vendredi est un jour de repos à la station (Shabbat) : vendredi moucheté dans le roster</label>
       ${field("s-actypes", "Types d'avion suivis (séparés par des virgules)", s.acTypes, { ph: "B747, B767, B777" })}
       ${field("s-checks", "Station Control : contrôles de fin de shift (un par ligne)", s.stationChecks || (typeof STATION_CHECKS !== "undefined" ? STATION_CHECKS.join("\n") : ""), { type: "textarea", wide: true })}
+      ${field("s-icao", "Code OACI de la station (météo)", s.stationIcao || "", { cls: "mono", ph: "LLBG" })}${field("s-gust", "Alerte rafales au-dessus de (kt)", s.gustKt || 45, { type: "number", min: 20 })}
+      ${field("s-notam", "Lien NOTAM (facultatif)", s.notamUrl || "", { ph: "https://…" })}
       ${field("s-expd", "Expirations : alerte (jours avant l'échéance)", s.expiryDays || 60, { type: "number", min: 7 })}
       ${field("s-tasks", "Tech Log : tâches pré-encodées (une par ligne)", s.taskPresets || (typeof TASK_PRESETS !== "undefined" ? TASK_PRESETS.join("\n") : ""), { type: "textarea", wide: true })}
     </div>
@@ -144,7 +146,7 @@ VIEWS.parametres = {
     f.onsubmit = async e => {
       e.preventDefault();
       await saveSettings({ name: val("s-name") || DEFAULT_SETTINGS.name, approval: val("s-approval"), vat: val("s-vat"), email: val("s-email"), phone: val("s-phone"), address: val("s-address"),
-        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60 });
+        stationCode: val("s-station").toUpperCase(), stationName: val("s-stname"), timeZone: val("s-tz"), fridayOff: document.getElementById("s-fri").checked, acTypes: val("s-actypes"), stationChecks: val("s-checks"), taskPresets: val("s-tasks"), expiryDays: +val("s-expd") || 60, stationIcao: val("s-icao").trim().toUpperCase(), gustKt: +val("s-gust") || 45, notamUrl: /^https:\/\//i.test(val("s-notam").trim()) ? val("s-notam").trim() : "" });
       toast("Paramètres enregistrés");
     };
   }

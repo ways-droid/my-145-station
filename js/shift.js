@@ -48,17 +48,20 @@ function prevBlock(id) {
 }
 
 VIEWS.shift = {
-  after() { if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) { render(true); fr24AutoRun(); } }); else if (SERVER) fr24AutoRun(); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
+  after() { if (typeof wxLoad === "function") wxLoad(); if (SERVER && !FR24) fr24Status().then(s => { if (s && s.configured) { render(true); fr24AutoRun(); } }); else if (SERVER) fr24AutoRun(); if (SERVER && !NOTION) notionStatus().then(s => { if (s && s.configured) render(true); }); if (SERVER && !OD) odStatus(); },
   render() {
     if (!UI.shift) UI.shift = currentShift();
     const [date, sh] = UI.shift, id = hoId(date, sh), h = hoDoc(id) || {}, cur = currentShift(), isCur = cur[0] === date && cur[1] === sh;
     const visits = hoItems(id, "visit"), bad = visits.filter(v => !visitCheck(v).ok).length;
-    return head("Shift", "Planning des avions et handover : les 5 sections du handover de la station", "",
+    const top = head("Shift", "Planning des avions et handover : les 5 sections du handover de la station", "",
       `<div class="row-g wrap"><button class="btn sm" data-a="shift-go" data-n="-1" aria-label="Shift précédent">‹</button><b class="rmonth">${esc(shiftName(date, sh))}</b><button class="btn sm" data-a="shift-go" data-n="1" aria-label="Shift suivant">›</button>
         <input type="date" id="shift-date" value="${esc(date)}" aria-label="Date"><div class="seg">${Object.keys(SHIFTS).map(k => `<button data-a="shift-sh" data-sh="${k}" class="${k === sh ? "on" : ""}">${k === "day" ? "Jour" : "Nuit"}</button>`).join("")}</div>
         ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
         ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
-        ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`) +
+        ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`);
+    const tabsH = (typeof wxBanner === "function" ? wxBanner() : "") + tabs("shift", [["shift", "Shift"], ["briefing", "Briefing"]]);
+    if (curTab("shift", "shift") === "briefing" && typeof shiftBriefing === "function") return top + tabsH + shiftBriefing(id, date, sh);
+    return top + tabsH +
       (prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? `<div class="ho-lockbar" role="status">🔒 ${esc(tr("Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent"))} <button class="linkbtn" data-a="shift-go" data-n="-1">${esc(shiftLabel(prevBlock(id)))}</button> ${esc(tr("n'est pas encore remis et repris."))}</div>` : "") +
       (h.out && h.out.at ? (hoLocked(h) ? `<div class="ho-lockbar ho-done" role="status">🔒 ${esc(tr("Shift remis par"))} ${esc(h.out.by || "?")} (${fmtDT(h.out.at)}) : ${esc(tr("plus aucune modification possible."))} ${canReopenShift() && !readOnly ? `<button class="btn sm" data-a="ho-reopen">${esc(tr("Réactiver la modification"))}</button>` : `<span class="small">${esc(tr("Le Station Lead peut le réactiver."))}</span>`}</div>`
         : `<div class="banner warn">✏️ ${esc(tr("Modification réactivée par"))} ${esc(h.reopen.by || "?")} (${fmtDT(h.reopen.at)}). ${!readOnly ? `<button class="btn sm" data-a="ho-relock">${esc(tr("Terminer et reverrouiller"))}</button>` : ""}</div>`) : "") +
