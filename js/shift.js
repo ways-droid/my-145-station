@@ -414,12 +414,16 @@ const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === 
    et n'est pas encore dans le shift y est ajouté (ligne créée automatiquement). La mise à jour automatique ne crée rien. */
 async function fr24Run(id, quiet, create = !quiet) {
   let vs = hoItems(id, "visit").filter(v => v.reg);
-  const fleet = !create ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
+  const isCur = id === hoId(...currentShift());   // les avions ne sont ajoutés que dans le shift en cours
+  const fleet = !create || !isCur ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
   if (!vs.length && !fleet.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
   const r = await API.call("POST", "fr24/track", { regs: [...vs.map(v => v.reg), ...fleet.map(a => a.reg)], station: stationIata() });
   const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
   const added = [];
-  for (const a of fleet) { const x = r.items[key(a.reg)]; if (!x || !x.live || x.live.to !== stationIata()) continue;
+  /* avion suivi à ajouter : en vol vers la station, ou posé à la station pendant ce shift et pas encore reparti */
+  for (const a of fleet) { const x = r.items[key(a.reg)]; if (!x) continue;
+    const rot = fr24Rot({ ho: id, fr24: x }), inbound = x.live && x.live.to === stationIata(), here = !x.live && rot && rot.arr && !rot.dep;
+    if (!inbound && !here) continue;
     const c = acClient(a), nid = await save("shiftItems", null, { kind: "visit", ho: id, reg: normReg(a.reg), acType: a.acType || "", clientId: c ? c.id : "", crs: [], mech: [], auto: "fr24", order: Date.now() });
     added.push(a.reg); vs = [...vs, { id: nid, reg: a.reg }]; }
   let found = 0, filled = 0;
@@ -427,7 +431,7 @@ async function fr24Run(id, quiet, create = !quiet) {
     if (x.arr || x.dep) filled++;
     await patch("shiftItems", v.id, { fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}, x.arr ? { arr: x.arr } : {}, x.dep ? { dep: x.dep } : {}) }); }
   FR24ERR = (r.errors || []).join(" · ");
-  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : ""));
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : fleet.length ? " " + tr("Avions suivis vérifiés") + " : " + fleet.length + ", " + tr("aucun en route vers la station ni posé.") : ""));
   if (quiet && FR24ERR) render(true);
 }
 let FR24ERR = "";
