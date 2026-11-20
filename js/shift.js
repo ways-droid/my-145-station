@@ -155,13 +155,14 @@ function fr24Times(v) {
   const f = v.fr24; if (!f) return "";
   const st = stationIata(), [a, b] = shiftWindow(v.ho);
   const near = iso => { const x = Date.parse(iso); return !isNaN(x) && x >= a - 36 * 3600000 && x <= b + 72 * 3600000; };
-  let arr = "", dep = "";
+  let arr = "", dep = "", fl = "";
   const P = f.last && f.last.to === st && f.last.landed ? f.last.landed : "";
-  if (f.arr && f.arr.at && near(f.arr.at)) arr = utcHM(f.arr.at);
+  if (f.arr && f.arr.at && near(f.arr.at)) { arr = utcHM(f.arr.at); fl = f.arr.flight || ""; }
   else if (P && near(P)) arr = utcHM(P);
-  else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) arr = "ETA " + utcHM(f.live.eta);
-  if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) dep = utcHM(f.dep.at);
-  return arr || dep ? `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${esc(arr || "—")} / ${esc(dep || "—")}</div>` : "";
+  else if (f.live && f.live.to === st && f.live.eta && near(f.live.eta)) { arr = "ETA " + utcHM(f.live.eta); fl = f.live.flight || ""; }
+  if (!fl && f.live && f.live.to === st) fl = f.live.flight || "";
+  if (f.dep && f.dep.at && near(f.dep.at) && (!f.arr || !f.arr.at || Date.parse(f.dep.at) > Date.parse(f.arr.at))) { dep = utcHM(f.dep.at); if (f.dep.flight) fl = fl ? fl + " / " + f.dep.flight : f.dep.flight; }
+  return arr || dep || fl ? `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24${fl ? " " + esc(fl) : ""} · ${esc(arr || "—")} / ${esc(dep || "—")}</div>` : "";
 }
 
 /* ---- Tech Log de l'avion ----
@@ -188,7 +189,7 @@ function techLogHtml(v) {
 /* 2. travail prévu / fait par avion */
 function shiftVisits(id) {
   const rows = hoItems(id, "visit"), ed = hoEd(id);
-  return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && rows.length ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
+  return sec(2, "Travail du shift (prévu et fait)", "Un avion par ligne. Le client est retrouvé par l'immatriculation. La CRS se fait dans AMOS.", (FR24 && FR24.configured && (rows.length || (S.aircraft || []).length) ? `<button class="btn sm" data-a="fr24-track" data-ho="${id}">Flightradar24</button>` : "") + (ed ? `<button class="btn sm primary" data-a="visit-form" data-ho="${id}">Ajouter un avion</button>` : ""),
     (FR24ERR && rows.length ? `<div class="banner warn">${esc(tr(FR24ERR))}</div>` : "") +
     (rows.length ? `<div class="tablewrap"><table class="visits"><thead><tr><th>Avion</th><th>ARR / DEP (UTC)</th><th>CRS</th><th>Mécanos</th><th>Tech Log : défaut / tâche → action</th><th>MHRS</th><th title="${esc(tr("LogBook n° d'arrivée"))}">LogBook</th></tr></thead>${rows.map(v => { const ck = visitCheck(v), c = clientOfReg(v.reg);
       const other = visitGroup(v).filter(x => x.id !== v.id && hasWork(x)).sort((x, y) => shKey(x.ho).localeCompare(shKey(y.ho)));
@@ -215,9 +216,10 @@ ACTIONS["visit-form"] = el => {
   const certs = crew.filter(p => (p.licences || []).length || Object.keys(p.ratings || {}).length);
   const m = modal(`${mHead(v.id ? "Avion · " + esc(v.reg) : "Nouvel avion")}<form><div class="body stack"><div class="fields">
     ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}<datalist id="vi-regs">${(S.aircraft || []).filter(a => a.active !== false).map(a => `<option value="${esc(a.reg)}">${esc([a.acType, a.variant].filter(Boolean).join(" "))}</option>`).join("")}</datalist>${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
-    ${field("vi-arr", "ARR (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "DEP (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}
+    ${field("vi-arr", "ETA prévue (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-dep", "ETD prévue (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}
     <div class="hint" id="vi-span" style="grid-column:1/-1"></div>
-    ${field("vi-flt", "Vol / rotation", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-atl", "LogBook n° d'arrivée", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
+    ${v.fr24 ? `<div style="grid-column:1/-1">${fr24Times(v) || ""}${fr24Line(v)}<div class="muted small">${esc(tr("Rempli par Flightradar24, vos champs ne sont pas modifiés."))}</div></div>` : ""}
+    ${field("vi-flt", "N° de vol / rotation (prévu)", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-atl", "LogBook n° d'arrivée", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
     <div class="muted small" id="vi-client"></div>
     ${staffPick("vi-crs", "CRS (affectés à cet avion)", v.crs || [], certs.length ? certs : crew)}${staffPick("vi-mech", "Mécanos / aides", v.mech || [], crew)}
     ${others.length ? `<label class="f">Ajouter quelqu'un qui n'est pas au roster de ce shift<select id="vi-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}
@@ -283,7 +285,10 @@ ACTIONS["visit-form"] = el => {
     e.preventDefault();
     const c = clientOfReg(val("vi-reg")), reg = val("vi-reg").toUpperCase();
     const dup = hoItems(v.ho, "visit").find(x => x.id !== v.id && normReg(x.reg) === normReg(reg));
-    if (dup && !m.dataset.dupOk) { m.dataset.dupOk = "1"; m.querySelector("#vi-warn").textContent = tr("Cet avion est déjà dans ce shift. Enregistrer quand même ? (cliquez encore sur Enregistrer)"); return; }
+    if (dup && !m.dataset.dupOk) { const w = m.querySelector("#vi-warn");
+      w.innerHTML = `<div class="banner warn">${esc(tr("Cet avion est déjà dans ce shift. Est-ce une erreur, ou un autre vol ?"))}<div class="row-g wrap" style="margin-top:6px"><button type="button" class="btn sm" data-dupx>${esc(tr("C'est une erreur"))}</button><button type="button" class="btn sm primary" data-dupok>${esc(tr("Autre vol : enregistrer"))}</button></div></div>`;
+      w.querySelector("[data-dupx]").onclick = () => closeModal();
+      w.querySelector("[data-dupok]").onclick = () => { m.dataset.dupOk = "1"; m.querySelector("form").requestSubmit(); }; return; }
     if ((val("vi-arr") && !hmOk(val("vi-arr"))) || (val("vi-dep") && !hmOk(val("vi-dep")))) { m.querySelector("#vi-warn").textContent = tr("Heure invalide : format HH:MM (UTC)."); return; }
     const t = visitTimes(times());
     const arrDate = val("vi-arr") ? (v.arrDate || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
@@ -398,17 +403,24 @@ function stationUtc(date, hour) {
 }
 /* fenêtre UTC d'un shift (jour 08-20, nuit 20-08 heure locale) */
 const shiftWindow = id => { const d = id.slice(0, 10), night = id.slice(11) === "night", a = stationUtc(d, night ? 20 : 8); return [a, a + 12 * 3600000]; };
+/* clic sur Flightradar24 : les avions du shift, plus ceux de la section Avions ; un avion suivi qui vole vers la station
+   et n'est pas encore dans le shift y est ajouté (ligne créée automatiquement). La mise à jour automatique ne crée rien. */
 async function fr24Run(id, quiet) {
-  const vs = hoItems(id, "visit").filter(v => v.reg);
-  if (!vs.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
-  const r = await API.call("POST", "fr24/track", { regs: vs.map(v => v.reg), station: stationIata() });
+  let vs = hoItems(id, "visit").filter(v => v.reg);
+  const fleet = quiet ? [] : (S.aircraft || []).filter(a => a.active !== false && a.reg && !vs.some(v => normReg(v.reg) === normReg(a.reg)));
+  if (!vs.length && !fleet.length) { if (!quiet) toast("Aucune immatriculation dans ce shift."); return; }
+  const r = await API.call("POST", "fr24/track", { regs: [...vs.map(v => v.reg), ...fleet.map(a => a.reg)], station: stationIata() });
   const key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, "");
+  const added = [];
+  for (const a of fleet) { const x = r.items[key(a.reg)]; if (!x || !x.live || x.live.to !== stationIata()) continue;
+    const c = acClient(a), nid = await save("shiftItems", null, { kind: "visit", ho: id, reg: normReg(a.reg), acType: a.acType || "", clientId: c ? c.id : "", crs: [], mech: [], auto: "fr24", order: Date.now() });
+    added.push(a.reg); vs = [...vs, { id: nid, reg: a.reg }]; }
   let found = 0, filled = 0;
   for (const v of vs) { const x = r.items[key(v.reg)]; if (!x) continue; if (x.live || x.last) found++;
     if (x.arr || x.dep) filled++;
     await patch("shiftItems", v.id, { fr24: Object.assign({ at: r.at }, x.live ? { live: x.live } : {}, x.last ? { last: x.last } : {}, x.arr ? { arr: x.arr } : {}, x.dep ? { dep: x.dep } : {}) }); }
   FR24ERR = (r.errors || []).join(" · ");
-  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.`);
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : ""));
   if (quiet && FR24ERR) render(true);
 }
 let FR24ERR = "";
