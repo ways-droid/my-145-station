@@ -10,6 +10,11 @@ const DEFAULT_SETTINGS = {
   name: "my-145-station", approval: "", vat: "", address: "", email: "", phone: "", stationCode: "", stationName: "", timeZone: "", acTypes: "B747, B767, B777"
 };
 const settings = () => Object.assign({}, DEFAULT_SETTINGS, S.settings);
+/* fuseau horaire de la station : celui des Paramètres, sinon déduit du code station (TLV par défaut), jamais celui de l'appareil
+   (un navigateur en Belgique ne doit pas décider du shift en cours à Tel Aviv) */
+const STATION_TZ = { TLV: "Asia/Jerusalem", ETM: "Asia/Jerusalem", HFA: "Asia/Jerusalem", LGG: "Europe/Brussels", BRU: "Europe/Brussels", CRL: "Europe/Brussels", OST: "Europe/Brussels",
+  CGN: "Europe/Berlin", FRA: "Europe/Berlin", LEJ: "Europe/Berlin", MLA: "Europe/Malta", AMS: "Europe/Amsterdam", CDG: "Europe/Paris", LHR: "Europe/London", JFK: "America/New_York", HKG: "Asia/Hong_Kong", DWC: "Asia/Dubai", DXB: "Asia/Dubai" };
+const stationTz = () => { const s = settings(); return s.timeZone || STATION_TZ[(s.stationCode || "TLV").toUpperCase()] || ""; };
 
 /* ======================= utilitaires ======================= */
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
