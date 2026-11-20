@@ -182,6 +182,9 @@ R=$(curl -s -H "$HT" -X POST -d '{"regs":["9h-abc","4X-ICA","OO-NOP"]}' $U/fr24/
 ok "FR24 : avion en vol avec ETA" "$R" '"eta":"2026-11-19T14:35:00Z"'; ok "FR24 : vol terminé" "$R" '"landed":"2026-11-19T10:02:00Z"'; ok "FR24 : avion sans vol" "$R" '"OO-NOP":\[\]'
 ok "FR24 : arrivée à la station" "$R" '"arr":{"at":"2026-11-19T10:02:00Z"'
 R=$(curl -s -H "$HT" -X POST -d '{"regs":["9H-DEP"],"station":"TLV"}' $U/fr24/track); ok "FR24 : arrivée et départ à la station" "$R" '"dep":{"at":"2026-11-19T08:05:00Z"'
+curl -s -H "$A" -X POST -d '{"key":"fr24-sandbox"}' $U/fr24/config >/dev/null
+ok "FR24 : clé de test (sandbox) signalée" "$(curl -s -H "$HT" -X POST -d '{"regs":["9H-CAC"]}' $U/fr24/track)" 'clé de test (sandbox)'
+curl -s -H "$A" -X POST -d '{"key":"fr24-good"}' $U/fr24/config >/dev/null
 ok "FR24 : diagnostic réservé aux admins" "$(curl -s -H "$B" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag)" 'administrateurs'
 R=$(curl -s -H "$A" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag); ok "FR24 : diagnostic" "$R" '"endpoint":"flight-summary/full","params"'; no "FR24 : diagnostic sans la clé" "$R" 'fr24-good'
 pkill -f "127.0.0.1:8773" || true

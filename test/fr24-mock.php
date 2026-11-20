@@ -1,6 +1,7 @@
 <?php
 // Faux Flightradar24 (API v1) pour les tests : clé « fr24-good », un avion en vol et un vol terminé.
 header('Content-Type: application/json');
+if (($_SERVER['HTTP_AUTHORIZATION'] ?? '') === 'Bearer fr24-sandbox') { echo json_encode(['data' => [['flight' => 'SK7679', 'reg' => 'EI-SIN', 'orig_iata' => 'ARN', 'dest_iata' => 'FUE', 'eta' => '2023-12-15T14:47:28Z']]]); exit; }
 if (($_SERVER['HTTP_AUTHORIZATION'] ?? '') !== 'Bearer fr24-good') { http_response_code(401); echo json_encode(['message' => 'Unauthenticated.']); exit; }
 if (($_SERVER['HTTP_ACCEPT_VERSION'] ?? '') !== 'v1') { http_response_code(400); echo json_encode(['message' => 'Accept-Version required']); exit; }
 $p = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH); $regs = explode(',', $_GET['registrations'] ?? '');

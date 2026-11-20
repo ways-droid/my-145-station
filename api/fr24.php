@@ -44,12 +44,12 @@ function fr24_provider_track(array $regs, $station = '') {
         $list = implode(',', $chunk);
         try { $live = fr24_http('live/flight-positions/full', ['registrations' => $list]); }
         catch (RuntimeException $e) { $GLOBALS['FR24_ERRORS'][] = 'Vols en cours : ' . $e->getMessage(); $live = []; }
-        foreach ((array) ($live['data'] ?? []) as $p) { $r = $byKey[fr24_key_reg($p['reg'] ?? '')] ?? null; if ($r === null) continue;
+        foreach ((array) ($live['data'] ?? []) as $p) { $r = $byKey[fr24_key_reg($p['reg'] ?? '')] ?? null; if ($r === null) { $GLOBALS['FR24_FOREIGN'] = ($GLOBALS['FR24_FOREIGN'] ?? 0) + 1; continue; }
             $out[$r]['live'] = ['flight' => (string) ($p['flight'] ?? $p['callsign'] ?? ''), 'from' => fr24_iata($p, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($p, 'dest_iata', 'dest_icao'),
                 'eta' => (string) ($p['eta'] ?? ''), 'alt' => (int) ($p['alt'] ?? 0), 'gspeed' => (int) ($p['gspeed'] ?? 0), 'type' => (string) ($p['type'] ?? ''), 'at' => (string) ($p['timestamp'] ?? '')]; }
         try { $sum = fr24_http('flight-summary/full', ['registrations' => $list, 'flight_datetime_from' => $from, 'flight_datetime_to' => $to]); }
         catch (RuntimeException $e) { $GLOBALS['FR24_ERRORS'][] = 'Vols récents : ' . $e->getMessage(); $sum = []; }
-        foreach ((array) ($sum['data'] ?? []) as $f) { $r = $byKey[fr24_key_reg($f['reg'] ?? '')] ?? null; if ($r === null) continue;
+        foreach ((array) ($sum['data'] ?? []) as $f) { $r = $byKey[fr24_key_reg($f['reg'] ?? '')] ?? null; if ($r === null) { $GLOBALS['FR24_FOREIGN'] = ($GLOBALS['FR24_FOREIGN'] ?? 0) + 1; continue; }
             $x = ['flight' => (string) ($f['flight'] ?? $f['callsign'] ?? ''), 'from' => fr24_iata($f, 'orig_iata', 'orig_icao'), 'to' => fr24_iata($f, 'dest_iata_actual', 'dest_iata') ?: fr24_iata($f, 'dest_icao_actual', 'dest_icao'),
                 'takeoff' => (string) ($f['datetime_takeoff'] ?? ''), 'landed' => (string) ($f['datetime_landed'] ?? ''), 'type' => (string) ($f['type'] ?? '')];
             if (!isset($out[$r]['last']) || strcmp($x['takeoff'], $out[$r]['last']['takeoff']) > 0) $out[$r]['last'] = $x;
@@ -91,6 +91,8 @@ function fr24_routes($route, $parts, $method, $who, $role) {
             $c = get_doc('settings', 'company'); $set = $c ? (json_decode($c['data'], true) ?: []) : [];
             $items = fr24_provider_track($regs, (string) ($b['station'] ?? $set['stationCode'] ?? ''));
             $errs = $GLOBALS['FR24_ERRORS'] ?? [];
+            // FR24 a répondu avec d'autres avions que ceux demandés, et aucun des nôtres : c'est le comportement d'une clé de test (sandbox)
+            if (!empty($GLOBALS['FR24_FOREIGN']) && !array_filter($items)) $errs[] = 'Flightradar24 renvoie des données de démonstration : la clé enregistrée est une clé de test (sandbox). Créez une clé de production sur fr24api.flightradar24.com et remplacez-la dans Paramètres.';
             if ($errs && count($errs) >= 2 * (int) ceil(count($regs) / 15)) fail(502, $errs[0]);   // tout a échoué : on le dit
             out(['items' => $items, 'errors' => $errs, 'at' => gmdate('c')]);
         }
