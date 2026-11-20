@@ -84,9 +84,19 @@ ACTIONS["todo-carry"] = async el => {
   toast(plural(src.length, "travail repris", "travaux repris"));
 };
 /* un avion sur plusieurs shifts : ses lignes vides des autres shifts partent avec lui ; celles avec du travail restent */
-ACTIONS["item-del"] = el => { const v = S.shiftItems.find(x => x.id === el.dataset.id), g = v && v.kind === "visit" ? visitGroup(v).filter(x => x.id !== v.id) : [];
-  confirmBox(g.length ? "Supprimer cet avion de ce shift ? Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent." : "Supprimer cette ligne ?",
-    async () => { await remove("shiftItems", el.dataset.id); for (const x of g) if (!hasWork(x)) await remove("shiftItems", x.id); closeModal(); }); };
+/* supprimer une ligne (avion, travail à reprendre, équipement) : confirmation dans la fiche même, sans la fermer.
+   Un avion sur plusieurs shifts : ses lignes vides des autres shifts partent avec lui ; celles avec du travail restent */
+ACTIONS["item-del"] = el => {
+  const v = S.shiftItems.find(x => x.id === el.dataset.id), g = v && v.kind === "visit" ? visitGroup(v).filter(x => x.id !== v.id) : [];
+  const msg = v && v.kind === "visit" ? `${esc(tr("Êtes-vous sûr de vouloir supprimer l'avion"))} <b>${esc(v.reg || "")}</b> ${esc(tr("de ce shift ?"))} ${esc(tr("Le Tech Log de ce shift sera perdu."))}${g.length ? " " + esc(tr("Ses lignes vides des autres shifts sont aussi retirées ; celles où du travail est encodé restent.")) : ""}`
+    : esc(tr("Êtes-vous sûr de vouloir supprimer cette ligne ?"));
+  const go = async () => { await remove("shiftItems", el.dataset.id); for (const x of g) if (!hasWork(x)) await remove("shiftItems", x.id); closeModal(); toast("C'est fait"); };
+  const box = el.closest(".left");
+  if (!box) return confirmBox(msg, go);
+  box.innerHTML = `<span class="tl-sure">${msg} <button type="button" class="btn sm" data-dno>${esc(tr("Non"))}</button> <button type="button" class="btn sm danger" data-dyes>${esc(tr("Oui, supprimer"))}</button></span>`;
+  box.querySelector("[data-dyes]").onclick = go;
+  box.querySelector("[data-dno]").onclick = () => { box.innerHTML = `<button type="button" class="btn danger" data-a="item-del" data-id="${esc(el.dataset.id)}">${esc(tr("Supprimer"))}</button>`; };
+};
 
 /* ---- avion sur plusieurs shifts ----
    Une escale = un groupe de lignes (une par shift, même visitId = id de la première ligne). Les données de l'escale
@@ -278,7 +288,11 @@ ACTIONS["visit-form"] = el => {
     if (e.target.dataset.tj != null) drawTasks(); });
   $t.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const c = b.closest("[data-ti]");
     if (b.dataset.tnew != null) { tasks.push({ id: uid(), text: b.dataset.tnew, action: "", logPage: "", wo: "", techs: [] }); drawTasks(); const ta = $t.querySelectorAll(".tl-card textarea"); if (ta.length) ta[b.dataset.tnew ? ta.length - 1 : ta.length - 2].focus(); }
-    else if (b.dataset.tidel != null) { tasks.splice(+b.dataset.tidel, 1); drawTasks(); }
+    /* garde-fou : retirer une ligne du Tech Log demande une confirmation */
+    else if (b.dataset.tidel != null) { const t = tasks[+b.dataset.tidel];
+      b.outerHTML = `<span class="tl-sure"><b>${esc(tr("Êtes-vous sûr de vouloir retirer cette ligne ?"))}</b>${t.text ? ` <span class="muted">(${esc(t.text.slice(0, 40))})</span>` : ""} <button type="button" class="btn sm" data-tino>${esc(tr("Non"))}</button> <button type="button" class="btn sm danger" data-tiyes="${b.dataset.tidel}">${esc(tr("Oui, retirer"))}</button></span>`; }
+    else if (b.dataset.tiyes != null) { tasks.splice(+b.dataset.tiyes, 1); drawTasks(); }
+    else if (b.dataset.tino != null) drawTasks();
     else if (b.dataset.tdel != null && c) { tasks[+c.dataset.ti].techs.splice(+b.dataset.tdel, 1); drawTasks(); } });
   /* tâches restées sans action sur les shifts précédents de l'escale : à reprendre ici */
   const drawCarry = () => {
