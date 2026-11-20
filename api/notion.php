@@ -67,7 +67,7 @@ function nt_when($iso, $tz) {
 function notion_write_handover($hoId, array $h, array $items, array $crew, array $checks, array $set) {
     $parent = notion_parent(); if ($parent === '') throw new RuntimeException('Notion : aucune page parente choisie dans Paramètres.');
     $staff = coll_docs('staff'); $nm = fn($id) => (string) ($staff[$id]['name'] ?? '');
-    $tz = (string) ($set['timeZone'] ?? ''); $stn = (string) ($set['stationCode'] ?? '');
+    $stn = (string) ($set['stationCode'] ?? ''); $tz = (string) ($set['timeZone'] ?? '') ?: (['TLV' => 'Asia/Jerusalem', 'LGG' => 'Europe/Brussels', 'BRU' => 'Europe/Brussels', 'MLA' => 'Europe/Malta'][strtoupper($stn ?: 'TLV')] ?? '');
     $date = (string) ($h['date'] ?? substr($hoId, 0, 10)); $sh = (string) ($h['shift'] ?? substr($hoId, 11));
     $dmy = preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $m) ? "$m[3]/$m[2]/$m[1]" : $date;
     $title = trim("$stn $dmy - " . ($sh === 'night' ? 'Night Shift' : 'Day Shift'));

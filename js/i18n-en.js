@@ -981,3 +981,4 @@ Object.assign(EN, {
   "Le Tech Log de ce shift sera perdu.": "This shift's Tech Log will be lost.", "Êtes-vous sûr de vouloir supprimer cette ligne ?": "Are you sure you want to delete this line?",
 });
 Object.assign(EN, { "Oui, supprimer": "Yes, delete" });
+Object.assign(EN, { "Fuseau horaire de la station (vide = déduit du code station)": "Station time zone (empty = from the station code)" });

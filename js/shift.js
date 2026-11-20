@@ -18,7 +18,7 @@ const nextShift = (date, sh) => sh === "day" ? [date, "night"] : [addDays(date, 
 /* shift en cours à l'heure de la station (fuseau des paramètres, sinon celui de l'appareil) */
 function currentShift() {
   let d = new Date(), date = today(), h = d.getHours();
-  try { if (settings().timeZone) { const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: settings().timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
+  try { if (stationTz()) { const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: stationTz(), year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
     date = `${p.year}-${p.month}-${p.day}`; h = +p.hour % 24; } } catch { }
   return h >= 20 ? [date, "night"] : h < 8 ? [addDays(date, -1), "night"] : [date, "day"];
 }
@@ -110,7 +110,7 @@ const hasWork = v => !!((v.tasks || []).length || (v.crs || []).length || (v.mec
 /* shift (id) qui contient un instant UTC, à l'heure de la station */
 function shiftOfUtc(ms) {
   const d = new Date(ms); let date = iso(d), h = d.getHours();
-  try { const tz = settings().timeZone; const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz || undefined, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
+  try { const tz = stationTz(); const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz || undefined, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false }).formatToParts(d).map(x => [x.type, x.value]));
     date = `${p.year}-${p.month}-${p.day}`; h = +p.hour % 24; } catch { }
   return h >= 20 ? hoId(date, "night") : h < 8 ? hoId(addDays(date, -1), "night") : hoId(date, "day");
 }
@@ -371,7 +371,7 @@ document.addEventListener("change", e => {
   if (t.id === "ho-ckn") hoPatch(hoId(...UI.shift), { checkNote: t.value.trim() });
   if (t.id === "ho-fm") hoPatch(hoId(...UI.shift), { foreman: t.value });
   if (t.id === "ho-add" && t.value) { const id = hoId(...UI.shift); hoPatch(id, { extra: Array.from(new Set([...(hoDoc(id)?.extra || []), t.value])) }); }
-  if (t.id === "shift-date" && t.value) { UI.shift = [t.value, UI.shift[1]]; render(true); }
+  if (t.id === "shift-date" && t.value) { UI.shift = [t.value, UI.shift[1]]; UI.shiftPinned = true; render(true); }
 });
 
 /* 5. manpower et signatures */
@@ -396,16 +396,20 @@ ACTIONS["ho-sign"] = el => {
     async () => { await hoPatch(id, { [k]: { by: meName(), at: new Date().toISOString() } }); render(true); }, k === "out" ? "Remettre" : "Reprendre");
 };
 ACTIONS["ho-unsign"] = () => confirmBox("Annuler les signatures de ce shift ?", async () => { await hoPatch(hoId(...UI.shift), { out: null, in: null }); render(true); }, "Annuler les signatures");
-ACTIONS["shift-go"] = el => { UI.shift = (+el.dataset.n < 0 ? prevShift : nextShift)(...(UI.shift || currentShift())); render(true); };
-ACTIONS["shift-sh"] = el => { UI.shift = [(UI.shift || currentShift())[0], el.dataset.sh]; render(true); };
-ACTIONS["shift-now"] = () => { UI.shift = currentShift(); render(true); };
+ACTIONS["shift-go"] = el => { UI.shiftPinned = true; UI.shift = (+el.dataset.n < 0 ? prevShift : nextShift)(...(UI.shift || currentShift())); render(true); };
+ACTIONS["shift-sh"] = el => { UI.shiftPinned = true; UI.shift = [(UI.shift || currentShift())[0], el.dataset.sh]; render(true); };
+ACTIONS["shift-now"] = () => { UI.shiftPinned = false; UI.shift = currentShift(); render(true); };
+/* page ouverte au changement de shift (08:00 / 20:00 heure de la station) : on passe au nouveau shift en cours,
+   sauf si l'utilisateur regarde volontairement un autre shift */
+setInterval(() => { try { if (!UI.shift || UI.shiftPinned || document.getElementById("modal-root")?.innerHTML) return; const c = currentShift();
+  if (c[0] !== UI.shift[0] || c[1] !== UI.shift[1]) { UI.shift = c; if (/^#shift/.test(location.hash)) render(true); } } catch { } }, 60000);
 
 /* ---- tableau de bord ---- */
 WIDGETS.shift_now = { h: 8, t: "Shift en cours", ic: "✈", c: "blue", m: "shift", size: "m", d: "Avions du shift en cours, travail non terminé, CRS manquants.",
   r() { const [d, sh] = currentShift(), id = hoId(d, sh), vs = hoItems(id, "visit"), todo = hoItems(id, "todo").filter(x => !x.done), bad = vs.filter(v => !visitCheck(v).ok);
     return `<div class="w-stats">${wStat(vs.length, "avions")}${wStat(todo.length, "non terminés", todo.length ? "warn" : "")}${wStat(bad.length, "sans CRS qualifié", bad.length ? "bad" : "")}</div>
       <div class="w-list">${vs.slice(0, 5).map(v => `<div class="list-row"><span><b class="mono">${esc(v.reg)}</b> <span class="muted small">${esc(v.acType || "")} · ${esc(v.arr || "—")}/${esc(v.dep || "—")} UTC</span></span><span class="small">${(v.crs || []).map(s => esc(sName(s))).join(", ")}</span></div>`).join("") || wEmpty("Aucun avion pour ce shift.")}</div>${wLink("shift", "Ouvrir le shift")}`; },
-  go() { UI.shift = currentShift(); } };
+  go() { UI.shiftPinned = false; UI.shift = currentShift(); } };
 
 /* ---- Flightradar24 (facultatif : clé de l'offre API FR24 ; sans clé, les heures se saisissent à la main) ---- */
 let FR24 = null;
@@ -423,7 +427,7 @@ function fr24Line(v) {
 }
 /* heure locale de la station → instant UTC (ms) */
 function stationUtc(date, hour) {
-  const tz = settings().timeZone, guess = Date.parse(`${date}T${pad(hour)}:00:00Z`);
+  const tz = stationTz(), guess = Date.parse(`${date}T${pad(hour)}:00:00Z`);
   if (!tz) return new Date(`${date}T${pad(hour)}:00:00`).getTime();
   try { const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", { timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(new Date(guess)).map(x => [x.type, x.value]));
     const asLocal = Date.parse(`${p.year}-${p.month}-${p.day}T${pad(+p.hour % 24)}:${p.minute}:00Z`); return guess - (asLocal - guess); } catch { return guess; }
