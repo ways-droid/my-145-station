@@ -50,11 +50,11 @@ function fids_routes($route, $parts, $method, $who, $role) {
             foreach ($names as $c) { $short = count($r) <= count($c) ? $r : $c; $long = $short === $r ? $c : $r;
                 if (count($short) >= 2 || strlen($short[0]) >= 5) { if (!array_diff($short, $long)) return true; } }
             return false; };
-        $rows = [];
-        try { foreach (fids_rows() as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']]) || ($names && $byName($r['name'] ?? ''))) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
+        $rows = []; $total = 0;
+        try { $all = fids_rows(); $total = count($all); foreach ($all as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']]) || ($names && $byName($r['name'] ?? ''))) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
         catch (Throwable $e) { out(['rows' => [], 'error' => fids_msg($e), 'at' => gmdate('c')]); }
         usort($rows, fn($x, $y) => strcmp($x['est'] ?: $x['sched'], $y['est'] ?: $y['sched']));
-        out(['rows' => $rows, 'at' => gmdate('c')]);
+        out(['rows' => $rows, 'total' => $total, 'at' => gmdate('c')]);
     }
     $items = [];
     try { foreach (fids_rows() as $r) if (isset($want[$r['f']])) { $f = $r['f']; unset($r['f'], $r['al'], $r['name']); $items[$f][] = $r; } }
