@@ -16,8 +16,8 @@ VIEWS.mur = {
         <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${esc(tr("Local"))} (LT)</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC (Z)</span></div>
         <button class="btn sm" data-a="wall-exit">${esc(tr("Quitter"))}</button></div></div>` +
       (typeof wxBanner === "function" ? wxBanner() : "") +
-      `<div class="wall-grid"><div class="wall-acs">${visits.map(v => { const open = visitTasks(v).filter(t => !t.action && t.text), c = visitCheck(v);
-        return `<div class="wall-ac ${c.ok ? "" : "warn"}"><div class="wall-reg"><b class="${regState(v)}">${esc(v.reg || "")}</b><span>${esc(v.acType || "")}</span></div>
+      `<div class="wall-grid"><div class="wall-acs">${visits.map(v => { const open = visitTasks(v).filter(t => t.text && !tlFull(t)), c = visitCheck(v);   // une tâche reste au Mur tant que son cadre n'est pas vert
+        return `<div class="wall-ac ${visitOff(v) ? "v-off" : c.ok ? "" : "warn"}"><div class="wall-reg"><b class="${regState(v)}">${esc(v.reg || "")}</b><span>${esc(v.acType || "")}</span></div>
           <div class="wall-t"><span>ARR <b>${esc(zHM(v.arr))}</b></span><span>DEP <b>${esc(zHM(v.dep))}</b></span></div>${fr24Times(v)}
           <div class="wall-who"><span class="lbl">CRS</span> ${crsHtml(v, ", ") || `<span class="txt-bad">${esc(tr("à affecter"))}</span>`}</div>
           ${(v.mech || []).length ? `<div class="wall-who"><span class="lbl">${esc(tr("Mécanos"))}</span> ${(v.mech || []).map(sName).map(esc).join(", ")}</div>` : ""}
