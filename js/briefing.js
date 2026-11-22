@@ -121,7 +121,7 @@ function shiftBriefing(id, date, sh) {
 }
 WIDGETS.briefing = { h: 8, t: "Briefing du shift", ic: "🧭", c: "blue", m: "shift", size: "m", d: "Météo et alerte rafales, avions attendus, équipe et situations ouvertes du shift en cours.",
   r() { wxLoad(); const [date, sh] = currentShift(), id = hoId(date, sh), v = hoItems(id, "visit"), crew = onShift(date, sh), sits = typeof sitOpen === "function" ? S.situations.filter(sitOpen) : [];
-    return `${wxAlert() ? `<div class="banner bad small">💨 ${"Gusts up to"} ${wxGust()} kt (${"limit"} ${gustLimit()} kt)</div>` : ""}
+    return `<div class="avi">${wxAlert() ? `<div class="banner bad small">💨 ${"Gusts up to"} ${wxGust()} kt (${"limit"} ${gustLimit()} kt)</div>` : ""}
       <div class="w-stats">${wStat(v.length, "avions")}${wStat(crew.length, "à l'équipe")}${wStat(sits.length, "situations ouvertes", sits.length ? "warn" : "")}</div>
-      ${WX && WX.metar ? `${wxPlain(WX.metar.raw, true)}<div class="small mono muted">${esc(WX.metar.raw)}</div>` : ""}`; },
+      ${WX && WX.metar ? `${wxPlain(WX.metar.raw, true)}<div class="small mono muted">${esc(WX.metar.raw)}</div>` : ""}</div>`; },
   go() { UI.tab.shift = "briefing"; UI.shift = null; } };

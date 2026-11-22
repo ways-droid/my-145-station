@@ -280,6 +280,9 @@ ok "FIDS station : vols de la compagnie cliente" "$R" '"al":"5C","name":"CHALLEN
 no "FIDS station : pas les autres compagnies" "$R" 'LY1'
 R=$(curl -s -H "$HT" -X POST -d '{"airlines":[],"flights":["LY001"]}' $U/fids/board)
 ok "FIDS station : vol d'un avion du shift" "$R" '"fl":"LY1"'
+R=$(curl -s -H "$HT" -X POST -d '{"names":["Challenge Airlines Malta"]}' $U/fids/board)
+ok "FIDS station : compagnie sans IATA trouvée par le nom" "$R" '"fl":"5C851"'
+no "FIDS station : nom, pas les autres" "$R" 'LY1'
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/none"]); $p->prepare("DELETE FROM ways_kv WHERE k=?")->execute(["fids_cache"]);' $T/t.db ; rm -f $T/up/.fids-cache.json
 echo "> flightradar24"
 pkill -f "127.0.0.1:8773" || true

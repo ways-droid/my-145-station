@@ -247,7 +247,7 @@ function fidsTimes(v) {
   const f = v.fids; if (!f) return "";
   if (!f.arr && !f.dep) return `<div class="fids-t muted" title="Ben Gurion airport FIDS">FIDS TLV · ${esc((f.tried || []).join(", "))} not listed on the airport FIDS${f.err ? ` (${esc(f.err)})` : " (cargo flights are often not published)"}</div>`;
   const one = (k, x) => { if (!x) return ""; const late = x.est && x.sched && x.est !== x.sched;
-    return `${k} ${esc(x.fl)}${x.guess ? ` <span class="muted" title="Next flight number of the same airline, usual for the return leg">(likely)</span>` : ""} <b>${esc(fidsHM(x.est || x.sched))} LT</b>${late ? ` <span class="muted">(sched ${esc(fidsHM(x.sched))})</span>` : ""}${x.status ? ` · ${esc(x.status)}` : ""}`; };
+    return `${k} ${esc(x.fl)}${x.guess ? ` <span class="muted" title="Next or previous flight number of the same airline, usual for the return leg">(likely)</span>` : ""} <b>${esc(fidsHM(x.est || x.sched))} LT</b>${late ? ` <span class="muted">(sched ${esc(fidsHM(x.sched))})</span>` : ""}${x.status ? ` · ${esc(x.status)}` : ""}`; };
   return `<div class="fids-t" title="Ben Gurion airport FIDS (Israel Airports Authority), local times">FIDS TLV · ${[one("ARR", f.arr), one("DEP", f.dep)].filter(Boolean).join(" / ")}</div>`;
 }
 /* « 2026-11-19T03:40:00 » heure locale de la station → ms UTC */
@@ -262,9 +262,9 @@ async function fidsRun(id, vs) {
   if (stationIata() !== "TLV" || !vs.length) return "";
   const cur = vs.map(v => S.shiftItems.find(x => x.id === v.id) || v);
   const fls = v => { const x = v.fr24 || {}; return [v.flight, x.live && x.live.flight, x.arr && x.arr.flight, x.dep && x.dep.flight, x.last && x.last.flight].map(fidsNorm).filter(Boolean); };
-  /* vol retour probable : même compagnie, n° suivant (5C770 → 5C771), utilisé seulement si le départ n'est pas connu autrement */
-  const nxt = f => { const m = f.match(/^([A-Z0-9]{2}[A-Z]?)(\d{1,4})$/); return m ? m[1] + (+m[2] + 1) : ""; };
-  const all = [...new Set(cur.flatMap(v => fls(v).flatMap(f => [f, nxt(f)])).filter(Boolean))]; if (!all.length) return "";
+  /* vol retour probable : même compagnie, n° voisin (X6 600 → 601, 5C 102 → 101), utilisé seulement si le départ n'est pas connu autrement */
+  const nxt = f => { const m = f.match(/^([A-Z0-9]{2}[A-Z]?)(\d{1,4})$/); return m ? [m[1] + (+m[2] + 1), +m[2] > 1 ? m[1] + (+m[2] - 1) : ""].filter(Boolean) : []; };
+  const all = [...new Set(cur.flatMap(v => fls(v).flatMap(f => [f, ...nxt(f)])).filter(Boolean))]; if (!all.length) return "";
   const r = await API.call("POST", "fids/tlv", { flights: all });
   if (r.error) { for (const v of cur) if (fls(v).length) await patch("shiftItems", v.id, { fids: { at: r.at, arr: null, dep: null, tried: fls(v), err: r.error } }); return r.error; }
   const [a, b] = shiftWindow(id);
@@ -274,7 +274,7 @@ async function fidsRun(id, vs) {
     const pick = dir => rows.filter(x => x.dir === dir).sort((p, q) => Math.abs(p.ms - (a + b) / 2) - Math.abs(q.ms - (a + b) / 2))[0];
     const arr = pick("A");
     let dep = pick("D");
-    if (!dep) { const g = [...new Set(fls(v).map(nxt))].flatMap(fl => (r.items[fl] || []).filter(x => x.dir === "D").map(x => Object.assign({ fl, guess: true }, x)))
+    if (!dep) { const g = [...new Set(fls(v).flatMap(nxt))].flatMap(fl => (r.items[fl] || []).filter(x => x.dir === "D").map(x => Object.assign({ fl, guess: true }, x)))
       .map(x => Object.assign(x, { ms: ltMs(x.est || x.sched) })).filter(x => x.ms != null && x.ms >= (arr ? arr.ms : a - 12 * 3600000) && x.ms <= b + 24 * 3600000).sort((p, q) => p.ms - q.ms);
       dep = g[0]; }
     const slim = x => x ? Object.assign({ fl: x.fl, sched: x.sched, est: x.est, status: x.status, other: x.other }, x.guess ? { guess: true } : {}) : null;

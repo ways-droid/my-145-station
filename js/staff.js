@@ -78,7 +78,7 @@ VIEWS.personnel = {
     return head("Personnel", `${plural(staffActive().length, "personne")} · licences, qualifications et documents`,
       isOffice() ? `<button class="btn primary" data-a="staff-form" ${dis()}>Ajouter une personne</button>` : "") +
       tabs("personnel", [["equipe", "Équipe", staffActive().length], ["matrice", "Qualifications"], ["echeances", "Échéances", due.length, late > 0], ["formation", "Formation station", typeof indTodo === "function" ? indTodo().length : 0], ["approvals", "Approvals et licences"]]) +
-      ({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList, formation: () => inductionList(), approvals: () => condPanel() })[tab]();
+      (["matrice", "formation", "approvals"].includes(tab) ? s => `<div class="avi">${s}</div>` : s => s)(({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList, formation: () => inductionList(), approvals: () => condPanel() })[tab]());
   }
 };
 function staffTeam() {
@@ -123,9 +123,9 @@ function openStaff(id) {
   modal(`${mHead(esc(p.name))}<div class="body stack">
     <div class="row-g wrap"><span class="chip info">${esc(STAFF_FN[p.function] || p.function || "—")}</span>${typeof indChip === "function" && p.function !== "hq" ? `<button class="linkbtn" data-a="ind-open" data-id="${p.id}">${indChip(p.id)}</button>` : ""}${p.active === false ? `<span class="chip">Ne fait plus partie de la station</span>` : ""}${p.shift ? `<span class="chip">${esc(SHIFT_LBL[p.shift] || p.shift)}</span>` : ""}</div>
     <dl class="kv sm">${[["Employeur", p.employer], ["Station de base", p.base], ["E-mail", p.email], ["Téléphone", p.phone], ["Nationalité", p.nationality]].filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
-    <h3>Licences</h3>${(p.licences || []).length ? `<table class="small"><tbody>${p.licences.map(l => `<tr><td class="mono"><b>${esc(l.cat)}</b></td><td class="mono">${esc(l.number || "")}</td><td>${esc(l.authority || "")}</td><td>${l.expires ? dueChip(l.expires, 60) : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Aucune licence enregistrée.</div>`}
+    <div class="avi"><h3>Licences</h3>${(p.licences || []).length ? `<table class="small"><tbody>${p.licences.map(l => `<tr><td class="mono"><b>${esc(l.cat)}</b></td><td class="mono">${esc(l.number || "")}</td><td>${esc(l.authority || "")}</td><td>${l.expires ? dueChip(l.expires, 60) : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Aucune licence enregistrée.</div>`}
     <h3>Type Ratings</h3><div>${ratingChips(p) || `<span class="muted">Aucune.</span>`}</div>
-    ${genAppr(p).length ? `<h3>${esc(tr("Approvals généraux"))}</h3><div>${genAppr(p).map(a => `<span class="chip sm"><b>${esc(a.code)}</b> ${esc(a.label || "")} · ${esc((a.types || []).length ? a.types.join(", ") : tr("tous les types"))}</span>`).join(" ")}</div>` : ""}
+    ${genAppr(p).length ? `<h3>${esc(tr("Approvals généraux"))}</h3><div>${genAppr(p).map(a => `<span class="chip sm"><b>${esc(a.code)}</b> ${esc(a.label || "")} · ${esc((a.types || []).length ? a.types.join(", ") : tr("tous les types"))}</span>`).join(" ")}</div>` : ""}</div>
     <div class="row-sb"><h3>Documents</h3>${ed ? `<button class="btn sm" data-a="sdoc-form" data-staff="${p.id}">Ajouter un document</button>` : ""}</div>
     ${docs.length ? `<table class="small"><tbody>${docs.map(d => `<tr class="${ed ? "click" : ""} ${d.old ? "muted" : ""}" ${ed ? `data-a="sdoc-form" data-staff="${p.id}" data-id="${d.id}"` : ""}><td><b>${esc(SDOC_TYPES[d.type] || d.type)}</b><div class="muted">${esc([d.name, d.acType, d.number ? "n° " + d.number : ""].filter(Boolean).join(" · "))}</div></td>
       <td>${d.old ? "Ancien" : d.expires ? dueChip(d.expires, 60) : ""}</td><td class="r">${d.file ? `<a class="btn sm" href="${esc(blobUrl(d.file))}" target="_blank" rel="noopener" data-stop>Fichier</a>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">${p.docs ? "Aucun document." : "Documents visibles par le bureau et par la personne elle-même."}</div>`}
@@ -149,14 +149,14 @@ ACTIONS["staff-form"] = el => {
     ${field("st-email", "E-mail (le même que son compte, pour qu'il voie sa fiche)", p.email, { type: "email" })}${field("st-phone", "Téléphone", p.phone)}
     ${field("st-nat", "Nationalité", p.nationality)}${field("st-shift", "Horaire habituel", p.shift || "", { type: "select", options: [["", "—"], ...Object.entries(SHIFT_LBL)] })}
   </div>
-  <div><div class="row-sb"><h3>Licences</h3><button type="button" class="btn sm" data-a="lic-add">Ajouter une licence</button></div><div class="lic-list stack">${(p.licences || []).map(licRow).join("")}</div></div>
+  <div class="avi stack"><div><div class="row-sb"><h3>Licences</h3><button type="button" class="btn sm" data-a="lic-add">Ajouter une licence</button></div><div class="lic-list stack">${(p.licences || []).map(licRow).join("")}</div></div>
   <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="trr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
     ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez ses approvals pour chaque Type Rating (liste dans l'onglet Approvals et licences), et CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
     <div class="tr-list stack">${staffTR(p).map(trRow).join("")}</div></div>
   <div><div class="row-sb"><h3>${esc(tr("Approvals généraux"))}</h3><button type="button" class="btn sm" data-a="ga-add">${esc(tr("Ajouter un approval général"))}</button></div>
     <div class="hint">${esc(tr("Un approval que la personne possède pour tous ses Type Ratings, ou seulement pour les types cochés (ex. E EASA, ou un approval maison). Code au choix : il compte dès qu'une fiche avion l'exige."))}</div>
     <datalist id="ga-codes">${condCats().map(c => `<option value="${esc(c.code)}">${esc(tr(c.label || ""))}</option>`).join("")}</datalist>
-    <div class="ga-list stack">${genAppr(p).map(gaRow).join("")}</div></div>
+    <div class="ga-list stack">${genAppr(p).map(gaRow).join("")}</div></div></div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
   ${isAdmin() ? `<div class="hint">${esc(tr("Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station."))}</div>` : ""}
   ${isAdmin() ? `<label class="chk sysadm"><input type="checkbox" id="st-sysadm" ${p.sysAdmin ? "checked" : ""}> <b>${esc(tr("Administrateur système"))}</b> <span class="muted small">${esc(tr("— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée."))}</span></label>`
