@@ -150,7 +150,7 @@ ACTIONS["staff-form"] = el => {
     ${field("st-nat", "Nationalité", p.nationality)}${field("st-shift", "Horaire habituel", p.shift || "", { type: "select", options: [["", "—"], ...Object.entries(SHIFT_LBL)] })}
   </div>
   <div><div class="row-sb"><h3>Licences</h3><button type="button" class="btn sm" data-a="lic-add">Ajouter une licence</button></div><div class="lic-list stack">${(p.licences || []).map(licRow).join("")}</div></div>
-  <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="tr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
+  <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="trr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
     ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez ses approvals pour chaque Type Rating (liste dans l'onglet Approvals et licences), et CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
     <div class="tr-list stack">${staffTR(p).map(trRow).join("")}</div></div>
   <div><div class="row-sb"><h3>${esc(tr("Approvals généraux"))}</h3><button type="button" class="btn sm" data-a="ga-add">${esc(tr("Ajouter un approval général"))}</button></div>
@@ -197,9 +197,9 @@ const trRow = (r = {}) => `<div class="tr-row row-g wrap"><select class="tr-t" a
   <select class="tr-m" aria-label="${esc(tr("Modèle"))}">${atModelOpts(r.t, r.m)}</select><select class="tr-e" aria-label="${esc(tr("Moteur"))}">${atEngOpts(r.t, r.m, r.e)}</select>
   <span class="tr-appr"><span class="small muted">${esc(tr("Approvals"))} :</span> ${rCodes(trLic(r)).map(({ code: c, label: l }) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${esc(c)}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${esc(c)}</b> <span class="small muted">${esc(tr(l))}</span></label>`).join("") || `<span class="small txt-warn">${esc(tr("aucun approval défini (Personnel > Approvals et licences)"))}</span>`}</span>
   <label class="chk line tr-crsl" title="${esc(tr("Autorisation compagnie de signer (CRS)"))}"><input type="checkbox" class="tr-crs" ${r.crs === true ? "checked" : ""}> <b>CRS</b> <span class="small muted">${esc(tr("autorisation compagnie"))}</span></label>
-  <button type="button" class="x" data-a="tr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
-ACTIONS["tr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());
-ACTIONS["tr-del"] = el => el.closest(".tr-row").remove();
+  <button type="button" class="x" data-a="trr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
+ACTIONS["trr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());
+ACTIONS["trr-del"] = el => el.closest(".tr-row").remove();   // "tr-del" est déjà pris par Voyages
 const gaRow = (a = {}) => { const all = !(a.types || []).length, types = atUniq(acTypes(), null).concat((a.types || []).filter(t => !acTypes().includes(t)));
   return `<div class="ga-row row-g wrap"><input class="ga-code mono" list="ga-codes" value="${esc(a.code || "")}" placeholder="E" aria-label="${esc(tr("Code"))}" style="max-width:7em">
   <input class="ga-label" value="${esc(a.label || "")}" placeholder="${esc(tr("Libellé (ex. EASA)"))}" aria-label="${esc(tr("Libellé"))}">
