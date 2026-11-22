@@ -29,6 +29,8 @@ VIEWS.mur = {
   },
   after() { if (typeof wxLoad === "function") wxLoad(); }
 };
-ACTIONS["wall-exit"] = () => { location.hash = "#shift"; };
-document.addEventListener("keydown", e => { if (e.key === "Escape" && route() === "mur" && !document.getElementById("modal-root").innerHTML) location.hash = "#shift"; });
+/* le Mur s'ouvre dans sa propre fenêtre : en sortir la ferme (sinon retour au Shift) */
+const wallExit = () => { if (history.length <= 1) { window.close(); setTimeout(() => { location.hash = "#shift"; }, 200); } else location.hash = "#shift"; };
+ACTIONS["wall-exit"] = wallExit;
+document.addEventListener("keydown", e => { if (e.key === "Escape" && route() === "mur" && !document.getElementById("modal-root").innerHTML) wallExit(); });
 setInterval(() => { if (route() === "mur") render(true); }, 60000);
