@@ -44,7 +44,7 @@ const AI_LABELS = [
     'forms' => 'formulaires approuvés par l\'autorité (no = n° du formulaire, title, rev, revDate, cat moe|maint|quality|hr|tools|stores|station|other, approval, url = lien OneDrive, file, notes = quand l\'utiliser, active)',
     'instructions' => 'consignes du Station Lead (title, body, fns = fonctions visées, vide = tout le monde, important, due, at, by, archived, acks {staffId: {at, name}} = signatures « lu et compris » ; ne jamais signer à la place de quelqu\'un)',
     'chargeLines' => 'lignes de Charge Sheet (date, company, reg, rotation, type, workType, description, qty, unit, price, currency, reviewed, invoiced) ; montant = qty × price',
-    'clients' => 'clients (compagnies aériennes servies par la station)', 'products' => 'articles et prix (tarifs des Charge Sheets)',
+    'clients' => 'clients (compagnies aériennes servies par la station : name, code court, icao = code compagnie OACI ex. CHG, regPrefixes…)', 'products' => 'articles et prix (tarifs des Charge Sheets)',
     'vehicles' => 'véhicules', 'vehEvents' => 'entretiens et événements véhicules', 'faults' => 'pannes signalées sur les véhicules', 'driverLogs' => 'prises en charge de véhicules', 'tires' => 'pneus',
     'tools' => 'outillage de la station (étalonnage)', 'labs' => "laboratoires d'étalonnage", 'adminDocs' => 'documents administratifs', 'adminFolders' => 'dossiers administratifs',
     'links' => 'liens utiles',
