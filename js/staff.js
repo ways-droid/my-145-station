@@ -73,8 +73,8 @@ VIEWS.personnel = {
     const tab = curTab("personnel", "equipe"), due = staffDue(60), late = due.filter(x => x.date < today()).length;
     return head("Personnel", `${plural(staffActive().length, "personne")} · licences, qualifications et documents`,
       isOffice() ? `<button class="btn primary" data-a="staff-form" ${dis()}>Ajouter une personne</button>` : "") +
-      tabs("personnel", [["equipe", "Équipe", staffActive().length], ["matrice", "Qualifications"], ["echeances", "Échéances", due.length, late > 0], ["formation", "Formation station", typeof indTodo === "function" ? indTodo().length : 0]]) +
-      ({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList, formation: () => inductionList() })[tab]();
+      tabs("personnel", [["equipe", "Équipe", staffActive().length], ["matrice", "Qualifications"], ["echeances", "Échéances", due.length, late > 0], ["formation", "Formation station", typeof indTodo === "function" ? indTodo().length : 0], ["approvals", "Approvals et licences"]]) +
+      ({ equipe: staffTeam, matrice: staffMatrix, echeances: staffDueList, formation: () => inductionList(), approvals: () => condPanel() })[tab]();
   }
 };
 function staffTeam() {
@@ -146,7 +146,7 @@ ACTIONS["staff-form"] = el => {
   </div>
   <div><div class="row-sb"><h3>Licences</h3><button type="button" class="btn sm" data-a="lic-add">Ajouter une licence</button></div><div class="lic-list stack">${(p.licences || []).map(licRow).join("")}</div></div>
   <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="tr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
-    ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
+    ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez ses approvals pour chaque Type Rating (liste dans l'onglet Approvals et licences), et CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
     <div class="tr-list stack">${staffTR(p).map(trRow).join("")}</div></div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
   ${isAdmin() ? `<div class="hint">${esc(tr("Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station."))}</div>` : ""}
@@ -176,7 +176,7 @@ ACTIONS["staff-form"] = el => {
 };
 const trRow = (r = {}) => `<div class="tr-row row-g wrap"><select class="tr-t" aria-label="${esc(tr("Type"))}">${atOpts([["", "— " + tr("Type") + " —"], ...atUniq(acTypes(), r.t).map(t => [t, t])], r.t)}</select>
   <select class="tr-m" aria-label="${esc(tr("Modèle"))}">${atModelOpts(r.t, r.m)}</select><select class="tr-e" aria-label="${esc(tr("Moteur"))}">${atEngOpts(r.t, r.m, r.e)}</select>
-  ${rCodes(trLic(r)).map(({ code: c, label: l }) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${esc(c)}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${esc(c)}</b></label>`).join("")}
+  <span class="tr-appr"><span class="small muted">${esc(tr("Approvals"))} :</span> ${rCodes(trLic(r)).map(({ code: c, label: l }) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${esc(c)}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${esc(c)}</b> <span class="small muted">${esc(tr(l))}</span></label>`).join("") || `<span class="small txt-warn">${esc(tr("aucun approval défini (Personnel > Approvals et licences)"))}</span>`}</span>
   <label class="chk line tr-crsl" title="${esc(tr("Autorisation compagnie de signer (CRS)"))}"><input type="checkbox" class="tr-crs" ${r.crs === true ? "checked" : ""}> <b>CRS</b> <span class="small muted">${esc(tr("autorisation compagnie"))}</span></label>
   <button type="button" class="x" data-a="tr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 ACTIONS["tr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());

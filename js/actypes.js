@@ -28,29 +28,29 @@ function atTree() {
     ${!l.length ? `<div class="pad stack"><div class="muted">${esc(tr("Aucun type d'appareil pour l'instant."))}</div>${ed ? `<div><button class="btn" data-a="at-preset">${esc(tr("Préparer B747, B767, B777 (à adapter)"))}</button></div>` : ""}</div>` : ""}
     ${makers.map(mk => `<div class="pad at-maker"><h3>${esc(mk)}</h3>${l.filter(t => (t.maker || tr("Autre")) === mk).map(t => `<div class="at-type ${ed ? "click" : ""}" ${ed ? `data-a="at-form" data-id="${t.id}"` : ""}>
       <div><b class="mono">${esc(t.code)}</b> ${t.name ? `<span class="muted">${esc(t.name)}</span>` : ""} <span class="muted small">· ${plural(aircraftList().filter(a => a.acType === t.code && a.active !== false).length, "avion")}</span></div>
-      <ul class="at-models">${(t.models || []).map(m => `<li><b>${esc(m.name)}</b> ${(m.engines || []).map(e => `<span class="chip sm">${esc(e)}</span>`).join(" ") || `<span class="muted small">${esc(tr("moteurs à compléter"))}</span>`}</li>`).join("") || `<li class="muted small">${esc(tr("Aucun modèle"))}</li>`}</ul></div>`).join("")}</div>`).join("")}</div>${condPanel()}`;
+      <ul class="at-models">${(t.models || []).map(m => `<li><b>${esc(m.name)}</b> ${(m.engines || []).map(e => `<span class="chip sm">${esc(e)}</span>`).join(" ") || `<span class="muted small">${esc(tr("moteurs à compléter"))}</span>`}</li>`).join("") || `<li class="muted small">${esc(tr("Aucun modèle"))}</li>`}</ul></div>`).join("")}</div>`).join("")}</div>`;
 }
 /* catégories de conditions pour signer : modifiables, avec les stations où elles s'appliquent */
 function condPanel() {
   const ed = canAT(), l = condCats();
-  return `<div class="panel" style="margin-top:14px"><div class="pad row-sb wrap"><div><h3 class="np">${esc(tr("Catégories de conditions pour signer"))}</h3>
-    <div class="hint">${esc(tr("Ce que l'on peut exiger dans les conditions d'un avion. « Type Rating » : case cochée sur le Type Rating du technicien ; « Licence » : catégorie de sa licence. Une catégorie limitée à certaines stations n'est proposée et vérifiée que là."))}</div></div>
-    ${ed ? `<button class="btn" data-a="cond-form">${esc(tr("Modifier les catégories"))}</button>` : ""}</div>
+  return `<div class="panel"><div class="pad row-sb wrap"><div><h3 class="np">${esc(tr("Approvals et catégories de licence"))}</h3>
+    <div class="hint">${esc(tr("Ce que l'on peut exiger dans les conditions pour signer un avion. « Approval sur le Type Rating » : se coche à côté de chaque Type Rating du technicien (ex. E EASA, I israélienne, F FAA). « Catégorie de licence » : se choisit dans ses licences (ex. B1, B2). Une ligne limitée à certaines stations n'est proposée et vérifiée que là."))}</div></div>
+    ${ed ? `<button class="btn" data-a="cond-form">${esc(tr("Modifier la liste"))}</button>` : ""}</div>
     <div class="tablewrap"><table><thead><tr><th>${esc(tr("Code"))}</th><th>${esc(tr("Libellé"))}</th><th>${esc(tr("Se lit sur"))}</th><th>${esc(tr("Stations"))}</th></tr></thead><tbody>
-    ${l.map(c => `<tr class="${condHere(c) ? "" : "muted"}"><td><b class="mono">${esc(c.code)}</b></td><td>${esc(tr(c.label || ""))}</td><td>${esc(tr(c.on === "licence" ? "Licence" : "Type Rating"))}</td>
+    ${l.map(c => `<tr class="${condHere(c) ? "" : "muted"}"><td><b class="mono">${esc(c.code)}</b></td><td>${esc(tr(c.label || ""))}</td><td>${esc(tr(c.on === "licence" ? "Catégorie de licence" : "Approval sur le Type Rating"))}</td>
       <td class="small">${String(c.stations || "").trim() ? esc(c.stations) + (condHere(c) ? "" : ` · ${esc(tr("pas cette station"))}`) : esc(tr("Toutes"))}</td></tr>`).join("")}</tbody></table></div></div>`;
 }
 const condRow = (c = {}) => `<div class="cond-row row-g wrap"><input class="cd-code mono" value="${esc(c.code || "")}" placeholder="B1" aria-label="${esc(tr("Code"))}" style="max-width:7em">
   <input class="cd-label" value="${esc(c.label ? tr(c.label) : "")}" placeholder="${esc(tr("Libellé"))}" aria-label="${esc(tr("Libellé"))}">
-  <select class="cd-on" aria-label="${esc(tr("Se lit sur"))}">${atOpts([["rating", tr("Type Rating")], ["licence", tr("Licence")]], c.on === "licence" ? "licence" : "rating")}</select>
+  <select class="cd-on" aria-label="${esc(tr("Se lit sur"))}">${atOpts([["rating", tr("Approval sur le Type Rating")], ["licence", tr("Catégorie de licence")]], c.on === "licence" ? "licence" : "rating")}</select>
   <input class="cd-st mono" value="${esc(c.stations || "")}" placeholder="${esc(tr("Toutes les stations"))}" aria-label="${esc(tr("Stations"))}" style="max-width:12em">
   <button type="button" class="x" data-a="cond-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 ACTIONS["cond-add"] = el => el.closest("form").querySelector(".cond-list").insertAdjacentHTML("beforeend", condRow());
 ACTIONS["cond-del"] = el => el.closest(".cond-row").remove();
 ACTIONS["cond-form"] = () => {
   if (!canAT()) return;
-  const m = modal(`${mHead("Catégories de conditions")}<form><div class="body stack"><div class="hint">${esc(tr("Code, libellé, où il se lit (Type Rating ou licence) et stations où la catégorie s'applique, séparées par des virgules (ex. TLV). Vide = toutes les stations."))}</div>
-    <div class="cond-list stack">${condCats().map(condRow).join("")}</div><div><button type="button" class="btn sm" data-a="cond-add">${esc(tr("Ajouter une catégorie"))}</button></div><div class="err" id="cd-err"></div></div>
+  const m = modal(`${mHead("Approvals et catégories de licence")}<form><div class="body stack"><div class="hint">${esc(tr("Code, libellé, où il se lit (approval à côté du Type Rating, ou catégorie de licence) et stations où il s'applique, séparées par des virgules (ex. TLV). Vide = toutes les stations."))}</div>
+    <div class="cond-list stack">${condCats().map(condRow).join("")}</div><div><button type="button" class="btn sm" data-a="cond-add">${esc(tr("Ajouter une ligne"))}</button></div><div class="err" id="cd-err"></div></div>
     <footer><div class="left"><button type="button" class="btn" data-a="cond-reset">${esc(tr("Valeurs par défaut"))}</button></div><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Enregistrer</button></footer></form>`, "lg");
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();

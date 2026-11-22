@@ -15,7 +15,7 @@ const acLic = a => Array.isArray(a.licences) && a.licences.length ? a.licences :
 /* conditions exigées pour signer (arbre ET / OU) : licRule, sinon la liste simple des licences (toutes exigées) */
 const acRule = a => a.licRule && Array.isArray(a.licRule.items) && a.licRule.items.length ? a.licRule : { op: "and", items: acLic(a) };
 /* choix d'une condition : les catégories qui s'appliquent à cette station (plus la valeur déjà choisie) */
-const ruleLeaves = cur => [...condCats().filter(c => condHere(c) || c.code === cur).map(c => [c.code, `${c.code} · ${tr(c.label || "")} (${tr(c.on === "licence" ? "licence" : "sur le Type Rating")})`]),
+const ruleLeaves = cur => [...condCats().filter(c => condHere(c) || c.code === cur).map(c => [c.code, `${c.code} · ${tr(c.label || "")} (${tr(c.on === "licence" ? "catégorie de licence" : "approval")})`]),
   ...(cur && !condOf(cur) ? [[cur, cur]] : [])];
 const ruleLeaf = (v = condCats()[0]?.code || "E") => `<div class="rule-l row-g"><select class="rule-v" aria-label="${esc(tr("Condition"))}">${atOpts(ruleLeaves(v), v)}</select><button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 const ruleGroup = (n, root) => `<div class="rule-g ${root ? "root" : ""}"><div class="row-g wrap"><select class="rule-op" aria-label="${esc(tr("Opérateur"))}">${atOpts([["and", tr("ET : toutes ces conditions")], ["or", tr("OU : au moins une de ces conditions")]], n.op === "or" ? "or" : "and")}</select>
