@@ -372,6 +372,7 @@ tr.pfrow td:first-child { box-shadow: inset 4px 0 0 var(--pfc); } tr.pfrow.pf-si
 .chip.bad { background: var(--red-bg); color: var(--red-ink); } .chip.amber { background: var(--orange-bg); color: var(--orange-ink, #9a4a00); } .chip.info { background: var(--blue-bg); color: var(--blue-ink); }
 /* shift : avion en vol (bleu) / posé à la station (vert), heures FR24, données des autres shifts de l'escale (grisées) */
 b.reg.reg-air { color: #1f6fe0; } b.reg.reg-in { color: #138a3e; }
+.vt-reg { font-size: 17px; font-weight: 800; letter-spacing: .02em; } .vt-man { font-size: 14px; } .vt-man b { font-size: 15px; font-weight: 800; } .vt-act { font-size: 13px; margin-top: 1px; } .vt-act b { font-weight: 800; color: var(--good, #0b7a55); } .vt-k { font-size: 11px; color: var(--muted); font-weight: 600; }
 .fr-t { color: #1f6fe0; font-weight: 600; margin-top: 2px; } .fids-t { color: #0b7a55; font-weight: 600; margin-top: 2px; font-size: 12px; } .fr-t .fr-nf { color: #c2188f; font-weight: 600; }
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .fr-t .fr-nf { color: #ff6fd0; } } :root[data-theme="dark"] .fr-t .fr-nf { color: #ff6fd0; }
 table.visits tr.vo-other td { color: var(--muted); font-size: 12px; cursor: default; }
@@ -402,6 +403,7 @@ body.wall .app { grid-template-columns: 1fr; } body.wall nav.side, body.wall .to
 .wall-p { display: flex; justify-content: space-between; gap: 10px; padding: 5px 0; border-top: 1px solid var(--line, #eee); font-size: 16px; } .wall-p span { text-align: right; color: var(--muted); }
 body.wall .fb-wrap { background: #0b1220; color: #e8eefc; margin: -18px -24px; padding: 18px 24px; min-height: 100vh; } body.wall .fb-wrap .wall-sh, body.wall .fb-wrap .wall-clk span { color: #9fb0d0; }
 body.wall .fb-wrap .fb th { background: transparent; } body.wall .fb-wrap .btn { background: #1b2640; color: #e8eefc; border-color: #2c3a5c; }
+.fb-diag { margin-top: 18px; font-size: 13px; color: #9fb0d0; } .fb-diag .bad { color: #ff8a8a; }
 .fb-sec h2 { margin: 18px 0 8px; font-size: 22px; color: #ffd23f; letter-spacing: .04em; } .fb { width: 100%; border-collapse: collapse; font-size: 20px; font-variant-numeric: tabular-nums; }
 .fb th { text-align: left; font-size: 13px; text-transform: uppercase; color: #9fb0d0; padding: 6px 10px; border-bottom: 2px solid #23304d; } .fb td { padding: 9px 10px; border-bottom: 1px solid #1b2640; }
 .fb tbody tr:nth-child(odd) { background: #101a2e; } .fb-time { font-family: var(--mono, monospace); font-weight: 700; } .fb-time.late { color: #ffb020; } .fb-fl { font-family: var(--mono, monospace); font-weight: 800; color: #ffd23f; }
