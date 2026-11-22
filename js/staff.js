@@ -44,11 +44,15 @@ const ruleText = (n, top = true) => { if (typeof n === "string") return n; const
 const licCats = p => new Set((p.licences || []).flatMap(l => String(l.cat || "").split("+")).filter(Boolean));
 /* retire les conditions dont la catégorie ne s'applique pas à cette station */
 const ruleLocal = n => typeof n === "string" ? (condOf(n) && !condHere(condOf(n)) ? null : n) : { op: n.op, items: (n.items || []).map(ruleLocal).filter(x => x && (typeof x === "string" || x.items.length)) };
-const trQualif = (p, ac, rule) => { const n = ruleLocal(ruleNorm(rule)), cats = licCats(p);
-  return staffTR(p).filter(r => trFits(r, ac) && ruleEval(n, c => { const k = condOf(c)?.on; return k === "licence" ? cats.has(c) : k === "rating" ? trLic(r).includes(c) : trLic(r).includes(c) || cats.has(c); })); };
+/* approvals généraux de la fiche : approvals = [{ code, label, types: [] = tous les types }] */
+const genAppr = p => Array.isArray(p.approvals) ? p.approvals.filter(a => a && a.code) : [];
+const apprFor = (p, t) => genAppr(p).filter(a => !(a.types || []).length || a.types.includes(t)).map(a => a.code);
+/* une condition est remplie si on la trouve sur le Type Rating, dans un approval général qui couvre ce type, ou dans les licences */
+const trQualif = (p, ac, rule) => { const n = ruleLocal(ruleNorm(rule)), cats = licCats(p), ga = apprFor(p, ac.acType);
+  return staffTR(p).filter(r => trFits(r, ac) && ruleEval(n, c => trLic(r).includes(c) || ga.includes(c) || cats.has(c))); };
 /* a le droit de signer : qualifié (type, modèle, moteur, conditions de licences) ET autorisation compagnie (CRS) cochée */
 const canSign = (p, ac, rule) => trQualif(p, ac, rule).some(r => r.crs !== false);
-const ratingsOf = list => { const o = {}; for (const r of list) if (r.t && r.crs !== false) { const h = new Set([...(o[r.t] || "").split("+"), ...trLic(r)]); const ord = [...condCats().filter(c => c.on === "rating").map(c => c.code), ...h]; o[r.t] = [...new Set(ord)].filter(c => c && h.has(c)).join("+"); }
+const ratingsOf = (list, appr = []) => { const o = {}; for (const r of list) if (r.t && r.crs !== false) { const h = new Set([...(o[r.t] || "").split("+"), ...trLic(r), ...apprFor({ approvals: appr }, r.t)]); const ord = [...condCats().filter(c => c.on === "rating").map(c => c.code), ...h]; o[r.t] = [...new Set(ord)].filter(c => c && h.has(c)).join("+"); }
   return Object.fromEntries(Object.entries(o).filter(([, l]) => l)); };
 const staff = id => S.staff.find(p => p.id === id);
 const staffActive = () => S.staff.filter(p => p.active !== false);
@@ -121,6 +125,7 @@ function openStaff(id) {
     <dl class="kv sm">${[["Employeur", p.employer], ["Station de base", p.base], ["E-mail", p.email], ["Téléphone", p.phone], ["Nationalité", p.nationality]].filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
     <h3>Licences</h3>${(p.licences || []).length ? `<table class="small"><tbody>${p.licences.map(l => `<tr><td class="mono"><b>${esc(l.cat)}</b></td><td class="mono">${esc(l.number || "")}</td><td>${esc(l.authority || "")}</td><td>${l.expires ? dueChip(l.expires, 60) : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Aucune licence enregistrée.</div>`}
     <h3>Type Ratings</h3><div>${ratingChips(p) || `<span class="muted">Aucune.</span>`}</div>
+    ${genAppr(p).length ? `<h3>${esc(tr("Approvals généraux"))}</h3><div>${genAppr(p).map(a => `<span class="chip sm"><b>${esc(a.code)}</b> ${esc(a.label || "")} · ${esc((a.types || []).length ? a.types.join(", ") : tr("tous les types"))}</span>`).join(" ")}</div>` : ""}
     <div class="row-sb"><h3>Documents</h3>${ed ? `<button class="btn sm" data-a="sdoc-form" data-staff="${p.id}">Ajouter un document</button>` : ""}</div>
     ${docs.length ? `<table class="small"><tbody>${docs.map(d => `<tr class="${ed ? "click" : ""} ${d.old ? "muted" : ""}" ${ed ? `data-a="sdoc-form" data-staff="${p.id}" data-id="${d.id}"` : ""}><td><b>${esc(SDOC_TYPES[d.type] || d.type)}</b><div class="muted">${esc([d.name, d.acType, d.number ? "n° " + d.number : ""].filter(Boolean).join(" · "))}</div></td>
       <td>${d.old ? "Ancien" : d.expires ? dueChip(d.expires, 60) : ""}</td><td class="r">${d.file ? `<a class="btn sm" href="${esc(blobUrl(d.file))}" target="_blank" rel="noopener" data-stop>Fichier</a>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">${p.docs ? "Aucun document." : "Documents visibles par le bureau et par la personne elle-même."}</div>`}
@@ -148,6 +153,10 @@ ACTIONS["staff-form"] = el => {
   <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="tr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
     ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez ses approvals pour chaque Type Rating (liste dans l'onglet Approvals et licences), et CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
     <div class="tr-list stack">${staffTR(p).map(trRow).join("")}</div></div>
+  <div><div class="row-sb"><h3>${esc(tr("Approvals généraux"))}</h3><button type="button" class="btn sm" data-a="ga-add">${esc(tr("Ajouter un approval général"))}</button></div>
+    <div class="hint">${esc(tr("Un approval que la personne possède pour tous ses Type Ratings, ou seulement pour les types cochés (ex. E EASA, ou un approval maison). Code au choix : il compte dès qu'une fiche avion l'exige."))}</div>
+    <datalist id="ga-codes">${condCats().map(c => `<option value="${esc(c.code)}">${esc(tr(c.label || ""))}</option>`).join("")}</datalist>
+    <div class="ga-list stack">${genAppr(p).map(gaRow).join("")}</div></div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
   ${isAdmin() ? `<div class="hint">${esc(tr("Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station."))}</div>` : ""}
   ${isAdmin() ? `<label class="chk sysadm"><input type="checkbox" id="st-sysadm" ${p.sysAdmin ? "checked" : ""}> <b>${esc(tr("Administrateur système"))}</b> <span class="muted small">${esc(tr("— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée."))}</span></label>`
@@ -158,14 +167,24 @@ ACTIONS["staff-form"] = el => {
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const typeRatings = [...m.querySelectorAll(".tr-row")].map(r => ({ t: r.querySelector(".tr-t").value, m: r.querySelector(".tr-m").value, e: r.querySelector(".tr-e").value,
-      lic: [...r.querySelectorAll(".tr-c:checked")].map(i => i.value).join("+"), crs: r.querySelector(".tr-crs").checked })).filter(r => r.t), ratings = ratingsOf(typeRatings);
+      lic: [...r.querySelectorAll(".tr-c:checked")].map(i => i.value).join("+"), crs: r.querySelector(".tr-crs").checked })).filter(r => r.t);
+    const approvals = [...m.querySelectorAll(".ga-row")].map(r => { const ts = [...r.querySelectorAll(".ga-t:checked")].map(i => i.value);
+      return { code: r.querySelector(".ga-code").value.trim().toUpperCase().replace(/[^A-Z0-9&.\-]/g, ""), label: r.querySelector(".ga-label").value.trim(), types: r.querySelector(".ga-all").checked ? [] : ts }; }).filter(a => a.code);
+    const ratings = ratingsOf(typeRatings, approvals);
     const licences = [...m.querySelectorAll(".lic-row")].map(r => ({ cat: r.querySelector(".l-cat").value, number: r.querySelector(".l-num").value.trim(), authority: r.querySelector(".l-auth").value.trim(), expires: r.querySelector(".l-exp").value }));
     const gone = m.querySelector("#st-gone")?.checked;
     const data = Object.assign(strip(p), { name: val("st-name"), function: val("st-fn"), employer: val("st-emp"), base: val("st-base").toUpperCase(), email: val("st-email").toLowerCase(), phone: val("st-phone"),
-      nationality: val("st-nat"), shift: val("st-shift"), notes: val("st-notes"), typeRatings, ratings, licences, active: !gone, docs: p.docs || [] });
+      nationality: val("st-nat"), shift: val("st-shift"), notes: val("st-notes"), typeRatings, approvals, ratings, licences, active: !gone, docs: p.docs || [] });
     if (isAdmin()) data.sysAdmin = !!m.querySelector("#st-sysadm")?.checked;
     const id = await save("staff", p.id, data);
     toast("Fiche enregistrée"); openStaff(id);
+  };
+  m.querySelector(".ga-list").onchange = e => {   // « Tous les types » et les types cochés s'excluent
+    const r = e.target.closest(".ga-row"); if (!r) return;
+    if (e.target.matches(".ga-all") && e.target.checked) r.querySelectorAll(".ga-t").forEach(i => { i.checked = false; });
+    if (e.target.matches(".ga-t")) r.querySelector(".ga-all").checked = !r.querySelector(".ga-t:checked");
+    const c = r.querySelector(".ga-code"), l = r.querySelector(".ga-label");
+    if (e.target === c && !l.value) l.value = tr(condOf(c.value.trim().toUpperCase())?.label || "");
   };
   m.querySelector(".tr-list").onchange = e => {   // le modèle et le moteur se filtrent d'après le type (et le modèle)
     const r = e.target.closest(".tr-row"); if (!r) return;
@@ -181,6 +200,14 @@ const trRow = (r = {}) => `<div class="tr-row row-g wrap"><select class="tr-t" a
   <button type="button" class="x" data-a="tr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 ACTIONS["tr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());
 ACTIONS["tr-del"] = el => el.closest(".tr-row").remove();
+const gaRow = (a = {}) => { const all = !(a.types || []).length, types = atUniq(acTypes(), null).concat((a.types || []).filter(t => !acTypes().includes(t)));
+  return `<div class="ga-row row-g wrap"><input class="ga-code mono" list="ga-codes" value="${esc(a.code || "")}" placeholder="E" aria-label="${esc(tr("Code"))}" style="max-width:7em">
+  <input class="ga-label" value="${esc(a.label || "")}" placeholder="${esc(tr("Libellé (ex. EASA)"))}" aria-label="${esc(tr("Libellé"))}">
+  <span class="tr-appr"><label class="chk line"><input type="checkbox" class="ga-all" ${all ? "checked" : ""}> <b>${esc(tr("Tous les types"))}</b></label>
+  ${types.map(t => `<label class="chk line"><input type="checkbox" class="ga-t" value="${esc(t)}" ${!all && a.types.includes(t) ? "checked" : ""}> ${esc(t)}</label>`).join("")}</span>
+  <button type="button" class="x" data-a="ga-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`; };
+ACTIONS["ga-add"] = el => el.closest("form").querySelector(".ga-list").insertAdjacentHTML("beforeend", gaRow());
+ACTIONS["ga-del"] = el => el.closest(".ga-row").remove();
 ACTIONS["staff-del"] = el => confirmBox("Supprimer cette fiche et ses documents ? Pour quelqu'un qui quitte la station, cochez plutôt « Ne fait plus partie de la station ».", () => remove("staff", el.dataset.id));
 
 /* ---- documents d'une personne (même principe que les documents des véhicules) ---- */

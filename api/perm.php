@@ -14,7 +14,7 @@
 
 const TERRAIN_HIDDEN     = ['products', 'adminDocs', 'adminFolders', 'chargeLines'];
 const TERRAIN_READONLY   = ['clients', 'settings', 'staff', 'roster', 'labs', 'hotels', 'travel', 'aircraft', 'actypes', 'expiries', 'forms', 'contacts'];
-const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'typeRatings', 'shift', 'demo'];
+const STAFF_PUBLIC       = ['name', 'function', 'employer', 'base', 'active', 'ratings', 'typeRatings', 'approvals', 'shift', 'demo'];
 
 /* fiche du personnel vue par un rôle terrain : la sienne en entier, celles des autres réduites */
 function staff_mine($d) { $me = (string) ($GLOBALS['ME_EMAIL'] ?? ''); return $me !== '' && mb_strtolower(trim((string) ($d['email'] ?? ''))) === $me; }
@@ -126,15 +126,18 @@ function shift_lock_write($role, $coll, $op, $old, $new, $patch) {
     deny('Ce shift a été remis : il est verrouillé. Le Station Lead peut le réactiver.');
 }
 /* résumé ratings { type: "E+I" } recalculé d'après les Type Ratings détaillés (lignes avec autorisation compagnie) */
-function staff_ratings($trs) {
+function staff_ratings($trs, $appr = []) {
     $o = [];
-    foreach ((array) $trs as $r) if (is_array($r) && ($t = trim((string) ($r['t'] ?? ''))) !== '' && ($r['crs'] ?? true) !== false)
-        foreach (explode('+', (string) ($r['lic'] ?? '')) as $c) if (preg_match('/^[A-Za-z0-9&.\-]{1,16}$/', $c)) $o[$t][$c] = true;
+    foreach ((array) $trs as $r) if (is_array($r) && ($t = trim((string) ($r['t'] ?? ''))) !== '' && ($r['crs'] ?? true) !== false) {
+        $codes = explode('+', (string) ($r['lic'] ?? ''));
+        foreach ((array) $appr as $a) if (is_array($a) && empty($a['types']) || is_array($a) && in_array($t, (array) $a['types'], true)) $codes[] = (string) ($a['code'] ?? '');
+        foreach ($codes as $c) if (preg_match('/^[A-Za-z0-9&.\-]{1,16}$/', $c)) $o[$t][$c] = true;
+    }
     $out = []; foreach ($o as $t => $h) $out[$t] = implode('+', array_keys($h));
     return $out;
 }
 function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
-    if ($coll === 'staff' && is_array($new) && isset($new['typeRatings']) && is_array($new['typeRatings'])) $new['ratings'] = staff_ratings($new['typeRatings']);
+    if ($coll === 'staff' && is_array($new) && isset($new['typeRatings']) && is_array($new['typeRatings'])) $new['ratings'] = staff_ratings($new['typeRatings'], is_array($new['approvals'] ?? null) ? $new['approvals'] : []);
     if (($coll === 'handovers' || $coll === 'shiftItems') && ($GLOBALS['ME_UID'] ?? '') !== '*') shift_lock_write($role, $coll, $op, $old, $new, $patch);
     if ($coll === 'settings' && is_array($old) && !in_array($role, ['admin', 'bureau'], true) && (string) ((me_staff() ?? [])['function'] ?? '') === 'lead' && $op !== 'delete') {
         $o = $old; $n = $new ?? []; unset($o['reopenForemen'], $n['reopenForemen']);   // le Station Lead règle lui-même la délégation
