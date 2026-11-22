@@ -67,7 +67,7 @@ ACTIONS["ac-form"] = el => {
   const types = acTypes(), q = a.id ? acQualified(a) : [], nc = a.id ? acNoCrs(a) : [];
   const m = modal(`${mHead(a.id ? esc(a.reg) : "Nouvel avion")}<form><div class="body stack"><fieldset ${ro ? "disabled" : ""} class="plain stack"><div class="fields">
     ${!ro && SERVER ? `<label class="f">${esc(tr("Immatriculation"))} *<div class="ac-regrow"><input id="ac-reg" class="mono" placeholder="4X-EKA" required ${a.id ? "" : "autofocus"} value="${esc(a.reg || "")}">
-      <button type="button" class="btn sm" data-a="ac-lookup" title="${esc(tr("d'après l'immatriculation (ADSBdb, Flightradar24) : vous vérifiez avant d'appliquer"))}">${esc(tr("Récupérer les données"))}</button></div></label>`
+      <button type="button" class="btn sm" data-a="ac-lookup" title="${esc(tr("d'après l'immatriculation (ADSBdb, Flightradar24, OpenSky) : vous vérifiez avant d'appliquer"))}">${esc(tr("Récupérer les données"))}</button></div></label>`
       : field("ac-reg", "Immatriculation", a.reg, { cls: "mono", ph: "4X-EKA", required: true, autofocus: !a.id })}
     ${field("ac-client", "Compagnie aérienne", a.clientId || clientOfReg(a.reg)?.id || "", { type: "select", options: [["", "—"], ...clients.map(c => [c.id, c.name + (c.code ? " (" + c.code + ")" : "")])] })}
     ${field("ac-type", "Type d'avion", a.acType || "", { type: "select", options: [["", "—"], ...Array.from(new Set([...types, a.acType].filter(Boolean))).map(t => [t, t])] })}
@@ -130,7 +130,14 @@ function acLookMap(d) {
   const words = op.split(/[^a-z0-9]+/).filter(w => w.length >= 4), sc = c => { const n = String(c.name || "").toLowerCase(); return n === op ? 99 : words.filter(w => n.includes(w)).length - (n.split(/\s+/).length - words.length) * 0.1; };
   const byName = !byIcao && words.length ? S.clients.filter(c => !c.icao || !oc).map(c => [c, sc(c)]).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1])[0]?.[0] : null;
   const cl = byIcao || byName;
-  return { acType: t?.code || "", variant: model, clientId: cl?.id || "", clientByIcao: !!byIcao };
+  /* moteur : « GE CF6-80C2B5F » → CF6-80 de la base (le nom sans le motoriste doit s'y retrouver ; « PW 4000 » ↔ PW4056) */
+  let engine = "";
+  if (t && d.engines) {
+    const os = String(d.engines).toLowerCase().replace(/[^a-z0-9]/g, "");
+    engine = atEngines(t.code, model).find(e => { const k = String(e).toLowerCase().replace(/^(ge|pw|rr|cfm|iae)[\s-]+/, "").replace(/[^a-z0-9]/g, ""), mk = (String(e).toLowerCase().match(/^(ge|pw|rr|cfm|iae)/) || [])[1] || "";
+      return k && (/^\d+$/.test(k) ? os.includes(mk + k[0]) : os.includes(k)); }) || "";
+  }
+  return { acType: t?.code || "", variant: model, engine, clientId: cl?.id || "", clientByIcao: !!byIcao };
 }
 ACTIONS["ac-lookup"] = async el => {
   const f = el.closest("form"), out = f.querySelector("#ac-look-out"), reg = normReg(f.querySelector("#ac-reg").value);
@@ -144,8 +151,9 @@ ACTIONS["ac-lookup"] = async el => {
     out.innerHTML = `<div class="ac-look-card"><table class="small"><tbody>
       ${row("Fabricant", esc(d.manufacturer || ""))}${row("Type", esc([d.typeName, d.icaoType ? "(" + d.icaoType + ")" : ""].filter(Boolean).join(" ")))}
       ${row("Opérateur", esc([d.operator, d.operatorIcao ? "(" + d.operatorIcao + ")" : ""].filter(Boolean).join(" ")))}${row("Pays", esc(d.country || ""))}${row("Mode S", d.modeS ? `<span class="mono">${esc(d.modeS)}</span>` : "")}
+      ${row("MSN", d.msn ? `<span class="mono">${esc(d.msn)}</span>${d.lineNumber ? ` <span class="muted">· L/N ${esc(d.lineNumber)}</span>` : ""}` : "")}${row("Construit", esc(String(d.built || "").slice(0, 4)))}${row("Moteurs", esc(d.engines || ""))}
       </tbody></table>
-      <div class="small"><b>${esc(tr("Proposé"))} :</b> ${esc(tr("Type"))} <b>${esc(p.acType || "—")}</b> · ${esc(tr("Modèle"))} <b>${esc(p.variant || "—")}</b> · ${esc(tr("Compagnie"))} <b>${esc(cl?.name || "—")}</b> · ${esc(tr("Moteur : à choisir"))}</div>
+      <div class="small"><b>${esc(tr("Proposé"))} :</b> ${esc(tr("Type"))} <b>${esc(p.acType || "—")}</b> · ${esc(tr("Modèle"))} <b>${esc(p.variant || "—")}</b> · ${esc(tr("Compagnie"))} <b>${esc(cl?.name || "—")}</b> · ${p.engine ? `${esc(tr("Moteur"))} <b>${esc(p.engine)}</b>` : esc(tr("Moteur : à choisir"))}${d.msn ? ` · MSN <b class="mono">${esc(d.msn)}</b>` : ""}</div>
       ${d.operatorIcao && !p.clientByIcao ? `<div class="small txt-warn">${esc(tr("Aucun client n'a le code OACI"))} <b class="mono">${esc(d.operatorIcao)}</b>${cl ? ` : ${esc(tr("compagnie proposée d'après le nom, à vérifier"))}` : ""}. ${esc(tr("Ajoutez ce code dans Clients pour la reconnaître à coup sûr."))}</div>` : ""}
       ${!p.acType && d.icaoType ? `<div class="small txt-warn">${esc(tr("Ce type n'est pas dans la base Types d'appareils : ajoutez-le dans Avions > Types d'appareils."))}</div>` : ""}
       <div class="row-g"><button type="button" class="btn sm primary" data-a="ac-look-apply">${esc(tr("Appliquer"))}</button><span class="small muted">${esc(tr("Source"))} : ${esc(d.sources.join(", "))}</span></div></div>`;
@@ -156,9 +164,10 @@ ACTIONS["ac-look-apply"] = el => {
   const f = el.closest("form"), L = UI.acLook; if (!L) return;
   const ty = f.querySelector("#ac-type"), vr = f.querySelector("#ac-var");
   if (L.p.acType) { if (![...ty.options].some(o => o.value === L.p.acType)) ty.insertAdjacentHTML("beforeend", `<option value="${esc(L.p.acType)}">${esc(L.p.acType)}</option>`); ty.value = L.p.acType;
-    vr.innerHTML = atModelOpts(L.p.acType, L.p.variant, "—"); vr.value = L.p.variant || ""; f.querySelector("#ac-eng").innerHTML = atEngOpts(L.p.acType, vr.value, "", "—"); }
+    vr.innerHTML = atModelOpts(L.p.acType, L.p.variant, "—"); vr.value = L.p.variant || ""; f.querySelector("#ac-eng").innerHTML = atEngOpts(L.p.acType, vr.value, L.p.engine || "", "—"); if (L.p.engine) f.querySelector("#ac-eng").value = L.p.engine; }
+  if (L.d.msn && !f.querySelector("#ac-msn").value.trim()) f.querySelector("#ac-msn").value = L.d.msn;
   if (L.p.clientId) f.querySelector("#ac-client").value = L.p.clientId;
   if (L.d.modeS) f.querySelector("#ac-modes").value = L.d.modeS;
-  el.closest(".ac-look-card").innerHTML = `<div class="small txt-good">✓ ${esc(tr("Données appliquées : vérifiez, choisissez le moteur, puis enregistrez."))}</div>`;
+  el.closest(".ac-look-card").innerHTML = `<div class="small txt-good">✓ ${esc(tr(L.p.engine ? "Données appliquées : vérifiez, puis enregistrez." : "Données appliquées : vérifiez, choisissez le moteur, puis enregistrez."))}</div>`;
 };
 ACTIONS["ac-del"] = el => confirmBox("Supprimer cet avion du référentiel ? Les shifts passés ne changent pas.", async () => { await remove("aircraft", el.dataset.id); closeModal(); });
