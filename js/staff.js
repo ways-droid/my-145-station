@@ -16,6 +16,15 @@ const splitList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filte
 /* types suivis : la base Types d'appareils (Avions) quand elle est remplie, sinon la liste des Paramètres */
 const acTypes = () => { const b = (S.actypes || []).map(t => t && t.code).filter(Boolean); return b.length ? [...new Set(b)].sort() : splitList(settings().acTypes); };
 const RATING_CODES = { E: "EASA", I: "Approbation israélienne", F: "FAA" };
+/* catégories de conditions pour signer (Paramètres > Avions > Types d'appareils) : code, libellé, se lit sur le Type Rating
+   ou sur la licence, stations où elle s'applique (vide = toutes). Par défaut : E, I, F sur le Type Rating ; B1, B2, C, A sur la licence. */
+const COND_DEF = [{ code: "E", label: "EASA", on: "rating" }, { code: "I", label: "Approbation israélienne", on: "rating" }, { code: "F", label: "FAA", on: "rating" },
+  { code: "B1", label: "Licence B1", on: "licence" }, { code: "B2", label: "Licence B2", on: "licence" }, { code: "C", label: "Licence C", on: "licence" }, { code: "A", label: "Licence A", on: "licence" }];
+const condCats = () => { const c = settings().condCats; return Array.isArray(c) && c.length ? c.filter(x => x && x.code) : COND_DEF; };
+const condHere = c => !String(c.stations || "").trim() || splitList(c.stations).map(s => s.toUpperCase()).includes(stationIata());
+const condOf = code => condCats().find(c => c.code === code);
+/* catégories cochables sur un Type Rating, ici (plus celles déjà cochées) */
+const rCodes = (keep = []) => condCats().filter(c => c.on === "rating" && (condHere(c) || keep.includes(c.code)));
 const ratingHas = (p, t, c) => String((p.ratings || {})[t] || "").split("+").includes(c);
 /* Type Ratings détaillés : typeRatings = [{ t: type, m: modèle ("" = tous), e: moteur ("" = tous), lic: "E+I", crs: autorisation compagnie }].
    ratings { type: "E+I" } en est le résumé (seulement les lignes avec autorisation compagnie), recalculé par le serveur.
@@ -33,11 +42,13 @@ const ruleEval = (n, has) => typeof n === "string" ? has(n) : !n || !Array.isArr
 const ruleText = (n, top = true) => { if (typeof n === "string") return n; const it = (n?.items || []).map(x => ruleText(x, false)).filter(Boolean); if (!it.length) return "";
   const s = it.join(n.op === "or" ? " " + tr("OU") + " " : " " + tr("ET") + " "); return top || it.length < 2 ? s : "(" + s + ")"; };
 const licCats = p => new Set((p.licences || []).flatMap(l => String(l.cat || "").split("+")).filter(Boolean));
-const trQualif = (p, ac, rule) => { const n = ruleNorm(rule), cats = licCats(p);
-  return staffTR(p).filter(r => trFits(r, ac) && ruleEval(n, c => RATING_CODES[c] ? trLic(r).includes(c) : cats.has(c))); };
+/* retire les conditions dont la catégorie ne s'applique pas à cette station */
+const ruleLocal = n => typeof n === "string" ? (condOf(n) && !condHere(condOf(n)) ? null : n) : { op: n.op, items: (n.items || []).map(ruleLocal).filter(x => x && (typeof x === "string" || x.items.length)) };
+const trQualif = (p, ac, rule) => { const n = ruleLocal(ruleNorm(rule)), cats = licCats(p);
+  return staffTR(p).filter(r => trFits(r, ac) && ruleEval(n, c => { const k = condOf(c)?.on; return k === "licence" ? cats.has(c) : k === "rating" ? trLic(r).includes(c) : trLic(r).includes(c) || cats.has(c); })); };
 /* a le droit de signer : qualifié (type, modèle, moteur, conditions de licences) ET autorisation compagnie (CRS) cochée */
 const canSign = (p, ac, rule) => trQualif(p, ac, rule).some(r => r.crs !== false);
-const ratingsOf = list => { const o = {}; for (const r of list) if (r.t && r.crs !== false) { const h = new Set([...(o[r.t] || "").split("+"), ...trLic(r)]); o[r.t] = Object.keys(RATING_CODES).filter(c => h.has(c)).join("+"); }
+const ratingsOf = list => { const o = {}; for (const r of list) if (r.t && r.crs !== false) { const h = new Set([...(o[r.t] || "").split("+"), ...trLic(r)]); const ord = [...condCats().filter(c => c.on === "rating").map(c => c.code), ...h]; o[r.t] = [...new Set(ord)].filter(c => c && h.has(c)).join("+"); }
   return Object.fromEntries(Object.entries(o).filter(([, l]) => l)); };
 const staff = id => S.staff.find(p => p.id === id);
 const staffActive = () => S.staff.filter(p => p.active !== false);
@@ -89,7 +100,7 @@ function staffMatrix() {
       ${types.map(t => { const l = (p.ratings || {})[t], rs = staffTR(p).filter(r => r.t === t && r.lic), det = rs.map(r => trName(r) + " " + r.lic + (r.crs === false ? " · " + tr("sans CRS") : "")).join("\n");
         return `<td class="c" title="${esc(det)}">${l ? `<span class="chip sm good">${esc(l)}</span>` : rs.length ? `<span class="chip sm muted">${esc(tr("sans CRS"))}</span>` : `<span class="muted">·</span>`}</td>`; }).join("")}</tr>`).join("")}
     <tr><td colspan="3" class="muted small">Avec autorisation compagnie (CRS)</td>${types.map(t => `<td class="c num"><b>${cnt(t)}</b></td>`).join("")}</tr>
-    ${Object.entries(RATING_CODES).map(([c, l]) => `<tr><td colspan="3" class="muted small">dont ${c} · ${l}</td>${types.map(t => `<td class="c num">${rows.filter(p => ratingHas(p, t, c)).length}</td>`).join("")}</tr>`).join("")}
+    ${rCodes().map(({ code: c, label: l }) => `<tr><td colspan="3" class="muted small">dont ${esc(c)} · ${esc(tr(l))}</td>${types.map(t => `<td class="c num">${rows.filter(p => ratingHas(p, t, c)).length}</td>`).join("")}</tr>`).join("")}
     </tbody></table></div><div class="pad hint">E = licence EASA · I = approbation israélienne (requise pour signer les avions 4X- en Israël) · F = licence FAA. Comptés : les Type Ratings avec autorisation compagnie (CRS) ; « sans CRS » = qualifié sans l'autorisation. Le détail (modèle, moteur) s'affiche au survol. La validation des travaux reste dans AMOS.</div></div>`;
 }
 function staffDueList() {
@@ -119,7 +130,7 @@ function openStaff(id) {
 ACTIONS["staff-open"] = el => openStaff(el.dataset.staff || el.dataset.id);
 
 /* ---- formulaire ---- */
-const licRow = (l = {}) => `<div class="row-g lic-row"><select class="l-cat">${LIC_CATS.map(c => `<option ${c === l.cat ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
+const licRow = (l = {}) => `<div class="row-g lic-row"><select class="l-cat">${[...new Set([...LIC_CATS, ...condCats().filter(c => c.on === "licence" && condHere(c)).map(c => c.code), l.cat].filter(Boolean))].map(c => `<option ${c === l.cat ? "selected" : ""}>${esc(c)}</option>`).join("")}</select>
   <input class="l-num mono" placeholder="${esc(tr("N° de licence"))}" value="${esc(l.number || "")}"><input class="l-auth" placeholder="${esc(tr("Autorité"))}" value="${esc(l.authority || "")}">
   <input class="l-exp" type="date" value="${esc(l.expires || "")}" aria-label="${esc(tr("Expiration"))}"><button type="button" class="x" data-a="lic-del" aria-label="Retirer">×</button></div>`;
 ACTIONS["lic-add"] = el => el.closest("form").querySelector(".lic-list").insertAdjacentHTML("beforeend", licRow());
@@ -147,7 +158,7 @@ ACTIONS["staff-form"] = el => {
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const typeRatings = [...m.querySelectorAll(".tr-row")].map(r => ({ t: r.querySelector(".tr-t").value, m: r.querySelector(".tr-m").value, e: r.querySelector(".tr-e").value,
-      lic: Object.keys(RATING_CODES).filter(c => r.querySelector(`.tr-c[value="${c}"]`).checked).join("+"), crs: r.querySelector(".tr-crs").checked })).filter(r => r.t), ratings = ratingsOf(typeRatings);
+      lic: [...r.querySelectorAll(".tr-c:checked")].map(i => i.value).join("+"), crs: r.querySelector(".tr-crs").checked })).filter(r => r.t), ratings = ratingsOf(typeRatings);
     const licences = [...m.querySelectorAll(".lic-row")].map(r => ({ cat: r.querySelector(".l-cat").value, number: r.querySelector(".l-num").value.trim(), authority: r.querySelector(".l-auth").value.trim(), expires: r.querySelector(".l-exp").value }));
     const gone = m.querySelector("#st-gone")?.checked;
     const data = Object.assign(strip(p), { name: val("st-name"), function: val("st-fn"), employer: val("st-emp"), base: val("st-base").toUpperCase(), email: val("st-email").toLowerCase(), phone: val("st-phone"),
@@ -165,7 +176,7 @@ ACTIONS["staff-form"] = el => {
 };
 const trRow = (r = {}) => `<div class="tr-row row-g wrap"><select class="tr-t" aria-label="${esc(tr("Type"))}">${atOpts([["", "— " + tr("Type") + " —"], ...atUniq(acTypes(), r.t).map(t => [t, t])], r.t)}</select>
   <select class="tr-m" aria-label="${esc(tr("Modèle"))}">${atModelOpts(r.t, r.m)}</select><select class="tr-e" aria-label="${esc(tr("Moteur"))}">${atEngOpts(r.t, r.m, r.e)}</select>
-  ${Object.entries(RATING_CODES).map(([c, l]) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${c}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${c}</b></label>`).join("")}
+  ${rCodes(trLic(r)).map(({ code: c, label: l }) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${esc(c)}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${esc(c)}</b></label>`).join("")}
   <label class="chk line tr-crsl" title="${esc(tr("Autorisation compagnie de signer (CRS)"))}"><input type="checkbox" class="tr-crs" ${r.crs === true ? "checked" : ""}> <b>CRS</b> <span class="small muted">${esc(tr("autorisation compagnie"))}</span></label>
   <button type="button" class="x" data-a="tr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 ACTIONS["tr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());

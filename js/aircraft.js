@@ -14,8 +14,10 @@ const acDefaultLic = reg => /^4X/i.test(normReg(reg)) ? ["E", "I"] : ["E"];
 const acLic = a => Array.isArray(a.licences) && a.licences.length ? a.licences : acDefaultLic(a.reg);
 /* conditions exigées pour signer (arbre ET / OU) : licRule, sinon la liste simple des licences (toutes exigées) */
 const acRule = a => a.licRule && Array.isArray(a.licRule.items) && a.licRule.items.length ? a.licRule : { op: "and", items: acLic(a) };
-const RULE_LEAVES = [["E", "E · EASA (sur le Type Rating)"], ["I", "I · Approbation israélienne (sur le Type Rating)"], ["F", "F · FAA (sur le Type Rating)"], ["B1", "Licence B1"], ["B2", "Licence B2"], ["C", "Licence C"], ["A", "Licence A"]];
-const ruleLeaf = (v = "E") => `<div class="rule-l row-g"><select class="rule-v" aria-label="${esc(tr("Condition"))}">${atOpts(RULE_LEAVES.map(([c, l]) => [c, tr(l)]), v)}</select><button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
+/* choix d'une condition : les catégories qui s'appliquent à cette station (plus la valeur déjà choisie) */
+const ruleLeaves = cur => [...condCats().filter(c => condHere(c) || c.code === cur).map(c => [c.code, `${c.code} · ${tr(c.label || "")} (${tr(c.on === "licence" ? "licence" : "sur le Type Rating")})`]),
+  ...(cur && !condOf(cur) ? [[cur, cur]] : [])];
+const ruleLeaf = (v = condCats()[0]?.code || "E") => `<div class="rule-l row-g"><select class="rule-v" aria-label="${esc(tr("Condition"))}">${atOpts(ruleLeaves(v), v)}</select><button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
 const ruleGroup = (n, root) => `<div class="rule-g ${root ? "root" : ""}"><div class="row-g wrap"><select class="rule-op" aria-label="${esc(tr("Opérateur"))}">${atOpts([["and", tr("ET : toutes ces conditions")], ["or", tr("OU : au moins une de ces conditions")]], n.op === "or" ? "or" : "and")}</select>
   <button type="button" class="btn sm" data-a="rule-leaf">${esc(tr("+ Condition"))}</button><button type="button" class="btn sm" data-a="rule-grp">${esc(tr("+ Groupe ET / OU"))}</button>${root ? "" : `<button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button>`}</div>
   <div class="rule-items stack">${(n.items || []).map(x => typeof x === "string" ? ruleLeaf(x) : ruleGroup(x)).join("")}</div></div>`;
@@ -24,7 +26,7 @@ const ruleRead = g => ({ op: g.querySelector(":scope > .row-g .rule-op").value, 
 const ruleCodes = n => typeof n === "string" ? [n] : (n?.items || []).flatMap(ruleCodes);
 const rulePreview = el => { const f = el.closest("form"), g = f?.querySelector(".rule-g.root"), o = f?.querySelector("#ac-rule-txt"); if (g && o) o.textContent = ruleText(ruleRead(g)) || tr("aucune condition"); };
 ACTIONS["rule-leaf"] = el => { const f = el.closest("form"); el.closest(".rule-g").querySelector(":scope > .rule-items").insertAdjacentHTML("beforeend", ruleLeaf()); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
-ACTIONS["rule-grp"] = el => { const f = el.closest("form"); el.closest(".rule-g").querySelector(":scope > .rule-items").insertAdjacentHTML("beforeend", ruleGroup({ op: "or", items: ["E", "F"] })); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
+ACTIONS["rule-grp"] = el => { const f = el.closest("form"); el.closest(".rule-g").querySelector(":scope > .rule-items").insertAdjacentHTML("beforeend", ruleGroup({ op: "or", items: [condCats()[0]?.code || "E"] })); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
 ACTIONS["rule-del"] = el => { const f = el.closest("form"); (el.closest(".rule-l") || el.closest(".rule-g")).remove(); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
 const acClient = a => S.clients.find(c => c.id === a.clientId) || clientOfReg(a.reg);
 /* type, modèle et moteur de l'avion, comparés aux Type Ratings du Personnel */
@@ -99,7 +101,7 @@ ACTIONS["ac-form"] = el => {
     const r = normReg(val("ac-reg")), dup = aircraftOf(r);
     if (!/^[A-Z0-9]{1,3}-?[A-Z0-9]{1,6}$/.test(r)) { m.querySelector("#ac-err").textContent = tr("Immatriculation invalide (ex. 4X-EKA, 9H-ABC, N123AB)."); return; }
     if (dup && dup.id !== a.id) { m.querySelector("#ac-err").textContent = tr("Cet avion existe déjà."); return; }
-    const licRule = ruleRead(m.querySelector(".rule-g.root")), licences = [...new Set(ruleCodes(licRule).filter(c => RATING_CODES[c]))];
+    const licRule = ruleRead(m.querySelector(".rule-g.root")), licences = [...new Set(ruleCodes(licRule).filter(c => condOf(c)?.on === "rating"))];
     await save("aircraft", a.id, Object.assign(strip(a), { reg: r, clientId: val("ac-client"), acType: val("ac-type"), variant: val("ac-var"), msn: val("ac-msn"), engines: val("ac-eng"),
       amosRef: val("ac-amos"), licences, licRule, active: m.querySelector("#ac-active").checked, notes: val("ac-notes") }));
     closeModal(); toast("Avion enregistré");

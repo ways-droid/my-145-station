@@ -129,8 +129,8 @@ function shift_lock_write($role, $coll, $op, $old, $new, $patch) {
 function staff_ratings($trs) {
     $o = [];
     foreach ((array) $trs as $r) if (is_array($r) && ($t = trim((string) ($r['t'] ?? ''))) !== '' && ($r['crs'] ?? true) !== false)
-        foreach (explode('+', (string) ($r['lic'] ?? '')) as $c) if (in_array($c, ['E', 'I', 'F'], true)) $o[$t][$c] = true;
-    $out = []; foreach ($o as $t => $h) $out[$t] = implode('+', array_values(array_filter(['E', 'I', 'F'], fn($c) => isset($h[$c]))));
+        foreach (explode('+', (string) ($r['lic'] ?? '')) as $c) if (preg_match('/^[A-Za-z0-9&.\-]{1,16}$/', $c)) $o[$t][$c] = true;
+    $out = []; foreach ($o as $t => $h) $out[$t] = implode('+', array_keys($h));
     return $out;
 }
 function perm_write($role, $coll, $op, $old, $new, $patch = null, $id = null) {
