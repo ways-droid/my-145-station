@@ -25,13 +25,69 @@ const wxHM = iso => iso ? utcHM(new Date(iso).toISOString()) : "";
 function wxBanner() {
   if (!wxAlert()) return "";
   const g = (WX.taf && WX.taf.gusts || []).filter(x => x.kt > gustLimit()), when = g.map(x => x.from ? `${wxHM(x.from)}–${wxHM(x.to)} UTC` : "").filter(Boolean).join(", ");
-  return `<div class="banner bad wx-alert" role="alert">💨 <b>${esc(tr("Rafales jusqu'à"))} ${wxGust()} kt</b> ${esc(tr("à"))} ${esc(WX.icao)} (${esc(tr("seuil"))} ${gustLimit()} kt)${when ? " · " + esc(tr("TAF")) + " " + esc(when) : ""}${WX.metar && WX.metar.wgst > gustLimit() ? " · " + esc(tr("en ce moment (METAR)")) : ""}. ${esc(tr("Sécurisez les escaliers, les capots, les portes et l'équipement de piste."))}</div>`;
+  return `<div class="banner bad wx-alert" role="alert">💨 <b>${"Gusts up to"} ${wxGust()} kt</b> ${"at"} ${esc(WX.icao)} (${"limit"} ${gustLimit()} kt)${when ? " · " + "TAF" + " " + esc(when) : ""}${WX.metar && WX.metar.wgst > gustLimit() ? " · " + "now (METAR)" : ""}. ${"Secure stairs, cowlings, doors and ramp equipment."}</div>`;
+}
+/* ---- METAR in plain English (aviation data stays in English, whatever the UI language) ----
+   metarDecode(raw) → [{ ic, k, t, lv: ""|"warn"|"bad" }] ; wxPlain(raw, compact) renders it. The raw line stays shown. */
+const MX_WX = { DZ: "drizzle", RA: "rain", SN: "snow", SG: "snow grains", IC: "ice crystals", PL: "ice pellets", GR: "hail", GS: "small hail", UP: "unknown precipitation",
+  BR: "mist", FG: "fog", FU: "smoke", VA: "volcanic ash", DU: "dust", SA: "sand", HZ: "haze", PY: "spray", PO: "dust whirls", SQ: "squalls", FC: "funnel cloud / tornado", SS: "sandstorm", DS: "duststorm" };
+const MX_DSC = { MI: "shallow", BC: "patches of", PR: "partial", DR: "low drifting", BL: "blowing", SH: "showers of", TS: "thunderstorm with", FZ: "freezing" };
+const MX_CLD = { FEW: "Few clouds (1-2/8)", SCT: "Scattered clouds (3-4/8)", BKN: "Broken clouds (5-7/8)", OVC: "Overcast (8/8)", VV: "Sky obscured, vertical visibility" };
+const mxPt = d => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(d / 45) % 8];
+const mxKmh = kt => Math.round(kt * 1.852);
+function metarDecode(raw) {
+  const out = [], tk = String(raw || "").trim().split(/\s+/), add = (ic, k, t, lv = "") => out.push({ ic, k, t, lv });
+  const end = tk.findIndex(x => x === "RMK"); const w = end < 0 ? tk : tk.slice(0, end);
+  let i = 0; while (i < w.length && /^(METAR|SPECI|COR|AUTO)$/.test(w[i])) i++;
+  if (/^[A-Z]{4}$/.test(w[i] || "")) i++;
+  const tm = (w[i] || "").match(/^(\d{2})(\d{2})(\d{2})Z$/);
+  if (tm) { i++; const d = new Date(); d.setUTCDate(+tm[1]); d.setUTCHours(+tm[2], +tm[3], 0, 0); if (d - Date.now() > 2 * 864e5) d.setUTCMonth(d.getUTCMonth() - 1);
+    let lt = ""; try { lt = new Intl.DateTimeFormat("en-GB", { timeZone: stationTz() || undefined, hour: "2-digit", minute: "2-digit" }).format(d); } catch { }
+    add("🕒", "Observed", `${tm[2]}:${tm[3]} UTC${lt ? ` (${lt} LT)` : ""}`); }
+  const lim = typeof gustLimit === "function" ? gustLimit() : 45;
+  let trend = [];
+  for (; i < w.length; i++) {
+    const x = w[i]; let m;
+    if (/^(NOSIG|BECMG|TEMPO)$/.test(x)) { trend = w.slice(i); break; }
+    if ((m = x.match(/^(\d{3}|VRB)(\d{2,3})(?:G(\d{2,3}))?(KT|MPS)$/))) {
+      const k = m[4] === "MPS" ? 1.944 : 1, sp = Math.round(+m[2] * k), g = m[3] ? Math.round(+m[3] * k) : 0, vr = /^\d{3}V\d{3}$/.test(w[i + 1] || "") ? w[++i] : "";
+      const dir = m[1] === "VRB" ? "Variable direction" : `From ${m[1]}° (${mxPt(+m[1])})`;
+      add("💨", "Wind", sp === 0 && !g ? "Calm" : `${dir}, ${sp} kt (${mxKmh(sp)} km/h)${g ? `, gusts ${g} kt (${mxKmh(g)} km/h)` : ""}${vr ? `, varying ${vr.replace("V", "° to ")}°` : ""}`,
+        g > lim || sp > lim ? "bad" : Math.max(sp, g) >= 25 ? "warn" : ""); continue; }
+    if (x === "CAVOK") { add("👁", "Visibility", "10 km or more, no significant cloud, no weather (CAVOK)"); continue; }
+    if ((m = x.match(/^(\d{4})(NDV|[NSEW]{1,2})?$/))) { const v = +m[1];
+      add("👁", "Visibility", v >= 9999 ? "10 km or more" : v >= 5000 ? `${v / 1000} km` : `${v} m`, v < 800 ? "bad" : v < 3000 ? "warn" : ""); continue; }
+    if ((m = x.match(/^(\d+(?:\/\d+)?)SM$/))) { add("👁", "Visibility", `${m[1]} statute miles`); continue; }
+    if (/^R\d{2}[LCR]?\//.test(x)) continue;
+    if ((m = x.match(/^(-|\+|VC)?(MI|BC|PR|DR|BL|SH|TS|FZ)?((?:DZ|RA|SN|SG|IC|PL|GR|GS|UP|BR|FG|FU|VA|DU|SA|HZ|PY|PO|SQ|FC|SS|DS)*)$/)) && (m[2] || m[3])) {
+      const ph = (m[3].match(/../g) || []).map(c => MX_WX[c]);
+      const txt = [m[1] === "-" ? "Light" : m[1] === "+" ? "Heavy" : m[1] === "VC" ? "In the vicinity:" : "", m[2] === "TS" && !ph.length ? "Thunderstorm" : MX_DSC[m[2]] || "", ph.join(" and ")].filter(Boolean).join(" ");
+      const bad = m[2] === "TS" || /GR|FC|SQ|VA|SS|DS/.test(m[3]) || m[2] === "FZ", warn = m[1] === "+" || /FG|SN|PL|GS/.test(m[3]);
+      add(m[2] === "TS" ? "⚡" : /RA|DZ|SH/.test(x) ? "🌧" : /SN|PL|IC|GR|GS/.test(x) ? "❄" : "🌫", "Weather", txt.charAt(0).toUpperCase() + txt.slice(1) + (m[2] === "TS" ? " – lightning risk: follow the station lightning procedure (refuelling, headsets, outdoor work)" : ""), bad ? "bad" : warn ? "warn" : ""); continue; }
+    if ((m = x.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3}|\/\/\/)(CB|TCU)?$/))) { const ft = /\d/.test(m[2]) ? (+m[2] * 100).toLocaleString("en-US") + " ft" : "unknown height";
+      add("☁", "Clouds", `${MX_CLD[m[1]]} at ${ft}${m[3] === "CB" ? " – cumulonimbus (thunderstorm cloud)" : m[3] === "TCU" ? " – towering cumulus" : ""}`, m[3] === "CB" ? "warn" : ""); continue; }
+    if (/^(NSC|NCD|SKC|CLR)$/.test(x)) { add("☁", "Clouds", "No significant cloud"); continue; }
+    if ((m = x.match(/^(M?\d{2})\/(M?\d{2})?$/))) { const n = s => s ? (s[0] === "M" ? -+s.slice(1) : +s) : null, t = n(m[1]), d = n(m[2]);
+      add("🌡", "Temperature", `${t} °C${d != null ? `, dew point ${d} °C` : ""}${d != null && t - d <= 2 ? " (humid, fog possible)" : ""}`, t >= 38 ? "warn" : t <= 0 ? "warn" : ""); continue; }
+    if ((m = x.match(/^Q(\d{4})$/))) { add("📏", "Pressure (QNH)", `${+m[1]} hPa`); continue; }
+    if ((m = x.match(/^A(\d{4})$/))) { add("📏", "Pressure (altimeter)", `${(+m[1] / 100).toFixed(2)} inHg`); continue; }
+    if ((m = x.match(/^RE(\w+)$/))) { add("ℹ", "Recent weather", m[1]); continue; }
+  }
+  if (trend.length) add("🔮", "Next 2 hours", trend[0] === "NOSIG" ? "No significant change expected" : `${trend[0] === "TEMPO" ? "Temporarily" : "Becoming"}: ${trend.slice(1).join(" ")}`);
+  return out;
+}
+function wxPlain(raw, compact) {
+  const d = metarDecode(raw); if (!d.length) return "";
+  const lv = d.some(x => x.lv === "bad") ? "bad" : d.some(x => x.lv === "warn") ? "warn" : "good";
+  const sum = `<div class="mx-sum ${lv}">${lv === "bad" ? "⛔ Caution: weather affects ground operations" : lv === "warn" ? "⚠ Watch the weather" : "✅ No weather concern for ground operations"}</div>`;
+  if (compact) return sum + `<div class="mx-c">${d.filter(x => x.k !== "Observed").map(x => `<span class="${x.lv}" title="${esc(x.k)}">${x.ic} ${esc(x.t.split(" – ")[0])}</span>`).join("")}</div>`;
+  return sum + `<div class="mx">${d.map(x => `<div class="mx-r ${x.lv}"><span class="mx-i">${x.ic}</span><span class="mx-k">${esc(x.k)}</span><span>${esc(x.t)}</span></div>`).join("")}</div>`;
 }
 function wxPanel() {
   if (!wxIcao()) return `<div class="pad muted">${esc(tr("Code OACI de la station inconnu : renseignez-le dans Paramètres (Station)."))}</div>`;
   if (!WX) return `<div class="pad muted">${esc(WXERR ? tr(WXERR) : tr("Chargement de la météo…"))}</div>`;
   const m = WX.metar, t = WX.taf;
-  return `<div class="pad wx">${m ? `<div class="wx-l"><span class="chip sm">METAR</span> <span class="mono">${esc(m.raw)}</span></div>` : ""}
+  return `<div class="pad wx">${m ? `${wxPlain(m.raw)}<div class="wx-l"><span class="chip sm">METAR</span> <span class="mono">${esc(m.raw)}</span></div>` : ""}
     ${t ? `<div class="wx-l"><span class="chip sm">TAF</span> <span class="mono pre">${esc(t.raw)}</span></div>` : ""}
     <div class="small muted">${esc(tr("Source : aviationweather.gov"))} · ${fmtDT(WX.at)}${WX.stale ? " · " + esc(tr("dernière version connue")) : ""} · ${esc(tr("Alerte rafales au-dessus de"))} ${gustLimit()} kt
       · <a href="${esc(notamUrl())}" target="_blank" rel="noopener">${esc(tr("NOTAM"))} ${esc(WX.icao)} ↗</a> <span class="muted">(${esc(tr("recherche"))} ${esc(WX.icao)})</span></div></div>`;
@@ -65,7 +121,7 @@ function shiftBriefing(id, date, sh) {
 }
 WIDGETS.briefing = { h: 8, t: "Briefing du shift", ic: "🧭", c: "blue", m: "shift", size: "m", d: "Météo et alerte rafales, avions attendus, équipe et situations ouvertes du shift en cours.",
   r() { wxLoad(); const [date, sh] = currentShift(), id = hoId(date, sh), v = hoItems(id, "visit"), crew = onShift(date, sh), sits = typeof sitOpen === "function" ? S.situations.filter(sitOpen) : [];
-    return `${wxAlert() ? `<div class="banner bad small">💨 ${esc(tr("Rafales jusqu'à"))} ${wxGust()} kt (${esc(tr("seuil"))} ${gustLimit()} kt)</div>` : ""}
+    return `${wxAlert() ? `<div class="banner bad small">💨 ${"Gusts up to"} ${wxGust()} kt (${"limit"} ${gustLimit()} kt)</div>` : ""}
       <div class="w-stats">${wStat(v.length, "avions")}${wStat(crew.length, "à l'équipe")}${wStat(sits.length, "situations ouvertes", sits.length ? "warn" : "")}</div>
-      ${WX && WX.metar ? `<div class="small mono muted">${esc(WX.metar.raw)}</div>` : ""}`; },
+      ${WX && WX.metar ? `${wxPlain(WX.metar.raw, true)}<div class="small mono muted">${esc(WX.metar.raw)}</div>` : ""}`; },
   go() { UI.tab.shift = "briefing"; UI.shift = null; } };

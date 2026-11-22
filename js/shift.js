@@ -236,16 +236,19 @@ function fr24Times(v) {
   const fl = [r.arr && r.arr.fl, r.dep && r.dep.fl].filter(Boolean).filter((x, i, l) => l.indexOf(x) === i).join(" / ");
   /* valeur non trouvée chez FR24 : en magenta */
   const nf = `<span class="fr-nf" title="${esc(tr("Non trouvé chez Flightradar24"))}">${esc(tr("non trouvé"))}</span>`;
-  return `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${fl ? esc(fl) : `<span class="fr-nf">${esc(tr("vol ?"))}</span>`} · ${arr ? esc(arr) : nf} / ${dep ? esc(dep) : nf}</div>${fidsTimes(v)}`;
+  /* avion pas encore reparti : FR24 ne connaît pas encore le vol retour, ce n'est pas une erreur */
+  const dnf = r.arr && !r.dep ? `<span class="muted" title="Flightradar24 only knows a departure once the aircraft has left">DEP not yet known</span>` : nf;
+  return `<div class="fr-t" title="${esc(tr("Heures Flightradar24 (réelles, ou estimée en vol)"))}">FR24 ${fl ? esc(fl) : `<span class="fr-nf">${esc(tr("vol ?"))}</span>`} · ${arr ? esc(arr) : nf} / ${dep ? esc(dep) : dnf}</div>${fidsTimes(v)}`;
 }
 /* ---- FIDS de Ben Gourion (TLV) : lu au clic sur Flightradar24, d'après les n° de vol (FR24 et champ « N° de vol ») ----
    v.fids = { at, arr: { fl, sched, est, status, other }, dep: {…} } ; heures locales (LT) telles que publiées par l'aéroport */
 const fidsHM = s => String(s || "").slice(11, 16);
 function fidsTimes(v) {
-  const f = v.fids; if (!f || (!f.arr && !f.dep)) return "";
+  const f = v.fids; if (!f) return "";
+  if (!f.arr && !f.dep) return `<div class="fids-t muted" title="Ben Gurion airport FIDS">FIDS TLV · ${esc((f.tried || []).join(", "))} not listed on the airport FIDS${f.err ? ` (${esc(f.err)})` : " (cargo flights are often not published)"}</div>`;
   const one = (k, x) => { if (!x) return ""; const late = x.est && x.sched && x.est !== x.sched;
-    return `${k} ${esc(x.fl)} <b>${esc(fidsHM(x.est || x.sched))} LT</b>${late ? ` <span class="muted">(${esc(tr("prévu"))} ${esc(fidsHM(x.sched))})</span>` : ""}${x.status ? ` · ${esc(x.status)}` : ""}`; };
-  return `<div class="fids-t" title="${esc(tr("FIDS de l'aéroport Ben Gourion (Israel Airports Authority), heures locales"))}">FIDS TLV · ${[one("ARR", f.arr), one("DEP", f.dep)].filter(Boolean).join(" / ")}</div>`;
+    return `${k} ${esc(x.fl)}${x.guess ? ` <span class="muted" title="Next flight number of the same airline, usual for the return leg">(likely)</span>` : ""} <b>${esc(fidsHM(x.est || x.sched))} LT</b>${late ? ` <span class="muted">(sched ${esc(fidsHM(x.sched))})</span>` : ""}${x.status ? ` · ${esc(x.status)}` : ""}`; };
+  return `<div class="fids-t" title="Ben Gurion airport FIDS (Israel Airports Authority), local times">FIDS TLV · ${[one("ARR", f.arr), one("DEP", f.dep)].filter(Boolean).join(" / ")}</div>`;
 }
 /* « 2026-11-19T03:40:00 » heure locale de la station → ms UTC */
 function ltMs(s) {
@@ -259,17 +262,23 @@ async function fidsRun(id, vs) {
   if (stationIata() !== "TLV" || !vs.length) return "";
   const cur = vs.map(v => S.shiftItems.find(x => x.id === v.id) || v);
   const fls = v => { const x = v.fr24 || {}; return [v.flight, x.live && x.live.flight, x.arr && x.arr.flight, x.dep && x.dep.flight, x.last && x.last.flight].map(fidsNorm).filter(Boolean); };
-  const all = [...new Set(cur.flatMap(fls))]; if (!all.length) return "";
+  /* vol retour probable : même compagnie, n° suivant (5C770 → 5C771), utilisé seulement si le départ n'est pas connu autrement */
+  const nxt = f => { const m = f.match(/^([A-Z0-9]{2}[A-Z]?)(\d{1,4})$/); return m ? m[1] + (+m[2] + 1) : ""; };
+  const all = [...new Set(cur.flatMap(v => fls(v).flatMap(f => [f, nxt(f)])).filter(Boolean))]; if (!all.length) return "";
   const r = await API.call("POST", "fids/tlv", { flights: all });
-  if (r.error) return r.error;
+  if (r.error) { for (const v of cur) if (fls(v).length) await patch("shiftItems", v.id, { fids: { at: r.at, arr: null, dep: null, tried: fls(v), err: r.error } }); return r.error; }
   const [a, b] = shiftWindow(id);
   let n = 0;
   for (const v of cur) {
     const rows = fls(v).flatMap(fl => (r.items[fl] || []).map(x => Object.assign({ fl }, x))).map(x => Object.assign(x, { ms: ltMs(x.est || x.sched) })).filter(x => x.ms != null && x.ms >= a - 12 * 3600000 && x.ms <= b + 12 * 3600000);
     const pick = dir => rows.filter(x => x.dir === dir).sort((p, q) => Math.abs(p.ms - (a + b) / 2) - Math.abs(q.ms - (a + b) / 2))[0];
-    const arr = pick("A"), dep = pick("D"); if (!arr && !dep) continue;
-    const slim = x => x ? { fl: x.fl, sched: x.sched, est: x.est, status: x.status, other: x.other } : null;
-    await patch("shiftItems", v.id, { fids: { at: r.at, arr: slim(arr), dep: slim(dep) } }); n++;
+    const arr = pick("A");
+    let dep = pick("D");
+    if (!dep) { const g = [...new Set(fls(v).map(nxt))].flatMap(fl => (r.items[fl] || []).filter(x => x.dir === "D").map(x => Object.assign({ fl, guess: true }, x)))
+      .map(x => Object.assign(x, { ms: ltMs(x.est || x.sched) })).filter(x => x.ms != null && x.ms >= (arr ? arr.ms : a - 12 * 3600000) && x.ms <= b + 24 * 3600000).sort((p, q) => p.ms - q.ms);
+      dep = g[0]; }
+    const slim = x => x ? Object.assign({ fl: x.fl, sched: x.sched, est: x.est, status: x.status, other: x.other }, x.guess ? { guess: true } : {}) : null;
+    await patch("shiftItems", v.id, { fids: { at: r.at, arr: slim(arr), dep: slim(dep), tried: [...new Set(fls(v))] } }); if (arr || dep) n++;
   }
   return n;
 }
@@ -657,7 +666,7 @@ async function fr24Run(id, quiet, create = !quiet) {
   FR24ERR = (r.errors || []).join(" · ");
   let fidsN = "";
   try { fidsN = await fidsRun(id, vs); } catch (e) { fidsN = e.message; }   // le FIDS ne bloque jamais Flightradar24
-  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : fleet.length ? " " + tr("Avions suivis vérifiés") + " : " + fleet.length + ", " + tr("aucun en route vers la station ni posé.") : "") + (typeof fidsN === "number" ? ` FIDS TLV : ${fidsN} ${tr(fidsN > 1 ? "vols trouvés" : "vol trouvé")}.` : fidsN ? ` FIDS TLV : ${tr(fidsN)}.` : ""));
+  if (!quiet) toast(FR24ERR ? tr(FR24ERR) : `Flightradar24 : ${found} avion${found > 1 ? "s" : ""} sur ${vs.length} avec un vol récent${filled ? `, heures connues pour ${filled}` : ""}.` + (added.length ? " " + tr("Ajouté(s) au shift, en vol vers la station") + " : " + added.join(", ") : fleet.length ? " " + tr("Avions suivis vérifiés") + " : " + fleet.length + ", " + tr("aucun en route vers la station ni posé.") : "") + (typeof fidsN === "number" ? ` FIDS TLV : ${fidsN} ${fidsN > 1 ? "flights found" : "flight found"}.` : fidsN ? ` FIDS TLV : ${tr(fidsN)}.` : ""));
   if (quiet && FR24ERR) render(true);
 }
 let FR24ERR = "";

@@ -7,13 +7,13 @@ const clientOfReg = reg => { const r = String(reg || "").toUpperCase().replace(/
 VIEWS.clients = {
   render() {
     const q = UI.q.toLowerCase();
-    const rows = S.clients.filter(c => !q || [c.name, c.code, c.icao, c.regPrefixes, c.contact, c.email, c.city].join(" ").toLowerCase().includes(q)).sort(byName);
+    const rows = S.clients.filter(c => !q || [c.name, c.code, c.icao, c.iata, c.regPrefixes, c.contact, c.email, c.city].join(" ").toLowerCase().includes(q)).sort(byName);
     const prices = id => S.products.filter(p => p.clientId === id).length;
     return head("Clients", plural(S.clients.length, "client"), `<button class="btn primary" data-a="client-form" ${dis()}>Ajouter un client</button>`) +
       `<div class="panel">${searchBar("Rechercher un nom, un code, une immatriculation…")}
       <div class="tablewrap"><table><thead><tr><th>Client</th><th>Code</th><th>Immatriculations</th><th>Contact</th><th>Langue</th><th class="r">Tarifs</th></tr></thead><tbody>
       ${rows.map(c => `<tr class="click" data-a="client-form" data-id="${c.id}"><td><b>${esc(c.name)}</b>${demoTag(c)}<div class="muted">${esc(c.city || "")}</div></td>
-        <td class="mono">${esc(c.code || "—")}${c.icao ? `<div class="muted small">${esc(tr("OACI"))} ${esc(c.icao)}</div>` : ""}</td><td class="mono">${esc(regsOf(c).join(" ") || "—")}</td>
+        <td class="mono">${esc(c.code || "—")}${c.icao ? `<div class="muted small">${esc(tr("OACI"))} ${esc(c.icao)}</div>` : ""}${c.iata ? `<div class="muted small">IATA ${esc(c.iata)}</div>` : ""}</td><td class="mono">${esc(regsOf(c).join(" ") || "—")}</td>
         <td>${esc(c.contact || "")}<div class="muted">${esc(c.email || "")}</div></td><td><span class="chip ${c.lang === "en" ? "info" : ""}" data-noi18n>${c.lang === "en" ? "EN" : "FR"}</span></td>
         <td class="r num">${prices(c.id) || "—"}</td></tr>`).join("")}
       </tbody></table>${rows.length ? "" : `<div class="empty">${S.clients.length ? "Aucun client ne correspond." : "Aucun client pour l'instant."}</div>`}</div></div>`;
@@ -23,7 +23,7 @@ ACTIONS["client-form"] = el => {
   const c = client(el.dataset.id) || {};
   const isNew = !c.id;
   const m = modal(`${mHead(isNew ? "Nouveau client" : esc(c.name))}<form id="f-client"><div class="body"><div class="fields">
-    ${field("c-name", "Nom de la compagnie", c.name, { required: true })}${field("c-code", "Code court (Charge Sheet)", c.code, { ph: "MT, BE, IL…", cls: "mono" })}${field("c-icao", "Code compagnie OACI", c.icao, { ph: "CHG, ICL…", cls: "mono" })}
+    ${field("c-name", "Nom de la compagnie", c.name, { required: true })}${field("c-code", "Code court (Charge Sheet)", c.code, { ph: "MT, BE, IL…", cls: "mono" })}${field("c-icao", "Code compagnie OACI", c.icao, { ph: "CHG, ICL…", cls: "mono" })}${field("c-iata", "Code compagnie IATA (FIDS)", c.iata, { ph: "5C, LY…", cls: "mono" })}
     ${field("c-regs", "Préfixes d'immatriculation", c.regPrefixes, { ph: "9H- OO- OE-", cls: "mono" })}${field("c-vat", "N° TVA", c.vat)}
     ${field("c-contact", "Personne de contact", c.contact)}${field("c-email", "E-mail", c.email, { type: "email" })}
     ${field("c-lang", "Langue de communication", c.lang || "en", { type: "select", options: [["fr", "Français"], ["en", "English"]] })}${field("c-phone", "Téléphone", c.phone)}${field("c-address", "Adresse", c.address)}${field("c-city", "Code postal et ville", c.city)}
@@ -32,7 +32,7 @@ ACTIONS["client-form"] = el => {
   <button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`);
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    await save("clients", c.id, Object.assign({}, strip(c), { name: val("c-name"), code: val("c-code").toUpperCase(), icao: val("c-icao").trim().toUpperCase(), regPrefixes: val("c-regs").toUpperCase(), vat: val("c-vat"), contact: val("c-contact"), email: val("c-email"), phone: val("c-phone"), lang: val("c-lang") || "en", address: val("c-address"), city: val("c-city"), notes: val("c-notes") }));
+    await save("clients", c.id, Object.assign({}, strip(c), { name: val("c-name"), code: val("c-code").toUpperCase(), icao: val("c-icao").trim().toUpperCase(), iata: val("c-iata").trim().toUpperCase(), regPrefixes: val("c-regs").toUpperCase(), vat: val("c-vat"), contact: val("c-contact"), email: val("c-email"), phone: val("c-phone"), lang: val("c-lang") || "en", address: val("c-address"), city: val("c-city"), notes: val("c-notes") }));
     closeModal(); toast("Client enregistré");
   };
 };
