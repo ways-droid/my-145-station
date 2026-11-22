@@ -291,8 +291,11 @@ ok "données avion : réservé au bureau" "$(curl -s -H "$HT" -X POST -d '{"reg"
 pkill -f "127.0.0.1:8775" || true
 (php -S 127.0.0.1:8775 "$D/opensky-mock.php" >/dev/null 2>&1 &); sleep 0.5
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["opensky_base","http://127.0.0.1:8775/api"]);' $T/t.db
-R=$(curl -s -H "$B" -X POST -d '{"reg":"4x-ica"}' $U/fr24/aircraft); ok "données avion : MSN (OpenSky)" "$R" '"msn":"29261"'; ok "données avion : moteurs (OpenSky)" "$R" '"engines":"GE CF6-80C2B5F"'
- ok "données avion : ADSBdb" "$R" '"typeName":"747 412","icaoType":"B744"'; ok "données avion : Mode S" "$R" '"modeS":"738A01"'
+R=$(curl -s -H "$B" -X POST -d '{"modeS":"738a01"}' $U/fr24/aircraft-msn); ok "données avion : MSN (OpenSky)" "$R" '"msn":"29261"'; ok "données avion : moteurs (OpenSky)" "$R" '"engines":"GE CF6-80C2B5F"'
+ok "données avion : MSN inconnu" "$(curl -s -H "$B" -X POST -d '{"modeS":"ABCDEF"}' $U/fr24/aircraft-msn)" '"found":false'
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["opensky_base","http://10.255.255.1/api"]);' $T/t.db
+ok "données avion : OpenSky en panne ne bloque pas" "$(curl -s -m 20 -H "$B" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/aircraft)" '"icaoType":"B744"'
+R=$(curl -s -H "$B" -X POST -d '{"reg":"4x-ica"}' $U/fr24/aircraft); ok "données avion : ADSBdb" "$R" '"typeName":"747 412","icaoType":"B744"'; ok "données avion : Mode S" "$R" '"modeS":"738A01"'
 ok "données avion : FR24 en complément" "$(curl -s -H "$B" -X POST -d '{"reg":"9H-DEP"}' $U/fr24/aircraft)" '"sources":\["Flightradar24"\]'
 ok "données avion : inconnu" "$(curl -s -H "$B" -X POST -d '{"reg":"OO-ZZZ"}' $U/fr24/aircraft)" '"found":false'
 R=$(curl -s -H "$A" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag); ok "FR24 : diagnostic" "$R" '"endpoint":"flight-summary/full","params"'; no "FR24 : diagnostic sans la clé" "$R" 'fr24-good'
