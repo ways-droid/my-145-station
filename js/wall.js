@@ -110,6 +110,10 @@ VIEWS.fids = {
     const fids = ((FIDSB && FIDSB.rows) || []).filter(keep), R0 = fbRegs(), have = new Set();
     for (const x of fids) { have.add(x.fl + x.dir); const g = R0.sure[x.fl]; if (g) have.add("R" + g + x.dir); }
     const extra = fbFr24Rows(have), rows = [...fids, ...extra].sort((a, b) => String(a.est || a.sched).localeCompare(String(b.est || b.sched)));
+    /* avions au sol en ce moment (shift en cours et précédent), avec leur stand */
+    const seen = new Set(), ground = fbVisits().filter(v => onGround(v) && !seen.has(normReg(v.reg)) && seen.add(normReg(v.reg)));
+    const gnd = ground.length ? `<section class="fb-sec"><h2>🅿 On ground</h2><table class="fb"><thead><tr><th>Stand</th><th>Reg.</th><th>Type</th><th>ATA</th><th>ETD</th><th>Arrival flight</th></tr></thead><tbody>${ground.map(v =>
+      `<tr><td><span class="gnd-tag">GROUND${v.stand ? " PK " + esc(v.stand) : ""}</span></td><td class="fb-reg">${esc(normReg(v.reg))}</td><td>${esc(v.acType || "")}</td><td class="fb-time">${v.ata ? esc(v.ata) + "Z" : ""}</td><td class="fb-time">${v.dep ? esc(v.dep) + "Z" : ""}</td><td class="fb-fl">${esc(v.flight || "")}</td></tr>`).join("")}</tbody></table></section>` : "";
     /* ligne de diagnostic : ce que chaque source a donné */
     const live = FB_FR24 ? FB_FR24.regs.filter(g => { const x = FB_FR24.items[String(g).toUpperCase().replace(/[^A-Z0-9-]/g, "")]; return x && (x.live || x.last); }) : [];
     const diag = `<div class="fb-diag">Airport FIDS: ${FIDSB && FIDSB.error ? `<b class="bad">${esc(FIDSB.error)}</b>` : FIDSB && FIDSB.total != null ? `${FIDSB.total} flights published, ${fids.length} ours` : FIDSB && FIDSB.none ? "nothing to look up (no aircraft, no flight number)" : "…"}
@@ -121,7 +125,7 @@ VIEWS.fids = {
         <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${"Local"} (LT)</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC (Z)</span></div>
         <button class="btn sm" data-a="fb-refresh">↻</button><button class="btn sm" data-a="wall-exit">${"Exit"}</button></div></div>` +
       (stationIata() !== "TLV" ? `<div class="wall-empty">${"FIDS is only available for the TLV station."}</div>` :
-      (!FIDSB ? `<div class="wall-empty">${"Loading…"}</div>` : tab("A", "Arrivals") + tab("D", "Departures") + diag)) + `</div>`;
+      (!FIDSB ? `<div class="wall-empty">${"Loading…"}</div>` : gnd + tab("A", "Arrivals") + tab("D", "Departures") + diag)) + `</div>`;
   },
   after() { if (stationIata() === "TLV") fbLoad(); }
 };
