@@ -265,6 +265,15 @@ ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" 
 no "terrain : changements sans Charge Sheet" "$(curl -s -H "$HT" "$U/changes?since=0")" 'PFSC (MT Transit'
 ok "terrain : Charge Sheet non modifiable" "$(curl -s -H "$HT" -X PUT -d '{"price":1}' $U/docs/chargeLines/cl2)" 'rôle'
 ok "historique : ligne nommée" "$(curl -s -H "$A" "$U/log?coll=chargeLines")" 'Charge Sheet 261119-9HABC-MT01'
+echo "> FIDS TLV"
+pkill -f "127.0.0.1:8776" || true
+(php -S 127.0.0.1:8776 "$D/fids-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/api"]);' $T/t.db
+R=$(curl -s -H "$HT" -X POST -d '{"flights":["5c 851","5C0852","XX9"]}' $U/fids/tlv)
+ok "FIDS : arrivée trouvée (n° normalisé)" "$R" '"5C851":\[{"dir":"A","sched":"2026-11-19T03:40:00","est":"2026-11-19T03:55:00","status":"LANDED"'
+ok "FIDS : départ trouvé" "$R" '"5C852":\[{"dir":"D"'
+no "FIDS : seulement les vols demandés" "$R" 'LY1'
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/none"]); $p->prepare("DELETE FROM ways_kv WHERE k=?")->execute(["fids_cache"]);' $T/t.db
 echo "> flightradar24"
 pkill -f "127.0.0.1:8773" || true
 (php -S 127.0.0.1:8773 "$D/fr24-mock.php" >/dev/null 2>&1 &); sleep 0.5
