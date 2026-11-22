@@ -13,9 +13,32 @@ const SDOC_TYPES = { passport: "Passeport", visa: "Visa", workPermit: "Permis de
   training: "Formation (Human Factors, EWIS…)", medical: "Aptitude médicale", driving: "Permis de conduire / piste", other: "Autre" };
 const SHIFT_LBL = { day: "Jour (08-20 LT)", night: "Nuit (20-08 LT)", custom: "Horaire libre" };
 const splitList = s => String(s || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
-const acTypes = () => splitList(settings().acTypes);
+/* types suivis : la base Types d'appareils (Avions) quand elle est remplie, sinon la liste des Paramètres */
+const acTypes = () => { const b = (S.actypes || []).map(t => t && t.code).filter(Boolean); return b.length ? [...new Set(b)].sort() : splitList(settings().acTypes); };
 const RATING_CODES = { E: "EASA", I: "Approbation israélienne", F: "FAA" };
 const ratingHas = (p, t, c) => String((p.ratings || {})[t] || "").split("+").includes(c);
+/* Type Ratings détaillés : typeRatings = [{ t: type, m: modèle ("" = tous), e: moteur ("" = tous), lic: "E+I", crs: autorisation compagnie }].
+   ratings { type: "E+I" } en est le résumé (seulement les lignes avec autorisation compagnie), recalculé par le serveur.
+   Anciennes fiches (ratings seulement) : lues comme type complet avec autorisation. */
+const staffTR = p => Array.isArray(p.typeRatings) ? p.typeRatings : Object.entries(p.ratings || {}).filter(([, l]) => l).map(([t, lic]) => ({ t, m: "", e: "", lic, crs: true }));
+const trLic = r => String(r.lic || "").split("+").filter(Boolean);
+const trName = r => [r.t, r.m, r.e ? "(" + r.e + ")" : ""].filter(Boolean).join(" ");
+/* la ligne couvre cet avion : même type, et même modèle / moteur quand les deux sont précisés */
+const trFits = (r, ac) => r.t === ac.acType && (!r.m || !ac.variant || r.m === ac.variant) && (!r.e || !ac.engine || r.e === ac.engine);
+/* conditions exigées pour signer un avion : arbre ET / OU imbriqué, sans limite.
+   nœud = { op: "and" | "or", items: [feuille | nœud] } ; feuille = code du Type Rating (E, I, F) ou catégorie de licence (B1, B2, A, C).
+   Une liste simple ["E","I"] vaut « E ET I ». */
+const ruleNorm = r => Array.isArray(r) ? { op: "and", items: r } : r && Array.isArray(r.items) ? r : { op: "and", items: [] };
+const ruleEval = (n, has) => typeof n === "string" ? has(n) : !n || !Array.isArray(n.items) || !n.items.length ? true : n.op === "or" ? n.items.some(x => ruleEval(x, has)) : n.items.every(x => ruleEval(x, has));
+const ruleText = (n, top = true) => { if (typeof n === "string") return n; const it = (n?.items || []).map(x => ruleText(x, false)).filter(Boolean); if (!it.length) return "";
+  const s = it.join(n.op === "or" ? " " + tr("OU") + " " : " " + tr("ET") + " "); return top || it.length < 2 ? s : "(" + s + ")"; };
+const licCats = p => new Set((p.licences || []).flatMap(l => String(l.cat || "").split("+")).filter(Boolean));
+const trQualif = (p, ac, rule) => { const n = ruleNorm(rule), cats = licCats(p);
+  return staffTR(p).filter(r => trFits(r, ac) && ruleEval(n, c => RATING_CODES[c] ? trLic(r).includes(c) : cats.has(c))); };
+/* a le droit de signer : qualifié (type, modèle, moteur, conditions de licences) ET autorisation compagnie (CRS) cochée */
+const canSign = (p, ac, rule) => trQualif(p, ac, rule).some(r => r.crs !== false);
+const ratingsOf = list => { const o = {}; for (const r of list) if (r.t && r.crs !== false) { const h = new Set([...(o[r.t] || "").split("+"), ...trLic(r)]); o[r.t] = Object.keys(RATING_CODES).filter(c => h.has(c)).join("+"); }
+  return Object.fromEntries(Object.entries(o).filter(([, l]) => l)); };
 const staff = id => S.staff.find(p => p.id === id);
 const staffActive = () => S.staff.filter(p => p.active !== false);
 /* Headquarters (training manager…) : pas dans le roster ni dans les équipes de la station */
@@ -32,7 +55,7 @@ function staffDates(p) {
 }
 const staffDue = (days = 60) => staffActive().flatMap(staffDates).filter(x => x.date <= addDays(today(), days)).sort((a, b) => a.date.localeCompare(b.date));
 const nextDate = p => staffDates(p).sort((a, b) => a.date.localeCompare(b.date))[0];
-const ratingChips = p => Object.entries(p.ratings || {}).filter(([, l]) => l).map(([t, l]) => `<span class="chip sm"><b>${esc(t)}</b> ${esc(l)}</span>`).join(" ");
+const ratingChips = p => staffTR(p).filter(r => r.t && r.lic).map(r => `<span class="chip sm ${r.crs === false ? "muted" : ""}" title="${esc(r.crs === false ? tr("Qualifié, sans autorisation compagnie (CRS)") : tr("Autorisation compagnie (CRS)"))}"><b>${esc(trName(r))}</b> ${esc(r.lic)}${r.crs === false ? " · " + esc(tr("sans CRS")) : ""}</span>`).join(" ");
 
 VIEWS.personnel = {
   render() {
@@ -59,14 +82,15 @@ function staffTeam() {
 /* tableau croisé personnes × types d'avion, comme les colonnes du roster */
 function staffMatrix() {
   const types = acTypes(), rows = staffActive().sort(staffSort);
-  if (!types.length) return `<div class="panel pad">Aucun type d'avion défini. Ajoutez-les dans <a href="#parametres">Paramètres</a> (Station).</div>`;
+  if (!types.length) return `<div class="panel pad">Aucun type d'avion défini. Ajoutez-les dans <a href="#avions">Avions</a> > Types d'appareils.</div>`;
   const cnt = t => rows.filter(p => (p.ratings || {})[t]).length;
   return `<div class="panel"><div class="tablewrap"><table class="matrix"><thead><tr><th>Nom</th><th>Fonction</th><th>Licences</th>${types.map(t => `<th class="c">${esc(t)}</th>`).join("")}</tr></thead><tbody>
     ${rows.map(p => `<tr class="click" data-a="staff-open" data-id="${p.id}"><td><b>${esc(p.name)}</b></td><td class="small">${esc(STAFF_FN[p.function] || "")}</td><td class="mono small">${esc(licText(p))}</td>
-      ${types.map(t => { const l = (p.ratings || {})[t]; return `<td class="c">${l ? `<span class="chip sm good">${esc(l)}</span>` : `<span class="muted">·</span>`}</td>`; }).join("")}</tr>`).join("")}
-    <tr><td colspan="3" class="muted small">Personnes qualifiées</td>${types.map(t => `<td class="c num"><b>${cnt(t)}</b></td>`).join("")}</tr>
+      ${types.map(t => { const l = (p.ratings || {})[t], rs = staffTR(p).filter(r => r.t === t && r.lic), det = rs.map(r => trName(r) + " " + r.lic + (r.crs === false ? " · " + tr("sans CRS") : "")).join("\n");
+        return `<td class="c" title="${esc(det)}">${l ? `<span class="chip sm good">${esc(l)}</span>` : rs.length ? `<span class="chip sm muted">${esc(tr("sans CRS"))}</span>` : `<span class="muted">·</span>`}</td>`; }).join("")}</tr>`).join("")}
+    <tr><td colspan="3" class="muted small">Avec autorisation compagnie (CRS)</td>${types.map(t => `<td class="c num"><b>${cnt(t)}</b></td>`).join("")}</tr>
     ${Object.entries(RATING_CODES).map(([c, l]) => `<tr><td colspan="3" class="muted small">dont ${c} · ${l}</td>${types.map(t => `<td class="c num">${rows.filter(p => ratingHas(p, t, c)).length}</td>`).join("")}</tr>`).join("")}
-    </tbody></table></div><div class="pad hint">E = licence EASA · I = approbation israélienne (requise pour signer les avions 4X- en Israël) · F = licence FAA. Les autorisations de signer (CRS) restent gérées dans AMOS.</div></div>`;
+    </tbody></table></div><div class="pad hint">E = licence EASA · I = approbation israélienne (requise pour signer les avions 4X- en Israël) · F = licence FAA. Comptés : les Type Ratings avec autorisation compagnie (CRS) ; « sans CRS » = qualifié sans l'autorisation. Le détail (modèle, moteur) s'affiche au survol. La validation des travaux reste dans AMOS.</div></div>`;
 }
 function staffDueList() {
   const all = staffActive().flatMap(staffDates).sort((a, b) => a.date.localeCompare(b.date)), lim = addDays(today(), 90);
@@ -85,7 +109,7 @@ function openStaff(id) {
     <div class="row-g wrap"><span class="chip info">${esc(STAFF_FN[p.function] || p.function || "—")}</span>${typeof indChip === "function" && p.function !== "hq" ? `<button class="linkbtn" data-a="ind-open" data-id="${p.id}">${indChip(p.id)}</button>` : ""}${p.active === false ? `<span class="chip">Ne fait plus partie de la station</span>` : ""}${p.shift ? `<span class="chip">${esc(SHIFT_LBL[p.shift] || p.shift)}</span>` : ""}</div>
     <dl class="kv sm">${[["Employeur", p.employer], ["Station de base", p.base], ["E-mail", p.email], ["Téléphone", p.phone], ["Nationalité", p.nationality]].filter(([, v]) => v).map(([k, v]) => `<dt>${k}</dt><dd>${esc(v)}</dd>`).join("")}</dl>
     <h3>Licences</h3>${(p.licences || []).length ? `<table class="small"><tbody>${p.licences.map(l => `<tr><td class="mono"><b>${esc(l.cat)}</b></td><td class="mono">${esc(l.number || "")}</td><td>${esc(l.authority || "")}</td><td>${l.expires ? dueChip(l.expires, 60) : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">Aucune licence enregistrée.</div>`}
-    <h3>Qualifications par type d'avion</h3><div>${ratingChips(p) || `<span class="muted">Aucune.</span>`}</div>
+    <h3>Type Ratings</h3><div>${ratingChips(p) || `<span class="muted">Aucune.</span>`}</div>
     <div class="row-sb"><h3>Documents</h3>${ed ? `<button class="btn sm" data-a="sdoc-form" data-staff="${p.id}">Ajouter un document</button>` : ""}</div>
     ${docs.length ? `<table class="small"><tbody>${docs.map(d => `<tr class="${ed ? "click" : ""} ${d.old ? "muted" : ""}" ${ed ? `data-a="sdoc-form" data-staff="${p.id}" data-id="${d.id}"` : ""}><td><b>${esc(SDOC_TYPES[d.type] || d.type)}</b><div class="muted">${esc([d.name, d.acType, d.number ? "n° " + d.number : ""].filter(Boolean).join(" · "))}</div></td>
       <td>${d.old ? "Ancien" : d.expires ? dueChip(d.expires, 60) : ""}</td><td class="r">${d.file ? `<a class="btn sm" href="${esc(blobUrl(d.file))}" target="_blank" rel="noopener" data-stop>Fichier</a>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="muted">${p.docs ? "Aucun document." : "Documents visibles par le bureau et par la personne elle-même."}</div>`}
@@ -102,7 +126,7 @@ ACTIONS["lic-add"] = el => el.closest("form").querySelector(".lic-list").insertA
 ACTIONS["lic-del"] = el => el.closest(".lic-row").remove();
 ACTIONS["staff-form"] = el => {
   const p = staff(el.dataset.id) || { function: "engineer", active: true, ratings: {}, licences: [] };
-  const isNew = !p.id, types = Array.from(new Set([...acTypes(), ...Object.keys(p.ratings || {})]));
+  const isNew = !p.id;
   const m = modal(`${mHead(isNew ? "Nouvelle personne" : esc(p.name))}<form><div class="body stack"><div class="fields">
     ${field("st-name", "Nom et prénom", p.name, { required: true, autofocus: true })}${field("st-fn", "Fonction", p.function, { type: "select", options: Object.entries(STAFF_FN).filter(([k]) => k !== "hq" || isAdmin() || p.function === "hq") })}
     ${field("st-emp", "Employeur", p.employer, { ph: "Challenge Technic, sous-traitant…" })}${field("st-base", "Station de base", p.base, { ph: "TLV, LGG…", cls: "mono" })}
@@ -110,8 +134,9 @@ ACTIONS["staff-form"] = el => {
     ${field("st-nat", "Nationalité", p.nationality)}${field("st-shift", "Horaire habituel", p.shift || "", { type: "select", options: [["", "—"], ...Object.entries(SHIFT_LBL)] })}
   </div>
   <div><div class="row-sb"><h3>Licences</h3><button type="button" class="btn sm" data-a="lic-add">Ajouter une licence</button></div><div class="lic-list stack">${(p.licences || []).map(licRow).join("")}</div></div>
-  <div><h3>Qualifications par type d'avion</h3>${types.length ? `<table class="small rating-edit"><thead><tr><th>Type</th>${Object.entries(RATING_CODES).map(([c, l]) => `<th class="c" title="${esc(tr(l))}">${c} · ${esc(tr(l))}</th>`).join("")}</tr></thead><tbody>
-    ${types.map((t, i) => `<tr><td><b>${esc(t)}</b></td>${Object.keys(RATING_CODES).map(c => `<td class="c"><input type="checkbox" class="st-r" data-t="${i}" data-c="${c}" ${ratingHas(p, t, c) ? "checked" : ""} aria-label="${esc(t + " " + c)}"></td>`).join("")}</tr>`).join("")}</tbody></table>` : `<div class="hint">Ajoutez d'abord les types d'avion dans Paramètres (Station).</div>`}</div>
+  <div><div class="row-sb"><h3>Type Ratings</h3><button type="button" class="btn sm" data-a="tr-add">${esc(tr("Ajouter un Type Rating"))}</button></div>
+    ${acTypes().length ? `<div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Types d'appareils (Avions). Cochez CRS si la compagnie l'autorise à signer : il peut avoir le type sur sa licence sans l'autorisation."))}</div>` : `<div class="hint">Ajoutez d'abord les types dans Avions > Types d'appareils.</div>`}
+    <div class="tr-list stack">${staffTR(p).map(trRow).join("")}</div></div>
   ${field("st-notes", "Notes", p.notes, { type: "textarea" })}
   ${isAdmin() ? `<div class="hint">${esc(tr("Fonction Headquarters (training manager…) : mêmes droits qu'un administrateur, avec la double authentification activée. Pas dans le roster de la station."))}</div>` : ""}
   ${isAdmin() ? `<label class="chk sysadm"><input type="checkbox" id="st-sysadm" ${p.sysAdmin ? "checked" : ""}> <b>${esc(tr("Administrateur système"))}</b> <span class="muted small">${esc(tr("— gère tout le système, en plus de sa fonction. Son compte (même e-mail) doit avoir la double authentification activée."))}</span></label>`
@@ -121,16 +146,30 @@ ACTIONS["staff-form"] = el => {
   <button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`, "lg");
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    const ratings = {}; types.forEach((t, i) => { const v = Object.keys(RATING_CODES).filter(c => m.querySelector(`.st-r[data-t="${i}"][data-c="${c}"]`)?.checked).join("+"); if (v) ratings[t] = v; });
+    const typeRatings = [...m.querySelectorAll(".tr-row")].map(r => ({ t: r.querySelector(".tr-t").value, m: r.querySelector(".tr-m").value, e: r.querySelector(".tr-e").value,
+      lic: Object.keys(RATING_CODES).filter(c => r.querySelector(`.tr-c[value="${c}"]`).checked).join("+"), crs: r.querySelector(".tr-crs").checked })).filter(r => r.t), ratings = ratingsOf(typeRatings);
     const licences = [...m.querySelectorAll(".lic-row")].map(r => ({ cat: r.querySelector(".l-cat").value, number: r.querySelector(".l-num").value.trim(), authority: r.querySelector(".l-auth").value.trim(), expires: r.querySelector(".l-exp").value }));
     const gone = m.querySelector("#st-gone")?.checked;
     const data = Object.assign(strip(p), { name: val("st-name"), function: val("st-fn"), employer: val("st-emp"), base: val("st-base").toUpperCase(), email: val("st-email").toLowerCase(), phone: val("st-phone"),
-      nationality: val("st-nat"), shift: val("st-shift"), notes: val("st-notes"), ratings, licences, active: !gone, docs: p.docs || [] });
+      nationality: val("st-nat"), shift: val("st-shift"), notes: val("st-notes"), typeRatings, ratings, licences, active: !gone, docs: p.docs || [] });
     if (isAdmin()) data.sysAdmin = !!m.querySelector("#st-sysadm")?.checked;
     const id = await save("staff", p.id, data);
     toast("Fiche enregistrée"); openStaff(id);
   };
+  m.querySelector(".tr-list").onchange = e => {   // le modèle et le moteur se filtrent d'après le type (et le modèle)
+    const r = e.target.closest(".tr-row"); if (!r) return;
+    const t = r.querySelector(".tr-t").value, md = r.querySelector(".tr-m");
+    if (e.target.matches(".tr-t")) md.innerHTML = atModelOpts(t, "");
+    if (e.target.matches(".tr-t, .tr-m")) r.querySelector(".tr-e").innerHTML = atEngOpts(t, md.value, "");
+  };
 };
+const trRow = (r = {}) => `<div class="tr-row row-g wrap"><select class="tr-t" aria-label="${esc(tr("Type"))}">${atOpts([["", "— " + tr("Type") + " —"], ...atUniq(acTypes(), r.t).map(t => [t, t])], r.t)}</select>
+  <select class="tr-m" aria-label="${esc(tr("Modèle"))}">${atModelOpts(r.t, r.m)}</select><select class="tr-e" aria-label="${esc(tr("Moteur"))}">${atEngOpts(r.t, r.m, r.e)}</select>
+  ${Object.entries(RATING_CODES).map(([c, l]) => `<label class="chk line" title="${esc(tr(l))}"><input type="checkbox" class="tr-c" value="${c}" ${trLic(r).includes(c) ? "checked" : ""}> <b>${c}</b></label>`).join("")}
+  <label class="chk line tr-crsl" title="${esc(tr("Autorisation compagnie de signer (CRS)"))}"><input type="checkbox" class="tr-crs" ${r.crs === true ? "checked" : ""}> <b>CRS</b> <span class="small muted">${esc(tr("autorisation compagnie"))}</span></label>
+  <button type="button" class="x" data-a="tr-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
+ACTIONS["tr-add"] = el => el.closest("form").querySelector(".tr-list").insertAdjacentHTML("beforeend", trRow());
+ACTIONS["tr-del"] = el => el.closest(".tr-row").remove();
 ACTIONS["staff-del"] = el => confirmBox("Supprimer cette fiche et ses documents ? Pour quelqu'un qui quitte la station, cochez plutôt « Ne fait plus partie de la station ».", () => remove("staff", el.dataset.id));
 
 /* ---- documents d'une personne (même principe que les documents des véhicules) ---- */

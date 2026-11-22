@@ -1,6 +1,6 @@
 "use strict";
 /* ======================= état & stockage ======================= */
-const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "expiries", "forms", "contacts", "instructions", "induction", "travel", "hotels", "aircraft", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
+const COLS = ["staff", "roster", "handovers", "shiftItems", "chargeLines", "partMoves", "needs", "situations", "expiries", "forms", "contacts", "instructions", "induction", "travel", "hotels", "aircraft", "actypes", "clients", "products", "vehicles", "vehEvents", "faults", "driverLogs", "tires", "tools", "labs", "adminDocs", "adminFolders", "notes", "userPrefs", "links"];
 const S = { settings: {}, loaded: {}, slow: false };
 COLS.forEach(c => S[c] = []);
 let db = null, assets = null, downloads = null, userCap = null, mode = "loading", readOnly = false;

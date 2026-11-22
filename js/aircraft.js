@@ -12,65 +12,96 @@ const aircraftOf = reg => { const r = normReg(reg); return r ? aircraftList().fi
 /* licences exigées par défaut : EASA, plus I pour un 4X- */
 const acDefaultLic = reg => /^4X/i.test(normReg(reg)) ? ["E", "I"] : ["E"];
 const acLic = a => Array.isArray(a.licences) && a.licences.length ? a.licences : acDefaultLic(a.reg);
+/* conditions exigées pour signer (arbre ET / OU) : licRule, sinon la liste simple des licences (toutes exigées) */
+const acRule = a => a.licRule && Array.isArray(a.licRule.items) && a.licRule.items.length ? a.licRule : { op: "and", items: acLic(a) };
+const RULE_LEAVES = [["E", "E · EASA (sur le Type Rating)"], ["I", "I · Approbation israélienne (sur le Type Rating)"], ["F", "F · FAA (sur le Type Rating)"], ["B1", "Licence B1"], ["B2", "Licence B2"], ["C", "Licence C"], ["A", "Licence A"]];
+const ruleLeaf = (v = "E") => `<div class="rule-l row-g"><select class="rule-v" aria-label="${esc(tr("Condition"))}">${atOpts(RULE_LEAVES.map(([c, l]) => [c, tr(l)]), v)}</select><button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button></div>`;
+const ruleGroup = (n, root) => `<div class="rule-g ${root ? "root" : ""}"><div class="row-g wrap"><select class="rule-op" aria-label="${esc(tr("Opérateur"))}">${atOpts([["and", tr("ET : toutes ces conditions")], ["or", tr("OU : au moins une de ces conditions")]], n.op === "or" ? "or" : "and")}</select>
+  <button type="button" class="btn sm" data-a="rule-leaf">${esc(tr("+ Condition"))}</button><button type="button" class="btn sm" data-a="rule-grp">${esc(tr("+ Groupe ET / OU"))}</button>${root ? "" : `<button type="button" class="x" data-a="rule-del" aria-label="${esc(tr("Retirer"))}">×</button>`}</div>
+  <div class="rule-items stack">${(n.items || []).map(x => typeof x === "string" ? ruleLeaf(x) : ruleGroup(x)).join("")}</div></div>`;
+const ruleRead = g => ({ op: g.querySelector(":scope > .row-g .rule-op").value, items: [...g.querySelector(":scope > .rule-items").children]
+  .map(c => c.classList.contains("rule-g") ? ruleRead(c) : c.querySelector(".rule-v").value).filter(x => typeof x === "string" || x.items.length) });
+const ruleCodes = n => typeof n === "string" ? [n] : (n?.items || []).flatMap(ruleCodes);
+const rulePreview = el => { const f = el.closest("form"), g = f?.querySelector(".rule-g.root"), o = f?.querySelector("#ac-rule-txt"); if (g && o) o.textContent = ruleText(ruleRead(g)) || tr("aucune condition"); };
+ACTIONS["rule-leaf"] = el => { const f = el.closest("form"); el.closest(".rule-g").querySelector(":scope > .rule-items").insertAdjacentHTML("beforeend", ruleLeaf()); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
+ACTIONS["rule-grp"] = el => { const f = el.closest("form"); el.closest(".rule-g").querySelector(":scope > .rule-items").insertAdjacentHTML("beforeend", ruleGroup({ op: "or", items: ["E", "F"] })); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
+ACTIONS["rule-del"] = el => { const f = el.closest("form"); (el.closest(".rule-l") || el.closest(".rule-g")).remove(); rulePreview(f); f.dispatchEvent(new Event("rulechange")); };
 const acClient = a => S.clients.find(c => c.id === a.clientId) || clientOfReg(a.reg);
-/* personnes actives qualifiées pour signer cet avion : qualification sur le type avec toutes les licences exigées */
-const acQualified = a => a.acType ? staffActive().filter(p => rated(p, a.acType) && acLic(a).every(c => ratingHas(p, a.acType, c))) : [];
+/* type, modèle et moteur de l'avion, comparés aux Type Ratings du Personnel */
+const acSpec = a => ({ acType: a.acType, variant: a.variant || "", engine: a.engines || "" });
+const acName = a => [a.acType, a.variant, a.engines ? "(" + a.engines + ")" : ""].filter(Boolean).join(" ");
+/* personnes actives qui ont le droit de signer cet avion : Type Rating sur le type, le modèle et le moteur, avec toutes
+   les licences exigées et l'autorisation compagnie (CRS) */
+const acQualified = a => a.acType ? staffActive().filter(p => canSign(p, acSpec(a), acRule(a))) : [];
+/* qualifiés mais sans autorisation compagnie */
+const acNoCrs = a => a.acType ? staffActive().filter(p => !canSign(p, acSpec(a), acRule(a)) && trQualif(p, acSpec(a), acRule(a)).length) : [];
 
 VIEWS.avions = {
   render() {
     const q = (UI.q || "").toLowerCase(), all = aircraftList().slice().sort((a, b) => (b.active !== false) - (a.active !== false) || normReg(a.reg).localeCompare(normReg(b.reg)));
     const rows = all.filter(a => !q || [a.reg, acClient(a)?.name, acClient(a)?.code, a.acType, a.variant, a.msn, a.amosRef].join(" ").toLowerCase().includes(q));
     const ed = isOffice() && !readOnly;
-    return head("Avions", "Avions servis par la station : immatriculation, compagnie, type et licences exigées pour signer. La maintenance reste dans AMOS.",
-      ed ? `<button class="btn primary" data-a="ac-form">Ajouter un avion</button>` : "") +
-      `<div class="panel">${searchBar(tr("Immatriculation, compagnie, type, MSN…"))}<div class="pad"><h3 class="np">${plural(all.filter(a => a.active !== false).length, "avion")} en service</h3></div>
-      ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Immatriculation</th><th>Compagnie</th><th>Type</th><th>MSN</th><th>Licences exigées</th><th class="r">CRS qualifiés</th></tr></thead><tbody>
+    const tab = curTab("avions", "liste");
+    return head("Avions", "Avions servis par la station : immatriculation, compagnie, type, modèle, moteur et licences exigées pour signer. La maintenance reste dans AMOS.",
+      ed && tab === "liste" ? `<button class="btn primary" data-a="ac-form">Ajouter un avion</button>` : "") +
+      tabs("avions", [["liste", "Avions", all.filter(a => a.active !== false).length], ["types", "Types d'appareils", atAll().length, !atAll().length]]) +
+      (tab === "types" ? atTree() : `<div class="panel">${searchBar(tr("Immatriculation, compagnie, type, MSN…"))}<div class="pad"><h3 class="np">${plural(all.filter(a => a.active !== false).length, "avion")} en service</h3></div>
+      ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Immatriculation</th><th>Compagnie</th><th>Type</th><th>MSN</th><th>Conditions pour signer</th><th class="r">CRS autorisés</th></tr></thead><tbody>
         ${rows.map(a => { const c = acClient(a), n = acQualified(a).length;
           return `<tr class="click ${a.active === false ? "muted" : ""}" data-a="ac-form" data-id="${a.id}"><td><b class="mono">${esc(a.reg)}</b>${a.active === false ? ` <span class="chip">${esc(tr("Plus servi"))}</span>` : ""}</td>
             <td>${c ? esc(c.name) + (c.code ? ` <span class="muted small">${esc(c.code)}</span>` : "") : `<span class="muted">—</span>`}</td>
-            <td>${esc(a.acType || "—")} <span class="muted small">${esc(a.variant || "")}</span></td><td class="mono small">${esc(a.msn || "")}</td>
-            <td>${acLic(a).map(l => `<span class="chip" title="${esc(tr(AC_LIC.find(x => x[0] === l)?.[1] || l))}">${l}</span>`).join(" ")}</td>
+            <td>${esc(a.acType || "—")} <span class="muted small">${esc([a.variant, a.engines].filter(Boolean).join(" · "))}</span></td><td class="mono small">${esc(a.msn || "")}</td>
+            <td><span class="chip mono">${esc(ruleText(acRule(a)) || "—")}</span></td>
             <td class="r"><span class="chip ${a.acType ? (n ? "good" : "bad") : ""}">${a.acType ? n : "—"}</span></td></tr>`; }).join("")}
       </tbody></table></div>` : `<div class="empty">${all.length ? "Aucun avion ne correspond." : "Aucun avion pour l'instant. Ajoutez les immatriculations servies par la station."}</div>`}
-      <div class="pad hint">CRS qualifiés : personnes actives du Personnel qualifiées sur le type, avec toutes les licences exigées (ex. E+I pour un 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
+      <div class="pad hint">CRS autorisés : personnes actives du Personnel avec un Type Rating sur le type, le modèle et le moteur de l'avion, toutes les licences exigées (ex. E+I pour un 4X-) et l'autorisation compagnie (CRS). La validation des travaux reste dans AMOS.</div></div>`);
   }
 };
 
 ACTIONS["ac-form"] = el => {
   const a = aircraftList().find(x => x.id === el.dataset.id) || { reg: el.dataset.reg || "", active: true };
-  const ro = readOnly || !isOffice(), lic = a.id ? acLic(a) : acDefaultLic(a.reg);
+  const ro = readOnly || !isOffice(), rule = a.id ? acRule(a) : { op: "and", items: acDefaultLic(a.reg) };
   const clients = S.clients.slice().sort(byName);
-  const types = acTypes(), q = a.id ? acQualified(a) : [];
+  const types = acTypes(), q = a.id ? acQualified(a) : [], nc = a.id ? acNoCrs(a) : [];
   const m = modal(`${mHead(a.id ? esc(a.reg) : "Nouvel avion")}<form><div class="body stack"><fieldset ${ro ? "disabled" : ""} class="plain stack"><div class="fields">
     ${field("ac-reg", "Immatriculation", a.reg, { cls: "mono", ph: "4X-EKA", required: true, autofocus: !a.id })}
     ${field("ac-client", "Compagnie aérienne", a.clientId || clientOfReg(a.reg)?.id || "", { type: "select", options: [["", "—"], ...clients.map(c => [c.id, c.name + (c.code ? " (" + c.code + ")" : "")])] })}
     ${field("ac-type", "Type d'avion", a.acType || "", { type: "select", options: [["", "—"], ...Array.from(new Set([...types, a.acType].filter(Boolean))).map(t => [t, t])] })}
-    ${field("ac-var", "Version", a.variant, { ph: "767-300ER, 777-200LRF…" })}
-    ${field("ac-msn", "MSN (n° de série)", a.msn, { cls: "mono" })}${field("ac-eng", "Moteurs", a.engines, { ph: "CF6-80C2…" })}
+    <label class="f"><span>${esc(tr("Modèle"))}</span><select id="ac-var">${atModelOpts(a.acType, a.variant, "—")}</select></label>
+    <label class="f"><span>${esc(tr("Moteur"))}</span><select id="ac-eng">${atEngOpts(a.acType, a.variant, a.engines, "—")}</select></label>
+    ${field("ac-msn", "MSN (n° de série)", a.msn, { cls: "mono" })}
     ${field("ac-amos", "Référence AMOS", a.amosRef, { cls: "mono" })}</div>
-    <div class="f"><span>Licences exigées pour signer cet avion</span><div class="row-g wrap" id="ac-lic">${AC_LIC.map(([c, l]) => `<label class="chk line"><input type="checkbox" value="${c}" ${lic.includes(c) ? "checked" : ""}> <b>${c}</b> ${esc(tr(l))}</label>`).join("")}</div>
-      <div class="hint">Par défaut : E (EASA), et I en plus pour un 4X-. Le shift vérifie que les CRS affectés ont ces licences sur le type.</div></div>
+    <div class="f wide"><span>${esc(tr("Conditions pour signer cet avion"))}</span>${ruleGroup(rule, true)}
+      <div class="small">${esc(tr("Règle"))} : <b class="mono" id="ac-rule-txt">${esc(ruleText(rule) || tr("aucune condition"))}</b></div>
+      <div class="hint">${esc(tr("Construisez l'arbre avec autant de conditions et de groupes ET / OU que nécessaire, ex. E ET (B1 OU B2). E, I, F se lisent sur le Type Rating qui correspond à l'avion (type, modèle, moteur) ; B1, B2, A, C sur les licences de la personne. Par défaut : E, et I en plus pour un 4X-. Il faut aussi l'autorisation compagnie (CRS)."))}</div></div>
     <label class="chk line"><input type="checkbox" id="ac-active" ${a.active !== false ? "checked" : ""}> Servi par la station</label>
     ${field("ac-notes", "Notes", a.notes, { type: "textarea", wide: true })}</fieldset>
-    ${a.id && a.acType ? `<div class="small"><b>${esc(tr("CRS qualifiés"))} :</b> ${q.length ? q.sort(staffSort).map(p => esc(p.name)).join(", ") : `<span class="muted">${esc(tr("aucun"))}</span>`}</div>` : ""}
+    <div class="hint">${esc(tr("Type, modèle et moteur viennent de la base Avions > Types d'appareils."))}</div>
+    ${a.id && a.acType ? `<div class="small"><b>${esc(tr("Peuvent signer"))} ${esc(acName(a))} :</b> ${q.length ? q.sort(staffSort).map(p => esc(p.name)).join(", ") : `<span class="txt-warn">${esc(tr("personne"))}</span>`}</div>
+      ${nc.length ? `<div class="small muted"><b>${esc(tr("Qualifiés sans autorisation compagnie (CRS)"))} :</b> ${nc.sort(staffSort).map(p => esc(p.name)).join(", ")}</div>` : ""}` : ""}
     <div class="err" id="ac-err"></div></div>
     <footer>${a.id && !ro ? `<div class="left"><button type="button" class="btn danger" data-a="ac-del" data-id="${a.id}">Supprimer</button></div>` : ""}<button type="button" class="btn" data-close>${ro ? "Fermer" : "Annuler"}</button>${ro ? "" : `<button class="btn primary">Enregistrer</button>`}</footer></form>`);
   if (ro) return;
   const reg = m.querySelector("#ac-reg"), touched = { lic: !!a.id, client: !!a.clientId };
-  m.querySelector("#ac-lic").onchange = () => { touched.lic = true; };
+  const form = m.querySelector("form");
+  form.addEventListener("change", e => { if (e.target.closest(".rule-g")) { touched.lic = true; rulePreview(form); } });
+  form.addEventListener("rulechange", () => { touched.lic = true; });
   m.querySelector("#ac-client").onchange = () => { touched.client = true; };
+  const ty = m.querySelector("#ac-type"), vr = m.querySelector("#ac-var");   // modèles et moteurs filtrés d'après le type
+  ty.onchange = () => { vr.innerHTML = atModelOpts(ty.value, "", "—"); m.querySelector("#ac-eng").innerHTML = atEngOpts(ty.value, "", "", "—"); };
+  vr.onchange = () => { m.querySelector("#ac-eng").innerHTML = atEngOpts(ty.value, vr.value, "", "—"); };
   reg.oninput = () => {   // nouvel avion : compagnie et licences proposées d'après l'immatriculation
     if (!touched.client) { const c = clientOfReg(reg.value); m.querySelector("#ac-client").value = c ? c.id : ""; }
-    if (!touched.lic) { const d = acDefaultLic(reg.value); m.querySelectorAll("#ac-lic input").forEach(i => { i.checked = d.includes(i.value); }); }
+    if (!touched.lic) { m.querySelector(".rule-g.root").outerHTML = ruleGroup({ op: "and", items: acDefaultLic(reg.value) }, true); rulePreview(form); }
   };
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const r = normReg(val("ac-reg")), dup = aircraftOf(r);
     if (!/^[A-Z0-9]{1,3}-?[A-Z0-9]{1,6}$/.test(r)) { m.querySelector("#ac-err").textContent = tr("Immatriculation invalide (ex. 4X-EKA, 9H-ABC, N123AB)."); return; }
     if (dup && dup.id !== a.id) { m.querySelector("#ac-err").textContent = tr("Cet avion existe déjà."); return; }
-    const licences = Array.from(m.querySelectorAll("#ac-lic input:checked")).map(i => i.value);
+    const licRule = ruleRead(m.querySelector(".rule-g.root")), licences = [...new Set(ruleCodes(licRule).filter(c => RATING_CODES[c]))];
     await save("aircraft", a.id, Object.assign(strip(a), { reg: r, clientId: val("ac-client"), acType: val("ac-type"), variant: val("ac-var"), msn: val("ac-msn"), engines: val("ac-eng"),
-      amosRef: val("ac-amos"), licences, active: m.querySelector("#ac-active").checked, notes: val("ac-notes") }));
+      amosRef: val("ac-amos"), licences, licRule, active: m.querySelector("#ac-active").checked, notes: val("ac-notes") }));
     closeModal(); toast("Avion enregistré");
   };
 };

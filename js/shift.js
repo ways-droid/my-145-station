@@ -24,17 +24,21 @@ function currentShift() {
 }
 const shiftName = (date, sh) => `${fmtDate(date)} · ${tr(SHIFTS[sh])}`;
 const sName = id => staff(id)?.name || "?";
-/* contrôle des qualifications d'un avion : au moins un CRS qualifié sur le type, avec I pour un 4X-,
-   et avec les licences exigées par la fiche de l'avion (section Avions) quand elle existe */
+/* contrôle des qualifications d'un avion : au moins un CRS affecté qui a le droit de le signer. Avec la fiche de l'avion
+   (section Avions) : Type Rating sur le type, le modèle et le moteur, conditions ET / OU de la fiche, autorisation compagnie.
+   Sans fiche : qualifié sur le type, avec I pour un 4X-. */
 function visitCheck(v) {
   if (!v.acType) return { ok: true, msg: "" };
   const crs = (v.crs || []).map(staff).filter(Boolean), is4X = /^4X/i.test(v.reg || "");
   if (!crs.length) return { ok: false, msg: "Aucun CRS affecté" };
-  if (!crs.some(p => rated(p, v.acType))) return { ok: false, lvl: "amber", msg: `Aucun CRS qualifié ${v.acType}` };
-  if (is4X && !crs.some(p => hasI(p, v.acType))) return { ok: false, lvl: "amber", msg: `4X- : aucun CRS avec I sur ${v.acType}` };
-  const ac = typeof aircraftOf === "function" ? aircraftOf(v.reg) : null;
-  if (ac) for (const c of acLic(ac)) if (!crs.some(p => ratingHas(p, v.acType, c))) return { ok: false, lvl: "amber", msg: `${normReg(v.reg)} : aucun CRS avec ${c} sur ${v.acType}` };
-  return { ok: true, msg: "" };
+  const ac0 = typeof aircraftOf === "function" ? aircraftOf(v.reg) : null, ac = ac0 && ac0.acType === v.acType ? ac0 : null;
+  const sp = ac ? acSpec(ac) : { acType: v.acType, variant: "", engine: "" }, rule = ac ? acRule(ac) : { op: "and", items: is4X ? ["I"] : [] };
+  if (crs.some(p => canSign(p, sp, rule))) return { ok: true, msg: "" };
+  const nm = ac ? acName(ac) : v.acType, rt = ruleText(rule);
+  if (crs.some(p => trQualif(p, sp, rule).length)) return { ok: false, lvl: "amber", msg: `${normReg(v.reg)} : CRS qualifié ${nm} mais sans autorisation compagnie` };
+  if (!crs.some(p => staffTR(p).some(r => r.t === v.acType))) return { ok: false, lvl: "amber", msg: `Aucun CRS qualifié ${v.acType}` };
+  if (!ac) return { ok: false, lvl: "amber", msg: `4X- : aucun CRS avec I sur ${v.acType}` };
+  return { ok: false, lvl: "amber", msg: `${normReg(v.reg)} : aucun CRS qualifié ${nm}${rt ? " avec " + rt : ""}` };
 }
 const hoClosed = h => !!(h && h.in && h.in.at);
 /* un shift ne peut être remis ni repris que si le shift précédent est entièrement passé (remis ET repris).
@@ -297,7 +301,7 @@ function shiftVisits(id) {
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
 function staffPick(id, label, sel, list) {
-  return `<div class="f wide"><span>${label}</span><div class="pick" id="${id}">${list.map(p => `<label class="chk"><input type="checkbox" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${esc(p.name)} <span class="muted small">${esc(Object.entries(p.ratings || {}).map(([t, l]) => t + " " + l).join(" · "))}</span></label>`).join("")}</div></div>`;
+  return `<div class="f wide"><span>${label}</span><div class="pick" id="${id}">${list.map(p => `<label class="chk"><input type="checkbox" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${esc(p.name)} <span class="muted small">${esc(staffTR(p).filter(r => r.t && r.lic).map(r => trName(r) + " " + r.lic + (r.crs === false ? " " + tr("sans CRS") : "")).join(" · "))}</span></label>`).join("")}</div></div>`;
 }
 const picked = (m, id) => [...m.querySelectorAll(`#${id} input:checked`)].map(i => i.value);
 ACTIONS["visit-form"] = el => {
@@ -305,7 +309,7 @@ ACTIONS["visit-form"] = el => {
   const h = hoDoc(v.ho) || {}, [date, sh] = [v.ho.slice(0, 10), v.ho.slice(11)];
   const crew = Array.from(new Set([...onShift(date, sh).map(p => p.id), ...(h.extra || []), ...(v.crs || []), ...(v.mech || [])])).map(staff).filter(Boolean).sort(staffSort);
   const others = staffActive().filter(p => !crew.includes(p)).sort(staffSort);
-  const certs = crew.filter(p => (p.licences || []).length || Object.keys(p.ratings || {}).length);
+  const certs = crew.filter(p => (p.licences || []).length || staffTR(p).length);
   const m = modal(`${mHead(v.id ? "Avion · " + esc(v.reg) : "Nouvel avion")}<form><div class="body stack"><div class="fields">
     ${field("vi-reg", "Immatriculation", v.reg, { cls: "mono", ph: "9H-ABC", required: true, autofocus: true })}<datalist id="vi-regs">${(S.aircraft || []).filter(a => a.active !== false).map(a => `<option value="${esc(a.reg)}">${esc([a.acType, a.variant].filter(Boolean).join(" "))}</option>`).join("")}</datalist>${field("vi-ac", "Type d'avion", v.acType || "", { type: "select", options: [["", "—"], ...acTypes().map(t => [t, t])] })}
     ${field("vi-arr", "ETA prévue (UTC)", v.arr, { ph: "14:35", cls: "mono" })}${field("vi-arrd", "Date d'arrivée (UTC)", v.arrDate || "", { type: "date" })}${field("vi-dep", "ETD prévue (UTC)", v.dep, { ph: "17:10", cls: "mono" })}${field("vi-depd", "Date de départ (UTC)", v.depDate || "", { type: "date" })}

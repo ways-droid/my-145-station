@@ -39,6 +39,7 @@ function log_label($coll, $d) {
     if ($coll === 'situations') return trim('Situation ' . mb_substr((string) ($d['title'] ?? $d['party'] ?? ''), 0, 80));
     if ($coll === 'contacts') return ($d['kind'] ?? '') === 'form' ? 'Contacts : en-tête du formulaire' : trim('Contact ' . mb_substr(trim(($d['org'] ?? '') . ' ' . ($d['role'] ?? '') . ' ' . ($d['name'] ?? '')), 0, 80));
     if ($coll === 'aircraft') return trim('Avion ' . ($d['reg'] ?? ''));
+    if ($coll === 'actypes') return trim('Type d\'appareil ' . ($d['code'] ?? ''));
     if ($coll === 'tools') return trim('Outil ' . ($d['toolNo'] ?? $d['serial'] ?? '') . ' ' . ($d['name'] ?? ''));
     if ($coll === 'vehicles') return trim('Véhicule ' . ($d['fleetNo'] ?? '') . ' ' . ($d['plate'] ?? ''));
     foreach (['number', 'name', 'title', 'label', 'plate', 'serial', 'ref', 'type'] as $k) if (!empty($d[$k]) && is_scalar($d[$k])) return mb_substr((string) $d[$k], 0, 120);
