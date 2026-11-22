@@ -269,7 +269,9 @@ echo "> FIDS TLV"
 pkill -f "127.0.0.1:8776" || true
 (php -S 127.0.0.1:8776 "$D/fids-mock.php" >/dev/null 2>&1 &); sleep 0.5
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/api"]);' $T/t.db
+rm -f $T/up/.fids-cache.json
 R=$(curl -s -H "$HT" -X POST -d '{"flights":["5c 851","5C0852","XX9"]}' $U/fids/tlv)
+ok "FIDS : cache dans un fichier (pas dans kv)" "$(ls -a $T/up)" '.fids-cache.json'
 ok "FIDS : arrivée trouvée (n° normalisé)" "$R" '"5C851":\[{"dir":"A","sched":"2026-11-19T03:40:00","est":"2026-11-19T03:55:00","status":"LANDED"'
 ok "FIDS : départ trouvé" "$R" '"5C852":\[{"dir":"D"'
 no "FIDS : seulement les vols demandés" "$R" 'LY1'
@@ -278,7 +280,7 @@ ok "FIDS station : vols de la compagnie cliente" "$R" '"al":"5C","name":"CHALLEN
 no "FIDS station : pas les autres compagnies" "$R" 'LY1'
 R=$(curl -s -H "$HT" -X POST -d '{"airlines":[],"flights":["LY001"]}' $U/fids/board)
 ok "FIDS station : vol d'un avion du shift" "$R" '"fl":"LY1"'
-php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/none"]); $p->prepare("DELETE FROM ways_kv WHERE k=?")->execute(["fids_cache"]);' $T/t.db
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["fids_base","http://127.0.0.1:8776/none"]); $p->prepare("DELETE FROM ways_kv WHERE k=?")->execute(["fids_cache"]);' $T/t.db ; rm -f $T/up/.fids-cache.json
 echo "> flightradar24"
 pkill -f "127.0.0.1:8773" || true
 (php -S 127.0.0.1:8773 "$D/fr24-mock.php" >/dev/null 2>&1 &); sleep 0.5

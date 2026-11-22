@@ -13,7 +13,9 @@ function fids_base() { $b = (string) (kv_get('fids_base') ?? ''); return $b !== 
 /* « 5C 0851 », « 5c851 » → « 5C851 » */
 function fids_norm($f) { $f = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', (string) $f)); return preg_match('/^([A-Z0-9]{2}[A-Z]?)0*(\d{1,4}[A-Z]?)$/', $f, $m) ? $m[1] . $m[2] : $f; }
 function fids_rows() {
-    $c = json_decode((string) (kv_get('fids_cache') ?? ''), true);
+    // cache dans un fichier (le tableau complet dépasse la colonne kv) ; un échec d'écriture ne bloque jamais les données
+    $cf = rtrim((string) cfg('upload_dir'), '/') . '/.fids-cache.json';
+    $c = is_file($cf) ? json_decode((string) @file_get_contents($cf), true) : null;
     if (is_array($c) && ($c['t'] ?? 0) > time() - 300) return $c['rows'];
     $ch = curl_init(fids_base() . '?' . http_build_query(['resource_id' => FIDS_RESOURCE, 'limit' => 1500]));
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 4,
@@ -29,9 +31,11 @@ function fids_rows() {
         $rows[] = ['f' => $fl, 'al' => strtoupper(trim((string) ($r['CHOPER'] ?? ''))), 'name' => trim((string) ($r['CHOPERD'] ?? '')), 'dir' => strtoupper(substr((string) ($r['CHAORD'] ?? ''), 0, 1)), 'sched' => (string) ($r['CHSTOL'] ?? ''), 'est' => (string) ($r['CHPTOL'] ?? ''),
             'status' => trim((string) ($r['CHRMINE'] ?? '')), 'other' => (string) ($r['CHLOC1'] ?? ''), 'city' => (string) ($r['CHLOC1D'] ?? ''), 'terminal' => (string) ($r['CHTERM'] ?? '')];
     }
-    kv_set('fids_cache', json_encode(['t' => time(), 'rows' => $rows], JSON_UNESCAPED_UNICODE));
+    try { $d = dirname($cf); if (!is_dir($d)) @mkdir($d, 0750, true); @file_put_contents($cf, json_encode(['t' => time(), 'rows' => $rows], JSON_UNESCAPED_UNICODE), LOCK_EX); } catch (Throwable $e) { }
     return $rows;
 }
+/* jamais d'erreur technique (SQL…) montrée à l'utilisateur */
+function fids_msg($e) { return $e instanceof RuntimeException && strpos($e->getMessage(), 'airport FIDS') === 0 ? $e->getMessage() : 'airport FIDS temporarily unavailable'; }
 function fids_routes($route, $parts, $method, $who, $role) {
     if ($route !== 'fids') return;
     if (!in_array($parts[1] ?? '', ['tlv', 'board'], true) || $method !== 'POST') fail(404, 'Route inconnue');
@@ -41,12 +45,12 @@ function fids_routes($route, $parts, $method, $who, $role) {
         foreach (array_slice((array) ($b['airlines'] ?? []), 0, 60) as $a) { $a = strtoupper(trim((string) $a)); if (preg_match('/^[A-Z0-9]{2,3}$/', $a)) $als[$a] = true; }
         $rows = [];
         try { foreach (fids_rows() as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']])) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
-        catch (RuntimeException $e) { out(['rows' => [], 'error' => $e->getMessage(), 'at' => gmdate('c')]); }
+        catch (Throwable $e) { out(['rows' => [], 'error' => fids_msg($e), 'at' => gmdate('c')]); }
         usort($rows, fn($x, $y) => strcmp($x['est'] ?: $x['sched'], $y['est'] ?: $y['sched']));
         out(['rows' => $rows, 'at' => gmdate('c')]);
     }
     $items = [];
     try { foreach (fids_rows() as $r) if (isset($want[$r['f']])) { $f = $r['f']; unset($r['f'], $r['al'], $r['name']); $items[$f][] = $r; } }
-    catch (RuntimeException $e) { out(['items' => (object) [], 'error' => $e->getMessage(), 'at' => gmdate('c')]); }
+    catch (Throwable $e) { out(['items' => (object) [], 'error' => fids_msg($e), 'at' => gmdate('c')]); }
     out(['items' => (object) $items, 'at' => gmdate('c')]);
 }
