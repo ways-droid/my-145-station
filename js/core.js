@@ -364,11 +364,11 @@ async function init() {
 /* ======================= routage & rendu ======================= */
 const NAV = [
   ["", [["dashboard", "Tableau de bord"]]],
-  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["consignes", "Consignes"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["contacts", "Contacts de la station"], ["voyages", "Voyages"]]],
+  ["Station", [["personnel", "Personnel"], ["expirations", "Expirations"], ["roster", "Roster"], ["shift", "Shift"], ["mur", "Mur de la station"], ["fids", "Station FIDS"], ["consignes", "Consignes"], ["avions", "Avions"], ["flotte", "Véhicules"], ["etalonnage", "Outillage"], ["pieces", "Pièces"], ["besoins", "Station Needs"], ["situations", "Situations ouvertes"], ["formulaires", "Formulaires"], ["contacts", "Contacts de la station"], ["voyages", "Voyages"]]],
   ["Clients", [["charge", "Charge Sheet"], ["clients", "Clients"], ["produits", "Articles et prix"]]],
   ["Management", [["headquarters", "Headquarters"], ["rapport", "Rapport mensuel"], ["admin", "Administration"], ["historique", "Historique"], ["parametres", "Paramètres"]]]
 ];
-const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", rapport: "grey", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", contacts: "red", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
+const MOD_COLOR = { dashboard: "blue", personnel: "blue", roster: "blue", shift: "blue", avions: "blue", charge: "yellow", flotte: "orange", etalonnage: "green", pieces: "yellow", mur: "blue", fids: "blue", rapport: "grey", consignes: "red", besoins: "yellow", expirations: "red", formulaires: "green", contacts: "red", headquarters: "blue", situations: "red", voyages: "blue", signaler: "red", clients: "yellow", produits: "yellow", admin: "grey", historique: "grey", parametres: "grey" };
 /* couleur de la pastille du menu, quand elle diffère de la couleur du module */
 const NAV_DOT = { charge: "white", clients: "white", produits: "white" };
 const VIEWS = {};   // route -> { title, render(), static?, after?() }
@@ -407,7 +407,7 @@ function renderNav() {
     `<div class="lang-switch" role="group" aria-label="Langue / Language" data-noi18n><button data-a="set-lang" data-l="fr" class="${UI_LANG === "fr" ? "on" : ""}" aria-pressed="${UI_LANG === "fr"}">Français</button><button data-a="set-lang" data-l="en" class="${UI_LANG === "en" ? "on" : ""}" aria-pressed="${UI_LANG === "en"}">English</button></div>` +
     `<div class="lang-switch theme-switch" role="group" aria-label="Thème"><button data-a="set-theme" data-t="light" class="${curTheme() === "light" ? "on" : ""}" aria-pressed="${curTheme() === "light"}">☀ Clair</button><button data-a="set-theme" data-t="dark" class="${curTheme() === "dark" ? "on" : ""}" aria-pressed="${curTheme() === "dark"}">☾ Sombre</button></div>` +
     NAV.map(([h, items]) => [h, items.filter(([k]) => allowed(k))]).filter(([, items]) => items.length).map(([h, items]) => (h ? `<div class="nav-h">${h}</div>` : "") + items.map(([k, l]) =>
-      `<a href="#${k}" ${k === "mur" ? `target="_blank" rel="noopener"` : ""} class="${r === k ? "on" : ""}" data-c="${NAV_DOT[k] || MOD_COLOR[k] || "grey"}"><span><i class="dot"></i>${l}</span>${badge[k] ? (badgeHidden(k) ? `<span class="cnt muted-cnt" role="button" tabindex="0" data-badge="${k}" title="Compteur masqué jusqu'à ${badgeUntil(k)} · cliquer pour le réafficher" aria-label="Réafficher le compteur">${badge[k]}</span>`
+      `<a href="#${k}" ${k === "mur" || k === "fids" ? `target="_blank" rel="noopener"` : ""} class="${r === k ? "on" : ""}" data-c="${NAV_DOT[k] || MOD_COLOR[k] || "grey"}"><span><i class="dot"></i>${l}</span>${badge[k] ? (badgeHidden(k) ? `<span class="cnt muted-cnt" role="button" tabindex="0" data-badge="${k}" title="Compteur masqué jusqu'à ${badgeUntil(k)} · cliquer pour le réafficher" aria-label="Réafficher le compteur">${badge[k]}</span>`
         : `<span class="cnt" role="button" tabindex="0" data-badge="${k}" title="${esc(badgeTip[k](badge[k]))} · cliquer pour masquer 8 h" aria-label="Masquer ce compteur pendant 8 heures">${badge[k]}</span>`) : ""}</a>`).join("")).join("") +
     (SBX ? `<div class="sbx-box"><b>${esc(tr("Environnement de test"))}</b><span class="small">${esc(tr("Rien n'est enregistré dans la base principale."))}</span><button class="btn sm" data-a="sbx-stop">${esc(tr("Quitter le test"))}</button></div>` : "") +
     (SERVER && ME ? `<div class="side-user"><div><b>${esc(ME.name)}</b><span class="muted small"> · ${tr(ROLE_LBL[ME.role] || ME.role)}</span></div><button class="linkbtn small" data-a="server-logout">${tr("Se déconnecter")}</button></div>` : "") +
@@ -443,7 +443,7 @@ function render(force) {
   renderNav();
   const r = route(), v = VIEWS[r];
   document.body.dataset.mod = MOD_COLOR[r] || "blue";
-  document.body.classList.toggle("wall", r === "mur");
+  document.body.classList.toggle("wall", r === "mur" || r === "fids");
   if (v.static && staticDone === r && !force) return;
   const main = document.getElementById("main");
   const ae = document.activeElement;

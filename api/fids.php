@@ -3,6 +3,7 @@
 // (data.gov.il, jeu « Flights », sans clé). Lu seulement au clic sur Flightradar24 du shift, mis en cache 5 minutes.
 // Heures locales d'Israël (LT). Une panne ou un refus du portail ne bloque rien : la réponse dit simplement « indisponible ».
 //
+//   POST fids/board { airlines: ["5C"…], flights: [..] } → { rows: [{ fl, al, name, dir, sched, est, status, other, city, terminal }], at, error? }  (FIDS de la station)
 //   POST fids/tlv { flights: ["5C851", "LY001"…] }  → { items: { "5C851": [{ dir: A|D, sched, est, status, other, city, terminal }] }, at, error? }
 
 const FIDS_API = 'https://data.gov.il/api/3/action/datastore_search';
@@ -25,7 +26,7 @@ function fids_rows() {
     foreach ($recs as $r) {
         if (!is_array($r)) continue;
         $fl = fids_norm(($r['CHOPER'] ?? '') . ($r['CHFLTN'] ?? '')); if ($fl === '') continue;
-        $rows[] = ['f' => $fl, 'dir' => strtoupper(substr((string) ($r['CHAORD'] ?? ''), 0, 1)), 'sched' => (string) ($r['CHSTOL'] ?? ''), 'est' => (string) ($r['CHPTOL'] ?? ''),
+        $rows[] = ['f' => $fl, 'al' => strtoupper(trim((string) ($r['CHOPER'] ?? ''))), 'name' => trim((string) ($r['CHOPERD'] ?? '')), 'dir' => strtoupper(substr((string) ($r['CHAORD'] ?? ''), 0, 1)), 'sched' => (string) ($r['CHSTOL'] ?? ''), 'est' => (string) ($r['CHPTOL'] ?? ''),
             'status' => trim((string) ($r['CHRMINE'] ?? '')), 'other' => (string) ($r['CHLOC1'] ?? ''), 'city' => (string) ($r['CHLOC1D'] ?? ''), 'terminal' => (string) ($r['CHTERM'] ?? '')];
     }
     kv_set('fids_cache', json_encode(['t' => time(), 'rows' => $rows], JSON_UNESCAPED_UNICODE));
@@ -33,11 +34,19 @@ function fids_rows() {
 }
 function fids_routes($route, $parts, $method, $who, $role) {
     if ($route !== 'fids') return;
-    if (($parts[1] ?? '') !== 'tlv' || $method !== 'POST') fail(404, 'Route inconnue');
-    $b = body_json(); $want = [];
+    if (!in_array($parts[1] ?? '', ['tlv', 'board'], true) || $method !== 'POST') fail(404, 'Route inconnue');
+    $b = body_json(); $want = []; $als = [];
     foreach (array_slice((array) ($b['flights'] ?? []), 0, 120) as $f) { $n = fids_norm($f); if (preg_match('/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/', $n)) $want[$n] = true; }
+    if ($parts[1] === 'board') {
+        foreach (array_slice((array) ($b['airlines'] ?? []), 0, 60) as $a) { $a = strtoupper(trim((string) $a)); if (preg_match('/^[A-Z0-9]{2,3}$/', $a)) $als[$a] = true; }
+        $rows = [];
+        try { foreach (fids_rows() as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']])) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
+        catch (RuntimeException $e) { out(['rows' => [], 'error' => $e->getMessage(), 'at' => gmdate('c')]); }
+        usort($rows, fn($x, $y) => strcmp($x['est'] ?: $x['sched'], $y['est'] ?: $y['sched']));
+        out(['rows' => $rows, 'at' => gmdate('c')]);
+    }
     $items = [];
-    try { foreach (fids_rows() as $r) if (isset($want[$r['f']])) { $f = $r['f']; unset($r['f']); $items[$f][] = $r; } }
+    try { foreach (fids_rows() as $r) if (isset($want[$r['f']])) { $f = $r['f']; unset($r['f'], $r['al'], $r['name']); $items[$f][] = $r; } }
     catch (RuntimeException $e) { out(['items' => (object) [], 'error' => $e->getMessage(), 'at' => gmdate('c')]); }
     out(['items' => (object) $items, 'at' => gmdate('c')]);
 }
