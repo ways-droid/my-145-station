@@ -19,7 +19,7 @@ VIEWS.mur = {
       `<div class="wall-grid"><div class="wall-acs">${visits.map(v => { const open = visitTasks(v).filter(t => !t.action && t.text), c = visitCheck(v);
         return `<div class="wall-ac ${c.ok ? "" : "warn"}"><div class="wall-reg"><b class="${regState(v)}">${esc(v.reg || "")}</b><span>${esc(v.acType || "")}</span></div>
           <div class="wall-t"><span>ARR <b>${esc(zHM(v.arr))}</b></span><span>DEP <b>${esc(zHM(v.dep))}</b></span></div>${fr24Times(v)}
-          <div class="wall-who"><span class="lbl">CRS</span> ${(v.crs || []).map(sName).map(esc).join(", ") || `<span class="txt-bad">${esc(tr("à affecter"))}</span>`}</div>
+          <div class="wall-who"><span class="lbl">CRS</span> ${crsHtml(v, ", ") || `<span class="txt-bad">${esc(tr("à affecter"))}</span>`}</div>
           ${(v.mech || []).length ? `<div class="wall-who"><span class="lbl">${esc(tr("Mécanos"))}</span> ${(v.mech || []).map(sName).map(esc).join(", ")}</div>` : ""}
           ${open.length ? `<ul class="wall-tasks">${open.slice(0, 5).map(t => `<li class="${t.from ? "carry" : ""}">${esc(t.text)}</li>`).join("")}${open.length > 5 ? `<li>… +${open.length - 5}</li>` : ""}</ul>` : visitTasks(v).length ? `<div class="wall-done">✓ ${esc(tr("Tout fait"))}</div>` : ""}</div>`; }).join("") || `<div class="wall-empty">${esc(tr("Aucun avion encodé pour ce shift."))}</div>`}</div>
         <aside class="wall-side"><h3>${esc(tr("Équipe"))} (${crewIds.length})</h3>${crewIds.map(staff).filter(Boolean).sort(staffSort).map(p => `<div class="wall-p"><b>${esc(p.name)}</b><span>${on(p.id).map(esc).join(" · ") || `<i>${esc(tr("libre"))}</i>`}</span></div>`).join("") || `<div class="muted">${esc(tr("Personne au roster pour ce shift."))}</div>`}
