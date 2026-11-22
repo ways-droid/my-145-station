@@ -257,6 +257,7 @@ ok "bureau : Type Ratings détaillés" "$(curl -s -H "$B" -X PUT -d '{"name":"Te
 ok "ratings recalculé (avec CRS seulement)" "$(curl -s -H "$B" $U/docs/staff/str)" '"ratings":{"B747":"E+I"}'
 ok "terrain : voit les Type Ratings" "$(curl -s -H "$HT" $U/docs/staff/str)" '"crs":false'
 ok "patch : ratings suit les Type Ratings" "$(curl -s -H "$B" -X PATCH -d '{"typeRatings":[{"t":"B777","lic":"E+F","crs":true}]}' $U/docs/staff/str >/dev/null; curl -s -H "$B" $U/docs/staff/str)" '"ratings":{"B777":"E+F"}'
+ok "Type Rating : catégorie maison gardée" "$(curl -s -H "$B" -X PATCH -d '{"typeRatings":[{"t":"B777","lic":"E+RUN-UP","crs":true}]}' $U/docs/staff/str >/dev/null; curl -s -H "$B" $U/docs/staff/str)" '"ratings":{"B777":"E+RUN-UP"}'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'
