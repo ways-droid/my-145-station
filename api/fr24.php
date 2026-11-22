@@ -8,6 +8,7 @@
 //   POST fr24/test              {}                 (administrateurs)
 //   POST fr24/track             { regs: [..] }     → { items: { REG: { live?, last? } } }
 //   POST fr24/aircraft          { reg }            → détails de l'avion (bureau) : ADSBdb (gratuit, sans clé), puis FR24 si besoin
+//   POST fr24/aircraft-msn      { modeS }          → MSN, année, moteurs (OpenSky), demandé à part
 //
 // Fournisseur interchangeable : fr24_provider_track() est le seul endroit qui parle à FR24.
 
@@ -30,13 +31,13 @@ function fr24_http($path, $q) {
 }
 /* détails d'un avion d'après son immatriculation : fabricant, type exact, code OACI, opérateur, Mode S.
    1) ADSBdb (base publique gratuite, sans clé) ; 2) Flightradar24 (vols des 14 derniers jours) si la clé existe et qu'il manque le type ou l'opérateur ;
-   3) base d'avions OpenSky Network (gratuite, d'après le Mode S) pour le MSN, l'année et les moteurs quand elle les connaît. Tout est à vérifier. */
+   Le MSN vient d'une requête séparée (opensky_lookup) : une source lente ou en panne ne bloque jamais les autres. */
 function opensky_base() { $b = (string) (kv_get('opensky_base') ?? ''); return $b !== '' ? rtrim($b, '/') . '/' : 'https://opensky-network.org/api/'; }
 function adsbdb_base() { $b = (string) (kv_get('adsbdb_base') ?? ''); return $b !== '' ? rtrim($b, '/') . '/' : 'https://api.adsbdb.com/v0/'; }
 function aircraft_lookup($reg) {
     $out = ['reg' => $reg, 'sources' => [], 'errors' => []];
     $ch = curl_init(adsbdb_base() . 'aircraft/' . rawurlencode($reg));
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
     $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
     $a = $res !== false ? ((json_decode($res, true) ?: [])['response']['aircraft'] ?? null) : null;
     if (is_array($a)) {
@@ -58,20 +59,20 @@ function aircraft_lookup($reg) {
             }
         } catch (RuntimeException $e) { $out['errors'][] = $e->getMessage(); }
     }
-    if (!empty($out['modeS']) && preg_match('/^[0-9A-F]{6}$/', $out['modeS'])) {
-        $ch = curl_init(opensky_base() . 'metadata/aircraft/icao/' . strtolower($out['modeS']));
-        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
-        $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-        $o = $res !== false && $st === 200 ? json_decode($res, true) : null;
-        if (is_array($o)) {
-            $got = false;
-            foreach (['msn' => 'serialNumber', 'lineNumber' => 'lineNumber', 'built' => 'built', 'engines' => 'engines'] as $k => $src)
-                if (is_scalar($o[$src] ?? null) && trim((string) $o[$src]) !== '') { $out[$k] = mb_substr(trim((string) $o[$src]), 0, 80); $got = true; }
-            if (empty($out['manufacturer']) && !empty($o['manufacturerName'])) $out['manufacturer'] = mb_substr((string) $o['manufacturerName'], 0, 80);
-            if ($got) $out['sources'][] = 'OpenSky';
-        } elseif ($res === false) $out['errors'][] = 'OpenSky injoignable';
-    }
     $out['found'] = !empty($out['sources']);
+    return $out;
+}
+/* base d'avions OpenSky Network (gratuite, d'après le Mode S) : MSN, numéro de ligne, année, moteurs quand elle les connaît. Délai court. */
+function opensky_lookup($hex) {
+    $out = ['modeS' => $hex, 'found' => false, 'errors' => []];
+    $ch = curl_init(opensky_base() . 'metadata/aircraft/icao/' . strtolower($hex));
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
+    $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $o = $res !== false && $st === 200 ? json_decode($res, true) : null;
+    if (is_array($o)) foreach (['msn' => 'serialNumber', 'lineNumber' => 'lineNumber', 'built' => 'built', 'engines' => 'engines'] as $k => $src)
+        if (is_scalar($o[$src] ?? null) && trim((string) $o[$src]) !== '') { $out[$k] = mb_substr(trim((string) $o[$src]), 0, 80); $out['found'] = true; }
+    if ($res === false) $out['errors'][] = 'OpenSky injoignable';
+    elseif ($st !== 200 && $st !== 404) $out['errors'][] = "OpenSky : erreur HTTP $st";
     return $out;
 }
 function fr24_norm_reg($r) { return strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string) $r)); }
@@ -121,6 +122,11 @@ function fr24_routes($route, $parts, $method, $who, $role) {
         if (!in_array($role, ['admin', 'bureau'], true)) fail(403, 'Réservé au bureau');
         $reg = fr24_norm_reg($b['reg'] ?? ''); if (!preg_match('/^[A-Z0-9]{1,3}-?[A-Z0-9]{1,6}$/', $reg)) fail(400, 'Immatriculation invalide');
         out(aircraft_lookup($reg));
+    }
+    if ($act === 'aircraft-msn' && $method === 'POST') {
+        if (!in_array($role, ['admin', 'bureau'], true)) fail(403, 'Réservé au bureau');
+        $hex = strtoupper(trim((string) ($b['modeS'] ?? ''))); if (!preg_match('/^[0-9A-F]{6}$/', $hex)) fail(400, 'Mode S invalide');
+        out(opensky_lookup($hex));
     }
     if (fr24_key() === '') fail(400, "Flightradar24 n'est pas configuré : saisissez les heures à la main, ou ajoutez une clé API FR24 dans Paramètres.");
     try {

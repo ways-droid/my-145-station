@@ -139,26 +139,38 @@ function acLookMap(d) {
   }
   return { acType: t?.code || "", variant: model, engine, clientId: cl?.id || "", clientByIcao: !!byIcao };
 }
+function acLookCard(out) {
+  const L = UI.acLook; if (!L || !out) return;
+  const d = L.d, p = L.p = acLookMap(d), cl = S.clients.find(c => c.id === p.clientId);
+  const row = (k, v) => v ? `<tr><td class="muted">${esc(tr(k))}</td><td>${v}</td></tr>` : "";
+  out.innerHTML = `<div class="ac-look-card"><table class="small"><tbody>
+    ${row("Fabricant", esc(d.manufacturer || ""))}${row("Type", esc([d.typeName, d.icaoType ? "(" + d.icaoType + ")" : ""].filter(Boolean).join(" ")))}
+    ${row("Opérateur", esc([d.operator, d.operatorIcao ? "(" + d.operatorIcao + ")" : ""].filter(Boolean).join(" ")))}${row("Pays", esc(d.country || ""))}${row("Mode S", d.modeS ? `<span class="mono">${esc(d.modeS)}</span>` : "")}
+    ${row("MSN", d.msn ? `<span class="mono">${esc(d.msn)}</span>${d.lineNumber ? ` <span class="muted">· L/N ${esc(d.lineNumber)}</span>` : ""}` : L.msnState === "wait" ? `<span class="muted">${esc(tr("recherche…"))}</span>` : L.msnState === "none" ? `<span class="muted">${esc(tr("non trouvé"))}</span>` : "")}${row("Construit", esc(String(d.built || "").slice(0, 4)))}${row("Moteurs", esc(d.engines || ""))}
+    </tbody></table>
+    <div class="small"><b>${esc(tr("Proposé"))} :</b> ${esc(tr("Type"))} <b>${esc(p.acType || "—")}</b> · ${esc(tr("Modèle"))} <b>${esc(p.variant || "—")}</b> · ${esc(tr("Compagnie"))} <b>${esc(cl?.name || "—")}</b> · ${p.engine ? `${esc(tr("Moteur"))} <b>${esc(p.engine)}</b>` : esc(tr("Moteur : à choisir"))}${d.msn ? ` · MSN <b class="mono">${esc(d.msn)}</b>` : ""}</div>
+    ${d.operatorIcao && !p.clientByIcao ? `<div class="small txt-warn">${esc(tr("Aucun client n'a le code OACI"))} <b class="mono">${esc(d.operatorIcao)}</b>${cl ? ` : ${esc(tr("compagnie proposée d'après le nom, à vérifier"))}` : ""}. ${esc(tr("Ajoutez ce code dans Clients pour la reconnaître à coup sûr."))}</div>` : ""}
+    ${!p.acType && d.icaoType ? `<div class="small txt-warn">${esc(tr("Ce type n'est pas dans la base Types d'appareils : ajoutez-le dans Avions > Types d'appareils."))}</div>` : ""}
+    <div class="row-g"><button type="button" class="btn sm primary" data-a="ac-look-apply">${esc(tr("Appliquer"))}</button><span class="small muted">${esc(tr("Source"))} : ${esc(d.sources.join(", "))}</span></div></div>`;
+}
 ACTIONS["ac-lookup"] = async el => {
   const f = el.closest("form"), out = f.querySelector("#ac-look-out"), reg = normReg(f.querySelector("#ac-reg").value);
   if (!reg) { out.innerHTML = `<div class="err">${esc(tr("Tapez d'abord l'immatriculation."))}</div>`; return; }
   out.innerHTML = `<div class="muted small">${esc(tr("Recherche…"))}</div>`; el.disabled = true;
-  try {
-    const d = await API.call("POST", "fr24/aircraft", { reg }), p = acLookMap(d), cl = S.clients.find(c => c.id === p.clientId);
-    if (!d.found) { out.innerHTML = `<div class="small txt-warn">${esc(tr("Aucune donnée trouvée pour cet avion."))}${(d.errors || []).length ? " " + esc(d.errors.join(" · ")) : ""}</div>`; return; }
-    UI.acLook = { d, p };
-    const row = (k, v) => v ? `<tr><td class="muted">${esc(tr(k))}</td><td>${v}</td></tr>` : "";
-    out.innerHTML = `<div class="ac-look-card"><table class="small"><tbody>
-      ${row("Fabricant", esc(d.manufacturer || ""))}${row("Type", esc([d.typeName, d.icaoType ? "(" + d.icaoType + ")" : ""].filter(Boolean).join(" ")))}
-      ${row("Opérateur", esc([d.operator, d.operatorIcao ? "(" + d.operatorIcao + ")" : ""].filter(Boolean).join(" ")))}${row("Pays", esc(d.country || ""))}${row("Mode S", d.modeS ? `<span class="mono">${esc(d.modeS)}</span>` : "")}
-      ${row("MSN", d.msn ? `<span class="mono">${esc(d.msn)}</span>${d.lineNumber ? ` <span class="muted">· L/N ${esc(d.lineNumber)}</span>` : ""}` : "")}${row("Construit", esc(String(d.built || "").slice(0, 4)))}${row("Moteurs", esc(d.engines || ""))}
-      </tbody></table>
-      <div class="small"><b>${esc(tr("Proposé"))} :</b> ${esc(tr("Type"))} <b>${esc(p.acType || "—")}</b> · ${esc(tr("Modèle"))} <b>${esc(p.variant || "—")}</b> · ${esc(tr("Compagnie"))} <b>${esc(cl?.name || "—")}</b> · ${p.engine ? `${esc(tr("Moteur"))} <b>${esc(p.engine)}</b>` : esc(tr("Moteur : à choisir"))}${d.msn ? ` · MSN <b class="mono">${esc(d.msn)}</b>` : ""}</div>
-      ${d.operatorIcao && !p.clientByIcao ? `<div class="small txt-warn">${esc(tr("Aucun client n'a le code OACI"))} <b class="mono">${esc(d.operatorIcao)}</b>${cl ? ` : ${esc(tr("compagnie proposée d'après le nom, à vérifier"))}` : ""}. ${esc(tr("Ajoutez ce code dans Clients pour la reconnaître à coup sûr."))}</div>` : ""}
-      ${!p.acType && d.icaoType ? `<div class="small txt-warn">${esc(tr("Ce type n'est pas dans la base Types d'appareils : ajoutez-le dans Avions > Types d'appareils."))}</div>` : ""}
-      <div class="row-g"><button type="button" class="btn sm primary" data-a="ac-look-apply">${esc(tr("Appliquer"))}</button><span class="small muted">${esc(tr("Source"))} : ${esc(d.sources.join(", "))}</span></div></div>`;
-  } catch (e) { out.innerHTML = `<div class="err">${esc(tr(e.message))}</div>`; }
+  let d;
+  try { d = await API.call("POST", "fr24/aircraft", { reg }); }
+  catch (e) { out.innerHTML = `<div class="err">${esc(tr(e.message))}</div>`; return; }
   finally { el.disabled = false; }
+  if (!d.found) { out.innerHTML = `<div class="small txt-warn">${esc(tr("Aucune donnée trouvée pour cet avion."))}${(d.errors || []).length ? " " + esc(d.errors.join(" · ")) : ""}</div>`; return; }
+  const L = UI.acLook = { d, msnState: d.modeS ? "wait" : "" };
+  acLookCard(out);
+  /* le MSN arrive à part (OpenSky) : s'il tarde ou échoue, le reste est déjà affiché */
+  if (d.modeS) try {
+    const x = await API.call("POST", "fr24/aircraft-msn", { modeS: d.modeS });
+    if (UI.acLook !== L) return;
+    if (x.found) { for (const k of ["msn", "lineNumber", "built", "engines"]) if (x[k]) d[k] = x[k]; d.sources = [...d.sources, "OpenSky"]; L.msnState = ""; } else L.msnState = "none";
+    acLookCard(out);
+  } catch { if (UI.acLook === L) { L.msnState = "none"; acLookCard(out); } }
 };
 ACTIONS["ac-look-apply"] = el => {
   const f = el.closest("form"), L = UI.acLook; if (!L) return;
