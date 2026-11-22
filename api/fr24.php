@@ -29,8 +29,9 @@ function fr24_http($path, $q) {
     return $d;
 }
 /* détails d'un avion d'après son immatriculation : fabricant, type exact, code OACI, opérateur, Mode S.
-   1) ADSBdb (base publique gratuite, sans clé) ; 2) Flightradar24 (vols des 14 derniers jours) si la clé existe et qu'il manque le type ou l'opérateur.
-   Le moteur n'est fourni par aucune des deux : il reste à choisir. */
+   1) ADSBdb (base publique gratuite, sans clé) ; 2) Flightradar24 (vols des 14 derniers jours) si la clé existe et qu'il manque le type ou l'opérateur ;
+   3) base d'avions OpenSky Network (gratuite, d'après le Mode S) pour le MSN, l'année et les moteurs quand elle les connaît. Tout est à vérifier. */
+function opensky_base() { $b = (string) (kv_get('opensky_base') ?? ''); return $b !== '' ? rtrim($b, '/') . '/' : 'https://opensky-network.org/api/'; }
 function adsbdb_base() { $b = (string) (kv_get('adsbdb_base') ?? ''); return $b !== '' ? rtrim($b, '/') . '/' : 'https://api.adsbdb.com/v0/'; }
 function aircraft_lookup($reg) {
     $out = ['reg' => $reg, 'sources' => [], 'errors' => []];
@@ -56,6 +57,19 @@ function aircraft_lookup($reg) {
                 if (empty($out['modeS']) && !empty($f['hex'])) $out['modeS'] = strtoupper((string) $f['hex']);
             }
         } catch (RuntimeException $e) { $out['errors'][] = $e->getMessage(); }
+    }
+    if (!empty($out['modeS']) && preg_match('/^[0-9A-F]{6}$/', $out['modeS'])) {
+        $ch = curl_init(opensky_base() . 'metadata/aircraft/icao/' . strtolower($out['modeS']));
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
+        $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        $o = $res !== false && $st === 200 ? json_decode($res, true) : null;
+        if (is_array($o)) {
+            $got = false;
+            foreach (['msn' => 'serialNumber', 'lineNumber' => 'lineNumber', 'built' => 'built', 'engines' => 'engines'] as $k => $src)
+                if (is_scalar($o[$src] ?? null) && trim((string) $o[$src]) !== '') { $out[$k] = mb_substr(trim((string) $o[$src]), 0, 80); $got = true; }
+            if (empty($out['manufacturer']) && !empty($o['manufacturerName'])) $out['manufacturer'] = mb_substr((string) $o['manufacturerName'], 0, 80);
+            if ($got) $out['sources'][] = 'OpenSky';
+        } elseif ($res === false) $out['errors'][] = 'OpenSky injoignable';
     }
     $out['found'] = !empty($out['sources']);
     return $out;
