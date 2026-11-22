@@ -21,7 +21,7 @@ function fids_rows() {
     $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
     $d = $res !== false && $st === 200 ? json_decode($res, true) : null;
     $recs = $d['result']['records'] ?? null;
-    if (!is_array($recs)) throw new RuntimeException($res === false ? 'FIDS TLV injoignable' : "FIDS TLV indisponible (HTTP $st)");
+    if (!is_array($recs)) throw new RuntimeException($res === false ? 'airport FIDS unreachable' : "airport FIDS unavailable (HTTP $st)");
     $rows = [];
     foreach ($recs as $r) {
         if (!is_array($r)) continue;
