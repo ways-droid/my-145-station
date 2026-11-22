@@ -125,8 +125,12 @@ function acLookMap(d) {
     model = (t.models || []).map(x => [x.name, score(x.name)]).filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1])[0]?.[0] || "";
   }
   const op = String(d.operator || "").toLowerCase(), oc = String(d.operatorIcao || "").toUpperCase();
-  const cl = S.clients.find(c => oc && String(c.code || "").toUpperCase() === oc) || S.clients.find(c => op && op.split(/\s+/).filter(w => w.length >= 4).some(w => String(c.name || "").toLowerCase().includes(w)));
-  return { acType: t?.code || "", variant: model, clientId: cl?.id || "" };
+  /* compagnie : code OACI (Clients), puis code court, puis nom (le plus proche) */
+  const byIcao = S.clients.find(c => oc && String(c.icao || "").toUpperCase() === oc) || S.clients.find(c => oc && String(c.code || "").toUpperCase() === oc);
+  const words = op.split(/[^a-z0-9]+/).filter(w => w.length >= 4), sc = c => { const n = String(c.name || "").toLowerCase(); return n === op ? 99 : words.filter(w => n.includes(w)).length - (n.split(/\s+/).length - words.length) * 0.1; };
+  const byName = !byIcao && words.length ? S.clients.filter(c => !c.icao || !oc).map(c => [c, sc(c)]).filter(([, v]) => v >= 1).sort((a, b) => b[1] - a[1])[0]?.[0] : null;
+  const cl = byIcao || byName;
+  return { acType: t?.code || "", variant: model, clientId: cl?.id || "", clientByIcao: !!byIcao };
 }
 ACTIONS["ac-lookup"] = async el => {
   const f = el.closest("form"), out = f.querySelector("#ac-look-out"), reg = normReg(f.querySelector("#ac-reg").value);
@@ -142,6 +146,7 @@ ACTIONS["ac-lookup"] = async el => {
       ${row("Opérateur", esc([d.operator, d.operatorIcao ? "(" + d.operatorIcao + ")" : ""].filter(Boolean).join(" ")))}${row("Pays", esc(d.country || ""))}${row("Mode S", d.modeS ? `<span class="mono">${esc(d.modeS)}</span>` : "")}
       </tbody></table>
       <div class="small"><b>${esc(tr("Proposé"))} :</b> ${esc(tr("Type"))} <b>${esc(p.acType || "—")}</b> · ${esc(tr("Modèle"))} <b>${esc(p.variant || "—")}</b> · ${esc(tr("Compagnie"))} <b>${esc(cl?.name || "—")}</b> · ${esc(tr("Moteur : à choisir"))}</div>
+      ${d.operatorIcao && !p.clientByIcao ? `<div class="small txt-warn">${esc(tr("Aucun client n'a le code OACI"))} <b class="mono">${esc(d.operatorIcao)}</b>${cl ? ` : ${esc(tr("compagnie proposée d'après le nom, à vérifier"))}` : ""}. ${esc(tr("Ajoutez ce code dans Clients pour la reconnaître à coup sûr."))}</div>` : ""}
       ${!p.acType && d.icaoType ? `<div class="small txt-warn">${esc(tr("Ce type n'est pas dans la base Types d'appareils : ajoutez-le dans Avions > Types d'appareils."))}</div>` : ""}
       <div class="row-g"><button type="button" class="btn sm primary" data-a="ac-look-apply">${esc(tr("Appliquer"))}</button><span class="small muted">${esc(tr("Source"))} : ${esc(d.sources.join(", "))}</span></div></div>`;
   } catch (e) { out.innerHTML = `<div class="err">${esc(tr(e.message))}</div>`; }
