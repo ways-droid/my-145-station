@@ -30,6 +30,7 @@ require __DIR__ . '/fr24.php';
 require __DIR__ . '/notion.php';
 require __DIR__ . '/onedrive.php';
 require __DIR__ . '/wx.php';
+require __DIR__ . '/fids.php';
 
 $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'POST' && isset($_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'])) {
@@ -66,6 +67,7 @@ try {
     notion_routes($route, $parts, $method, $who, $role);
     onedrive_routes($route, $parts, $method, $who, $role);
     wx_routes($route, $parts, $method, $who, $role);
+    fids_routes($route, $parts, $method, $who, $role);
 
     // ---------- Documents ----------
     if ($route === 'docs') {
