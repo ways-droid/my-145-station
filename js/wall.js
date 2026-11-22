@@ -39,7 +39,7 @@ setInterval(() => { if (route() === "mur") render(true); }, 60000);
    Tableau type aéroport, seulement « nos » vols. Nos avions volent souvent sous le code d'une autre compagnie (sous-traitance) :
    on part donc d'abord de l'IMMATRICULATION (toute la flotte du module Avions + avions du shift) → n° de vol Flightradar24 → FIDS.
    Le vol retour est cherché au n° voisin (X6 600 → X6 601, 5C 102 → 5C 101), marqué « ? ». En plus : compagnies clientes
-   (code IATA, sinon nom). Source : FIDS de Ben Gourion (TLV). FIDS relu toutes les 5 min, Flightradar24 toutes les 15 min. */
+   (case « Show all flights in FIDS » : code IATA, sinon nom). Source : FIDS de Ben Gourion (TLV). FIDS relu toutes les 5 min, Flightradar24 toutes les 15 min. */
 let FIDSB = null, FIDSB_T = 0, FIDSB_Q = "", FB_FLEET = {}, FB_FLEET_T = 0, FB_FLEET_Q = "", FB_FR24ERR = "";
 const fbNear = f => { const m = f.match(/^([A-Z0-9]{2}[A-Z]?)(\d{1,4})$/); return m ? [m[1] + (+m[2] + 1), +m[2] > 1 ? m[1] + (+m[2] - 1) : ""].filter(Boolean) : []; };
 async function fbFleet(force) {
@@ -61,8 +61,10 @@ function fbRegs() {
 const fbVisits = () => { const [d, sh] = currentShift(), ids = [hoId(d, sh), hoId(...prevShift(d, sh))]; return S.shiftItems.filter(x => x.kind === "visit" && ids.includes(x.ho) && x.reg); };
 const fbFls = v => { const x = v.fr24 || {}; return [v.flight, x.live && x.live.flight, x.arr && x.arr.flight, x.dep && x.dep.flight, x.last && x.last.flight, v.fids && v.fids.arr && v.fids.arr.fl, v.fids && v.fids.dep && v.fids.dep.fl].map(fidsNorm).filter(Boolean); };
 async function fbLoad(force) {
-  const airlines = [...new Set(S.clients.map(c => String(c.iata || "").toUpperCase().trim()).filter(Boolean))];
-  const names = S.clients.filter(c => !c.iata).map(c => c.name).filter(Boolean);   // sans code IATA : rapprochement par le nom de la compagnie
+  /* compagnies dont on montre TOUS les vols : case « Show all flights in FIDS » de la fiche client (ex. Cargojet) */
+  const all = S.clients.filter(c => c.fidsAll);
+  const airlines = [...new Set(all.map(c => String(c.iata || "").toUpperCase().trim()).filter(Boolean))];
+  const names = all.filter(c => !c.iata).map(c => c.name).filter(Boolean);   // sans code IATA : rapprochement par le nom de la compagnie
   await fbFleet(force);
   const { sure, likely } = fbRegs(), flights = [...new Set([...Object.keys(sure), ...Object.keys(likely)])].slice(0, 120), q = JSON.stringify([airlines, names, flights]);
   if (!force && FIDSB && q === FIDSB_Q && Date.now() - FIDSB_T < 5 * 60000) return;   // relu si les compagnies ou les vols du shift changent

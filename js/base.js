@@ -27,12 +27,13 @@ ACTIONS["client-form"] = el => {
     ${field("c-regs", "Préfixes d'immatriculation", c.regPrefixes, { ph: "9H- OO- OE-", cls: "mono" })}${field("c-vat", "N° TVA", c.vat)}
     ${field("c-contact", "Personne de contact", c.contact)}${field("c-email", "E-mail", c.email, { type: "email" })}
     ${field("c-lang", "Langue de communication", c.lang || "en", { type: "select", options: [["fr", "Français"], ["en", "English"]] })}${field("c-phone", "Téléphone", c.phone)}${field("c-address", "Adresse", c.address)}${field("c-city", "Code postal et ville", c.city)}
-  </div>${field("c-notes", "Notes", c.notes, { type: "textarea" })}</div>
+  </div><label class="chk line avi"><input type="checkbox" id="c-fidsall" ${c.fidsAll ? "checked" : ""}> Show all flights in FIDS <span class="muted small">(every flight of this airline to and from the station, found by its IATA code or, without it, by its name; useful when we do not know all its registrations)</span></label>
+  ${field("c-notes", "Notes", c.notes, { type: "textarea" })}</div>
   <footer>${isNew ? "" : `<div class="left"><button type="button" class="btn danger" data-a="client-del" data-id="${c.id}" ${dis()}>Supprimer</button></div>`}
   <button type="button" class="btn" data-close>Annuler</button><button class="btn primary" ${dis()}>Enregistrer</button></footer></form>`);
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
-    await save("clients", c.id, Object.assign({}, strip(c), { name: val("c-name"), code: val("c-code").toUpperCase(), icao: val("c-icao").trim().toUpperCase(), iata: val("c-iata").trim().toUpperCase(), regPrefixes: val("c-regs").toUpperCase(), vat: val("c-vat"), contact: val("c-contact"), email: val("c-email"), phone: val("c-phone"), lang: val("c-lang") || "en", address: val("c-address"), city: val("c-city"), notes: val("c-notes") }));
+    await save("clients", c.id, Object.assign({}, strip(c), { name: val("c-name"), code: val("c-code").toUpperCase(), icao: val("c-icao").trim().toUpperCase(), iata: val("c-iata").trim().toUpperCase(), regPrefixes: val("c-regs").toUpperCase(), vat: val("c-vat"), contact: val("c-contact"), email: val("c-email"), phone: val("c-phone"), lang: val("c-lang") || "en", address: val("c-address"), city: val("c-city"), notes: val("c-notes"), fidsAll: document.getElementById("c-fidsall").checked }));
     closeModal(); toast("Client enregistré");
   };
 };
