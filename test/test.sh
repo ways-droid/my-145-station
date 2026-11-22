@@ -248,6 +248,15 @@ ok "bureau : avion" "$(curl -s -H "$B" -X PUT -d '{"reg":"4X-EKA","acType":"B777
 ok "terrain : avions visibles" "$(curl -s -H "$HT" $U/docs/aircraft)" '4X-EKA'
 ok "terrain : ne modifie pas un avion" "$(curl -s -H "$HT" -X PATCH -d '{"msn":"1"}' $U/docs/aircraft/ac1)" 'rôle'
 ok "historique : avion nommé" "$(curl -s -H "$A" "$U/log?coll=aircraft")" 'Avion 4X-EKA'
+echo "> types d'appareils et Type Ratings détaillés"
+ok "bureau : type d'appareil" "$(curl -s -H "$B" -X PUT -d '{"maker":"Boeing","code":"B747","models":[{"name":"-400","engines":["RR RB211","PW 4000"]}]}' $U/docs/actypes/at1)" '"ok":true'
+ok "terrain : lit les types" "$(curl -s -H "$HT" $U/docs/actypes)" 'RB211'
+ok "terrain : ne modifie pas un type" "$(curl -s -H "$HT" -X PATCH -d '{"name":"x"}' $U/docs/actypes/at1)" 'rôle'
+ok "historique : type nommé" "$(curl -s -H "$A" "$U/log?coll=actypes")" "Type d'appareil B747"
+ok "bureau : Type Ratings détaillés" "$(curl -s -H "$B" -X PUT -d '{"name":"Tech TR","function":"engineer","typeRatings":[{"t":"B747","m":"-400","e":"RR RB211","lic":"E+I","crs":true},{"t":"B777","m":"","e":"","lic":"E","crs":false}],"ratings":{"B777":"E"}}' $U/docs/staff/str)" '"ok":true'
+ok "ratings recalculé (avec CRS seulement)" "$(curl -s -H "$B" $U/docs/staff/str)" '"ratings":{"B747":"E+I"}'
+ok "terrain : voit les Type Ratings" "$(curl -s -H "$HT" $U/docs/staff/str)" '"crs":false'
+ok "patch : ratings suit les Type Ratings" "$(curl -s -H "$B" -X PATCH -d '{"typeRatings":[{"t":"B777","lic":"E+F","crs":true}]}' $U/docs/staff/str >/dev/null; curl -s -H "$B" $U/docs/staff/str)" '"ratings":{"B777":"E+F"}'
 echo "> charge sheet"
 ok "bureau : ligne de Charge Sheet" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-19","company":"MT","reg":"9H-ABC","rotation":"261119-9HABC-MT01","type":"TLV Rotation","workType":"PFSC (MT Transit 767)","qty":1,"price":2735}' $U/docs/chargeLines/cl1)" '"ok":true'
 ok "terrain : Charge Sheet invisible" "$(curl -s -H "$HT" $U/docs/chargeLines)" '"docs":\[\]'
