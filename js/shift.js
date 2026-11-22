@@ -138,7 +138,7 @@ ACTIONS["item-del"] = el => {
    Une escale = un groupe de lignes (une par shift, même visitId = id de la première ligne). Les données de l'escale
    (immatriculation, type, ARR, DEP et leurs dates UTC, vol) sont recopiées sur toutes les lignes du groupe ; le travail
    (CRS, mécanos, prévu, fait, MHRS, ATL…) appartient au shift de sa ligne et ne se modifie que depuis ce shift. */
-const VISIT_SHARED = ["reg", "acType", "clientId", "arr", "dep", "arrDate", "depDate", "flight"];
+const VISIT_SHARED = ["reg", "acType", "clientId", "arr", "dep", "arrDate", "depDate", "flight", "flightAuto"];
 const visitGid = v => v.visitId || v.id;
 const visitGroup = v => S.shiftItems.filter(x => x.kind === "visit" && visitGid(x) === visitGid(v));
 const shKey = id => id.slice(0, 10) + (id.endsWith("night") ? "1" : "0");
@@ -379,7 +379,7 @@ ACTIONS["visit-form"] = el => {
     ${field("vi-ata", "ATA (UTC)", v.ata || "", { ph: "14:41", cls: "mono" })}${field("vi-atd", "ATD (UTC)", v.atd || "", { ph: "17:22", cls: "mono" })}
     <div class="hint" id="vi-span" style="grid-column:1/-1"></div>
     ${v.fr24 ? `<div style="grid-column:1/-1">${fr24Times(v) || ""}${fr24Line(v)}<div class="muted small">${esc(tr("Rempli par Flightradar24, vos champs ne sont pas modifiés."))}</div></div>` : ""}
-    ${field("vi-flt", "N° de vol / rotation (prévu)", v.flight, { cls: "mono", ph: "Rotation, n° de vol…" })}${field("vi-atl", "LogBook n° d'arrivée", v.atl, { cls: "mono" })}${field("vi-cht", "CHT covers", v.cht)}</div>
+    ${field("vi-flt", "Arrival Flight No.", v.flight, { cls: "mono req-f" + (v.flightAuto && v.flight ? " auto-f" : "") })}${field("vi-atl", "Arrival LogBook No.", v.atl, { cls: "mono req-f" })}${field("vi-cht", "CHT covers", v.cht)}</div>
     <div class="muted small" id="vi-client"></div>
     ${staffPick("vi-crs", "CRS (affectés à cet avion)", v.crs || [], certs.length ? certs : crew, v.crsLead || "")}${staffPick("vi-mech", "Mécanos / aides", v.mech || [], crew)}
     ${others.length ? `<label class="f">Ajouter quelqu'un qui n'est pas au roster de ce shift<select id="vi-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}
@@ -450,7 +450,10 @@ ACTIONS["visit-form"] = el => {
   drawTasks(); drawCarry();
   m.querySelector("#vi-mech").onchange = drawTasks;
   m.querySelector("#vi-reg").setAttribute("list", "vi-regs");
-  m.querySelector("#vi-reg").oninput = () => { const ac = aircraftOf(val("vi-reg")); if (ac && ac.acType && !val("vi-ac")) m.querySelector("#vi-ac").value = ac.acType; upd(); }; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = e => { crsLeadUi(m, e.target); upd(); drawTasks(); }; upd();
+  m.querySelector("#vi-reg").oninput = () => { const ac = aircraftOf(val("vi-reg")); if (ac && ac.acType && !val("vi-ac")) m.querySelector("#vi-ac").value = ac.acType; upd(); }; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = e => { crsLeadUi(m, e.target); upd(); drawTasks(); };
+  /* Arrival Flight No. et Arrival LogBook No. : rouge tant que vide, vert une fois rempli ; texte bleu = rempli par Flightradar24 */
+  const reqUpd = () => m.querySelectorAll(".req-f").forEach(i => { i.classList.toggle("ok", !!i.value.trim()); i.classList.toggle("ko", !i.value.trim()); });
+  m.querySelectorAll(".req-f").forEach(i => i.addEventListener("input", () => { if (i.id === "vi-flt") i.classList.remove("auto-f"); reqUpd(); })); reqUpd(); upd();
   const add = m.querySelector("#vi-add");
   if (add) add.onchange = () => { const p = staff(add.value); if (!p) return; for (const box of ["vi-crs", "vi-mech"]) m.querySelector("#" + box).insertAdjacentHTML("beforeend", `<label class="chk"><input type="checkbox" value="${p.id}"> ${esc(p.name)}</label>`); add.querySelector(`option[value="${p.id}"]`).remove(); add.value = ""; };
   m.querySelector("form").onsubmit = async e => {
@@ -464,7 +467,7 @@ ACTIONS["visit-form"] = el => {
     if (["vi-arr", "vi-dep", "vi-ata", "vi-atd"].some(k => val(k) && !hmOk(val(k)))) { m.querySelector("#vi-warn").textContent = tr("Heure invalide : format HH:MM (UTC)."); return; }
     const t = visitTimes(times());
     const arrDate = val("vi-arr") ? (val("vi-arrd") || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
-    const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), ata: val("vi-ata") ? hmNorm(val("vi-ata")) : "", atd: val("vi-atd") ? hmNorm(val("vi-atd")) : "", arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), atl: val("vi-atl"), cht: val("vi-cht"), ...crsLeadOf(m),
+    const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), ata: val("vi-ata") ? hmNorm(val("vi-ata")) : "", atd: val("vi-atd") ? hmNorm(val("vi-atd")) : "", arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), flightAuto: !!(v.flightAuto && val("vi-flt") === v.flight), atl: val("vi-atl"), cht: val("vi-cht"), ...crsLeadOf(m),
       mech: picked(m, "vi-mech"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() });
     /* Tech Log : lignes vides retirées ; textes prévu / fait et total MHRS recalculés pour la Charge Sheet, Notion et Sindri */
     const tl = tasks.filter(t => t.text.trim() || t.action.trim()).map(t => Object.assign(t, { text: t.text.trim(), action: (t.action || "").trim(), techs: (t.techs || []).filter(x => x.id) }));
@@ -617,11 +620,16 @@ ACTIONS["ho-sign"] = el => {
   if (pb) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body">${esc(tr("Le shift précédent"))} <b>${esc(shiftLabel(pb))}</b> ${esc(tr("doit d'abord être remis et repris."))}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   /* et tous les contrôles Station Control (section 4) doivent être cochés */
   const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]), aiN = aiTaskPending(id);
-  if (k === "out" && (eq.length || miss.length || aiN)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
+  /* chaque avion : Arrival Flight No., Arrival LogBook No. et toutes les tâches du Tech Log complètes (cadres verts) */
+  const inc = hoItems(id, "visit").map(v => ({ v, why: [!String(v.flight || "").trim() && "Arrival Flight No.", !String(v.atl || "").trim() && "Arrival LogBook No.",
+    visitTasks(v).filter(t => !t.unc && !tlFull(t)).length && `${visitTasks(v).filter(t => !t.unc && !tlFull(t)).length} Tech Log task(s) not complete`].filter(Boolean) })).filter(x => x.why.length);
+  const noLead = hoItems(id, "visit").filter(v => !(v.crsLead && (v.crs || []).includes(v.crsLead)));
+  if (k === "out" && (eq.length || miss.length || aiN || inc.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
+    ${inc.length ? `<div>Aircraft not complete (section 2, frames must be green):</div><ul>${inc.map(x => `<li><b class="mono">${esc(x.v.reg || "")}</b> · ${esc(x.why.join(", "))}</li>`).join("")}</ul>` : ""}
     ${aiN ? `<div>✦ ${plural(aiN, "tâche")} ${esc(tr("du Tech Log encodée(s) par Sindri à vérifier et valider (section 2) :"))}</div><ul>${hoItems(id, "visit").flatMap(v => visitTasks(v).filter(t => t.ai && !t.ok).map(t => `<li><b class="mono">${esc(v.reg || "")}</b> · ${esc(t.text || "")}</li>`)).join("")}</ul>` : ""}
     ${eq.length ? `<div>${esc(tr("Équipement à renseigner (section 3) pour :"))}</div><ul>${eq.map(x => `<li><b class="mono">${esc(x.reg || "")}</b> · ${esc(x.task || "")}</li>`).join("")}</ul>` : ""}
     ${miss.length ? `<div>${esc(tr("Station Control à cocher (section 4) :"))}</div><ul>${miss.map(c => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
-  confirmBox(`${k === "out" ? "Remettre" : "Reprendre"} le shift ${esc(shiftName(...UI.shift))} au nom de ${esc(meName())} ?${open && k === "out" ? `<div class="banner warn small" style="margin-top:8px">${plural(open, "avion")} sans CRS qualifié affecté.</div>` : ""}`,
+  confirmBox(`${k === "out" ? "Remettre" : "Reprendre"} le shift ${esc(shiftName(...UI.shift))} au nom de ${esc(meName())} ?${open && k === "out" ? `<div class="banner warn small" style="margin-top:8px">${plural(open, "avion")} sans CRS qualifié affecté.</div>` : ""}${noLead.length && k === "out" ? `<div class="banner warn small" style="margin-top:8px">No CRS in charge: ${noLead.map(v => esc(v.reg || "")).join(", ")}</div>` : ""}`,
     async () => { await hoPatch(id, { [k]: { by: meName(), at: new Date().toISOString() } }); render(true); }, k === "out" ? "Remettre" : "Reprendre");
 };
 ACTIONS["ho-unsign"] = () => confirmBox("Annuler les signatures de ce shift ?", async () => { await hoPatch(hoId(...UI.shift), { out: null, in: null }); render(true); }, "Annuler les signatures");
@@ -688,6 +696,8 @@ async function fr24Run(id, quiet, create = !quiet) {
     const cur = S.shiftItems.find(y => y.id === v.id) || v, rot = fr24Rot({ ho: id, fr24 }), act = {};
     if (rot && rot.arr && !rot.arr.eta && rot.arr.ms != null && !cur.ata) act.ata = utcHM(new Date(rot.arr.ms).toISOString());
     if (rot && rot.dep && rot.dep.ms != null && !cur.atd) act.atd = utcHM(new Date(rot.dep.ms).toISOString());
+    /* Arrival Flight No. : rempli par Flightradar24 s'il est vide (affiché en bleu tant qu'on ne le modifie pas) */
+    if (rot && rot.arr && rot.arr.fl && !cur.flight) { act.flight = rot.arr.fl; act.flightAuto = true; }
     await patch("shiftItems", v.id, Object.assign({ fr24 }, act)); }
   FR24ERR = (r.errors || []).join(" · ");
   let fidsN = "";
