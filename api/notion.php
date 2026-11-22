@@ -94,7 +94,7 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
         'MHRS' => $rt, 'LOG PAGE ATL' => $rt, 'Work Planned' => $rt, 'Work Done' => $rt, 'Notes' => $rt, 'CHT Covers' => $rt, 'Files' => ['files' => (object) []], 'Date' => ['date' => (object) []]]);
     foreach ($visits as $v) nt_row($db['id'], ['A/C REG' => nt_title((string) ($v['reg'] ?? '')), 'A/C TYPE' => nt_rt((string) ($v['acType'] ?? '')), 'ARR UTC' => nt_rt((string) ($v['arr'] ?? '')), 'DEP UTC' => nt_rt((string) ($v['dep'] ?? '')),
         'CRS' => nt_ms(array_map($nm, (array) ($v['crs'] ?? []))), 'MECH' => nt_ms(array_map($nm, (array) ($v['mech'] ?? []))), 'MHRS' => nt_rt((string) ($v['mhrs'] ?? '')), 'LOG PAGE ATL' => nt_rt((string) ($v['atl'] ?? '')),
-        'Work Planned' => nt_rt((string) ($v['planned'] ?? '')), 'Work Done' => nt_rt((string) ($v['done'] ?? '')), 'Notes' => nt_rt((string) ($v['notes'] ?? '')), 'CHT Covers' => nt_rt((string) ($v['cht'] ?? '')),
+        'Work Planned' => nt_rt((string) ($v['planned'] ?? '')), 'Work Done' => nt_rt((string) ($v['done'] ?? '')), 'Notes' => nt_rt((string) ($v['notes'] ?? '')), 'CHT Covers' => nt_rt(!empty($v['chtOff']) ? 'No – covered by ' . (string) ($v['chtBy'] ?? '') : ((string) ($v['cht'] ?? '') !== '' ? (string) $v['cht'] : 'Yes')),
         'Date' => ['date' => ['start' => $date]]]);
 
     // 3. équipement et matériel
