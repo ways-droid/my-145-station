@@ -7,6 +7,7 @@
 //   POST fr24/config            { key }            (administrateurs)
 //   POST fr24/test              {}                 (administrateurs)
 //   POST fr24/track             { regs: [..] }     → { items: { REG: { live?, last? } } }
+//   POST fr24/aircraft          { reg }            → détails de l'avion (bureau) : ADSBdb (gratuit, sans clé), puis FR24 si besoin
 //
 // Fournisseur interchangeable : fr24_provider_track() est le seul endroit qui parle à FR24.
 
@@ -26,6 +27,38 @@ function fr24_http($path, $q) {
     if ($st === 429) throw new RuntimeException('Flightradar24 : trop de demandes, réessayez dans un instant.');
     if ($st >= 400 || !is_array($d)) throw new RuntimeException('Flightradar24 : ' . (is_array($d) ? (string) ($d['message'] ?? $d['error'] ?? "erreur HTTP $st") : "erreur HTTP $st"));
     return $d;
+}
+/* détails d'un avion d'après son immatriculation : fabricant, type exact, code OACI, opérateur, Mode S.
+   1) ADSBdb (base publique gratuite, sans clé) ; 2) Flightradar24 (vols des 14 derniers jours) si la clé existe et qu'il manque le type ou l'opérateur.
+   Le moteur n'est fourni par aucune des deux : il reste à choisir. */
+function adsbdb_base() { $b = (string) (kv_get('adsbdb_base') ?? ''); return $b !== '' ? rtrim($b, '/') . '/' : 'https://api.adsbdb.com/v0/'; }
+function aircraft_lookup($reg) {
+    $out = ['reg' => $reg, 'sources' => [], 'errors' => []];
+    $ch = curl_init(adsbdb_base() . 'aircraft/' . rawurlencode($reg));
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 10, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_HTTPHEADER => ['Accept: application/json'], CURLOPT_USERAGENT => 'my-145-station']);
+    $res = curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+    $a = $res !== false ? ((json_decode($res, true) ?: [])['response']['aircraft'] ?? null) : null;
+    if (is_array($a)) {
+        $out['sources'][] = 'ADSBdb';
+        foreach (['manufacturer' => 'manufacturer', 'typeName' => 'type', 'icaoType' => 'icao_type', 'modeS' => 'mode_s', 'operator' => 'registered_owner',
+            'operatorIcao' => 'registered_owner_operator_flag_code', 'country' => 'registered_owner_country_name'] as $k => $src)
+            if (is_scalar($a[$src] ?? null) && trim((string) $a[$src]) !== '') $out[$k] = mb_substr(trim((string) $a[$src]), 0, 80);
+    } elseif ($res === false) $out['errors'][] = 'ADSBdb injoignable';
+    elseif ($st !== 404 && $st !== 200) $out['errors'][] = "ADSBdb : erreur HTTP $st";
+    if (fr24_key() !== '' && (empty($out['icaoType']) || empty($out['operatorIcao']))) {
+        try {
+            $d = fr24_http('flight-summary/full', ['registrations' => $reg, 'flight_datetime_from' => gmdate('Y-m-d\TH:i:s\Z', time() - 14 * 86400), 'flight_datetime_to' => gmdate('Y-m-d\TH:i:s\Z'), 'limit' => 1]);
+            $f = ((array) ($d['data'] ?? []))[0] ?? null;
+            if (is_array($f)) {
+                $out['sources'][] = 'Flightradar24';
+                if (empty($out['icaoType']) && !empty($f['type'])) $out['icaoType'] = (string) $f['type'];
+                if (empty($out['operatorIcao'])) foreach (['operating_as', 'painted_as'] as $k) if (!empty($f[$k])) { $out['operatorIcao'] = (string) $f[$k]; break; }
+                if (empty($out['modeS']) && !empty($f['hex'])) $out['modeS'] = strtoupper((string) $f['hex']);
+            }
+        } catch (RuntimeException $e) { $out['errors'][] = $e->getMessage(); }
+    }
+    $out['found'] = !empty($out['sources']);
+    return $out;
 }
 function fr24_norm_reg($r) { return strtoupper(preg_replace('/[^A-Za-z0-9-]/', '', (string) $r)); }
 function fr24_key_reg($r) { return str_replace('-', '', fr24_norm_reg($r)); }    // 9H-CAC et 9HCAC : même avion
@@ -69,6 +102,11 @@ function fr24_routes($route, $parts, $method, $who, $role) {
         if ($k !== '' && !preg_match('/^[A-Za-z0-9|._\-]{8,300}$/', $k)) fail(400, 'Clé API invalide');
         kv_set('fr24_key', $k); log_event('settings', 'fr24', 'update', $k === '' ? 'Flightradar24 déconnecté' : 'Clé Flightradar24 enregistrée');
         out(['ok' => true, 'configured' => $k !== '']);
+    }
+    if ($act === 'aircraft' && $method === 'POST') {
+        if (!in_array($role, ['admin', 'bureau'], true)) fail(403, 'Réservé au bureau');
+        $reg = fr24_norm_reg($b['reg'] ?? ''); if (!preg_match('/^[A-Z0-9]{1,3}-?[A-Z0-9]{1,6}$/', $reg)) fail(400, 'Immatriculation invalide');
+        out(aircraft_lookup($reg));
     }
     if (fr24_key() === '') fail(400, "Flightradar24 n'est pas configuré : saisissez les heures à la main, ou ajoutez une clé API FR24 dans Paramètres.");
     try {

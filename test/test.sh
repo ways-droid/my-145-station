@@ -284,6 +284,13 @@ curl -s -H "$A" -X POST -d '{"key":"fr24-sandbox"}' $U/fr24/config >/dev/null
 ok "FR24 : clé de test (sandbox) signalée" "$(curl -s -H "$HT" -X POST -d '{"regs":["9H-CAC"]}' $U/fr24/track)" 'clé de test (sandbox)'
 curl -s -H "$A" -X POST -d '{"key":"fr24-good"}' $U/fr24/config >/dev/null
 ok "FR24 : diagnostic réservé aux admins" "$(curl -s -H "$B" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag)" 'administrateurs'
+pkill -f "127.0.0.1:8774" || true
+(php -S 127.0.0.1:8774 "$D/adsbdb-mock.php" >/dev/null 2>&1 &); sleep 0.5
+php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["adsbdb_base","http://127.0.0.1:8774/v0"]);' $T/t.db
+ok "données avion : réservé au bureau" "$(curl -s -H "$HT" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/aircraft)" 'bureau'
+R=$(curl -s -H "$B" -X POST -d '{"reg":"4x-ica"}' $U/fr24/aircraft); ok "données avion : ADSBdb" "$R" '"typeName":"747 412","icaoType":"B744"'; ok "données avion : Mode S" "$R" '"modeS":"738A01"'
+ok "données avion : FR24 en complément" "$(curl -s -H "$B" -X POST -d '{"reg":"9H-DEP"}' $U/fr24/aircraft)" '"sources":\["Flightradar24"\]'
+ok "données avion : inconnu" "$(curl -s -H "$B" -X POST -d '{"reg":"OO-ZZZ"}' $U/fr24/aircraft)" '"found":false'
 R=$(curl -s -H "$A" -X POST -d '{"reg":"4X-ICA"}' $U/fr24/diag); ok "FR24 : diagnostic" "$R" '"endpoint":"flight-summary/full","params"'; no "FR24 : diagnostic sans la clé" "$R" 'fr24-good'
 pkill -f "127.0.0.1:8773" || true
 echo "> météo du briefing"
