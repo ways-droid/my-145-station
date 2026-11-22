@@ -1196,3 +1196,4 @@ rule(/^Tous les contrôles doivent être cochés avant de remettre le shift\. \(
 rule(/^Préparer depuis les shifts \((\d+)\)$/, "Prepare from shifts ($1)"); rule(/^Équipe \((\d+)\)$/, "Crew ($1)"); rule(/^sur (\d+)$/, "of $1");
 rule(/^(.+) · depuis le (.+)$/, "$1 · since $2", true);
 Object.assign(EN, {"Liens": "Links", "Aucun lien.": "No links.", "Lier à une autre fiche : plaque, client, outil, article…": "Link to another record: plate, customer, tool, item…"});
+Object.assign(EN, {"+ technicien": "+ technician", "+ Ligne": "+ Line"});
