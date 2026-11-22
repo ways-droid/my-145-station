@@ -142,7 +142,9 @@ const VISIT_SHARED = ["reg", "acType", "clientId", "arr", "dep", "arrDate", "dep
 const visitGid = v => v.visitId || v.id;
 const visitGroup = v => S.shiftItems.filter(x => x.kind === "visit" && visitGid(x) === visitGid(v));
 const shKey = id => id.slice(0, 10) + (id.endsWith("night") ? "1" : "0");
-const hasWork = v => !!((v.tasks || []).length || (v.crs || []).length || (v.mech || []).length || v.planned || v.done || v.notes || v.mhrs || v.atl || v.cht || (v.scans || []).length);
+/* rotation non couverte par CHT (case décochée et « Covered by » rempli) : grisée, inactive, ne bloque pas la remise */
+const visitOff = v => !!(v.chtOff && String(v.chtBy || "").trim());
+const hasWork = v => !!((v.tasks || []).length || (v.crs || []).length || (v.mech || []).length || v.planned || v.done || v.notes || v.mhrs || v.atl || v.cht || v.chtOff || (v.scans || []).length);
 /* shift (id) qui contient un instant UTC, à l'heure de la station */
 function shiftOfUtc(ms) {
   const d = new Date(ms); let date = iso(d), h = d.getHours();
@@ -339,7 +341,7 @@ function shiftVisits(id) {
       const gid = visitGid(v), open = UI.voOpen && UI.voOpen.has(gid);
       const tog = other.length ? `<button type="button" class="vo-tog ${open ? "on" : ""}" data-a="vo-toggle" data-g="${esc(gid)}" title="${esc(tr(open ? "Masquer les données des autres shifts" : "Afficher les données des autres shifts"))}">${open ? "▾" : "▸"} ${esc(tr(plural(other.length, "autre shift", "autres shifts")))} <span class="vo-n">(${[prev.length ? "↑" + prev.length : "", next.length ? "↓" + next.length : ""].filter(Boolean).join(" ")})</span></button>` : "";
       if (!open) { prev.length = 0; next.length = 0; }
-      return `<tbody class="vgrp${open ? " multi" : ""}">` + prev.map((x, i) => ghost(x, prev.length - 1 - i, "prev")).join("") + `<tr class="vo-main ${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono reg vt-reg ${regState(v)}">${esc(v.reg || "")}</b>${tog ? " " + tog : ""} <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
+      return `<tbody class="vgrp${open ? " multi" : ""}${visitOff(v) ? " v-off" : ""}" ${visitOff(v) ? `title="Not covered by CHT: covered by ${esc(v.chtBy)}"` : ""}>` + prev.map((x, i) => ghost(x, prev.length - 1 - i, "prev")).join("") + `<tr class="vo-main ${ed ? "click" : ""}" ${ed ? `data-a="visit-form" data-ho="${id}" data-id="${v.id}"` : ""}><td><b class="mono reg vt-reg ${regState(v)}">${esc(v.reg || "")}</b>${visitOff(v) ? `<div class="small v-off-l">Not covered by CHT · covered by ${esc(v.chtBy)}</div>` : ""}${tog ? " " + tog : ""} <span class="muted small">${esc(v.acType || "")}</span><div class="muted small">${esc(c ? c.code || c.name : "")}${(v.scans || []).length ? ` · <span title="${esc(tr("Scans dans OneDrive"))}">📎 ${v.scans.length}</span>` : ""}</div>${ck.ok ? "" : `<span class="chip sm ${ck.lvl || "bad"}">${esc(ck.msg)}</span>`}${v.open ? ` <span class="chip sm warn">Non terminé</span>` : ""}</td>
         <td class="mono small"><div class="vt-man"><span class="vt-k">ETA</span> <b>${esc(zHM(v.arr))}</b>${v.arrDate && v.arrDate !== v.ho.slice(0, 10) ? ` <span class="muted">(${esc(fmtDate(v.arrDate))})</span>` : ""} · <span class="vt-k">ETD</span> <b>${esc(zHM(v.dep))}</b>${v.depDate && span.length > 1 ? ` <span class="muted">(${esc(fmtDate(v.depDate))})</span>` : ""}</div>
           <div class="vt-act" title="Actual times: Flightradar24 flight history, or entered by hand"><span class="vt-k">ATA</span> <b>${esc(zHM(v.ata))}</b> · <span class="vt-k">ATD</span> <b>${esc(zHM(v.atd))}</b></div>${fr24Times(v)}${fr24Line(v)}${stay}</td><td class="small">${crsHtml(v, "<br>") || "—"}</td><td class="small">${(v.mech || []).map(s => esc(sName(s))).join("<br>") || "—"}</td>
         <td class="small">${techLogHtml(v)}${v.notes ? `<div class="muted">${esc(v.notes)}</div>` : ""}</td><td class="mono small">${fmtH(visitH(v))}</td><td class="mono small">${esc(v.atl || "")}</td></tr>` + next.map((x, i) => ghost(x, i, "next")).join("") + `</tbody>`; }).join("")}</table></div>`
@@ -379,7 +381,8 @@ ACTIONS["visit-form"] = el => {
     ${field("vi-ata", "ATA (UTC)", v.ata || "", { ph: "14:41", cls: "mono" })}${field("vi-atd", "ATD (UTC)", v.atd || "", { ph: "17:22", cls: "mono" })}
     <div class="hint" id="vi-span" style="grid-column:1/-1"></div>
     ${v.fr24 ? `<div style="grid-column:1/-1">${fr24Times(v) || ""}${fr24Line(v)}<div class="muted small">${esc(tr("Rempli par Flightradar24, vos champs ne sont pas modifiés."))}</div></div>` : ""}
-    ${field("vi-flt", "Arrival Flight No.", v.flight, { cls: "mono req-f" + (v.flightAuto && v.flight ? " auto-f" : "") })}${field("vi-atl", "Arrival LogBook No.", v.atl, { cls: "mono req-f" })}${field("vi-cht", "CHT covers", v.cht)}</div>
+    ${field("vi-flt", "Arrival Flight No.", v.flight, { cls: "mono req-f" + (v.flightAuto && v.flight ? " auto-f" : "") })}${field("vi-atl", "Arrival LogBook No.", v.atl, { cls: "mono req-f" })}<div class="f cht-f"><label class="chk"><input type="checkbox" id="vi-chton" ${v.chtOff ? "" : "checked"}> CHT covers</label>
+      <label class="f cht-by" ${v.chtOff ? "" : "hidden"}><span>Covered by *</span><input id="vi-chtby" class="req-f" value="${esc(v.chtBy || "")}" placeholder="Who covers this aircraft?"></label></div></div>
     <div class="muted small" id="vi-client"></div>
     ${staffPick("vi-crs", "CRS (affectés à cet avion)", v.crs || [], certs.length ? certs : crew, v.crsLead || "")}${staffPick("vi-mech", "Mécanos / aides", v.mech || [], crew)}
     ${others.length ? `<label class="f">Ajouter quelqu'un qui n'est pas au roster de ce shift<select id="vi-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}
@@ -452,6 +455,7 @@ ACTIONS["visit-form"] = el => {
   m.querySelector("#vi-reg").setAttribute("list", "vi-regs");
   m.querySelector("#vi-reg").oninput = () => { const ac = aircraftOf(val("vi-reg")); if (ac && ac.acType && !val("vi-ac")) m.querySelector("#vi-ac").value = ac.acType; upd(); }; m.querySelector("#vi-ac").onchange = upd; m.querySelector("#vi-crs").onchange = e => { crsLeadUi(m, e.target); upd(); drawTasks(); };
   /* Arrival Flight No. et Arrival LogBook No. : rouge tant que vide, vert une fois rempli ; texte bleu = rempli par Flightradar24 */
+  m.querySelector("#vi-chton").onchange = e => { m.querySelector(".cht-by").hidden = e.target.checked; if (!e.target.checked) m.querySelector("#vi-chtby").focus(); };
   const reqUpd = () => m.querySelectorAll(".req-f").forEach(i => { i.classList.toggle("ok", !!i.value.trim()); i.classList.toggle("ko", !i.value.trim()); });
   m.querySelectorAll(".req-f").forEach(i => i.addEventListener("input", () => { if (i.id === "vi-flt") i.classList.remove("auto-f"); reqUpd(); })); reqUpd(); upd();
   const add = m.querySelector("#vi-add");
@@ -464,10 +468,11 @@ ACTIONS["visit-form"] = el => {
       w.innerHTML = `<div class="banner warn">${esc(tr("Cet avion est déjà dans ce shift. Est-ce une erreur, ou un autre vol ?"))}<div class="row-g wrap" style="margin-top:6px"><button type="button" class="btn sm" data-dupx>${esc(tr("C'est une erreur"))}</button><button type="button" class="btn sm primary" data-dupok>${esc(tr("Autre vol : enregistrer"))}</button></div></div>`;
       w.querySelector("[data-dupx]").onclick = () => closeModal();
       w.querySelector("[data-dupok]").onclick = () => { m.dataset.dupOk = "1"; m.querySelector("form").requestSubmit(); }; return; }
+    if (!m.querySelector("#vi-chton").checked && !val("vi-chtby").trim()) { m.querySelector("#vi-warn").textContent = "CHT does not cover this aircraft: fill in who covers it."; m.querySelector("#vi-chtby").focus(); return; }
     if (["vi-arr", "vi-dep", "vi-ata", "vi-atd"].some(k => val(k) && !hmOk(val(k)))) { m.querySelector("#vi-warn").textContent = tr("Heure invalide : format HH:MM (UTC)."); return; }
     const t = visitTimes(times());
     const arrDate = val("vi-arr") ? (val("vi-arrd") || (t.arr != null ? new Date(t.arr).toISOString().slice(0, 10) : "")) : "";
-    const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), ata: val("vi-ata") ? hmNorm(val("vi-ata")) : "", atd: val("vi-atd") ? hmNorm(val("vi-atd")) : "", arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), flightAuto: !!(v.flightAuto && val("vi-flt") === v.flight), atl: val("vi-atl"), cht: val("vi-cht"), ...crsLeadOf(m),
+    const data = Object.assign(strip(v), cur(), { clientId: c ? c.id : "", arr: hmNorm(val("vi-arr")), dep: hmNorm(val("vi-dep")), ata: val("vi-ata") ? hmNorm(val("vi-ata")) : "", atd: val("vi-atd") ? hmNorm(val("vi-atd")) : "", arrDate, depDate: val("vi-dep") ? val("vi-depd") : "", flight: val("vi-flt"), flightAuto: !!(v.flightAuto && val("vi-flt") === v.flight), atl: val("vi-atl"), chtOff: !document.getElementById("vi-chton").checked, chtBy: document.getElementById("vi-chton").checked ? "" : val("vi-chtby"), ...crsLeadOf(m),
       mech: picked(m, "vi-mech"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() });
     /* Tech Log : lignes vides retirées ; textes prévu / fait et total MHRS recalculés pour la Charge Sheet, Notion et Sindri */
     const tl = tasks.filter(t => t.text.trim() || t.action.trim()).map(t => Object.assign(t, { text: t.text.trim(), action: (t.action || "").trim(), techs: (t.techs || []).filter(x => x.id) }));
@@ -614,16 +619,16 @@ ACTIONS["ho-sum"] = async el => {
 ACTIONS["hs-ai"] = () => { };
 ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
 ACTIONS["ho-sign"] = el => {
-  const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitCheck(v).ok).length;
+  const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitOff(v) && !visitCheck(v).ok).length;
   /* garde-fou : un équipement coché dans le Tech Log doit être renseigné avant de remettre le shift */
   const pb = prevBlock(id);
   if (pb) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body">${esc(tr("Le shift précédent"))} <b>${esc(shiftLabel(pb))}</b> ${esc(tr("doit d'abord être remis et repris."))}</div><footer><button class="btn primary" data-close>OK</button></footer>`, "sm"); return; }
   /* et tous les contrôles Station Control (section 4) doivent être cochés */
   const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]), aiN = aiTaskPending(id);
   /* chaque avion : Arrival Flight No., Arrival LogBook No. et toutes les tâches du Tech Log complètes (cadres verts) */
-  const inc = hoItems(id, "visit").map(v => ({ v, why: [!String(v.flight || "").trim() && "Arrival Flight No.", !String(v.atl || "").trim() && "Arrival LogBook No.",
+  const inc = hoItems(id, "visit").filter(v => !visitOff(v)).map(v => ({ v, why: [!String(v.flight || "").trim() && "Arrival Flight No.", !String(v.atl || "").trim() && "Arrival LogBook No.",
     visitTasks(v).filter(t => !t.unc && !tlFull(t)).length && `${visitTasks(v).filter(t => !t.unc && !tlFull(t)).length} Tech Log task(s) not complete`].filter(Boolean) })).filter(x => x.why.length);
-  const noLead = hoItems(id, "visit").filter(v => !(v.crsLead && (v.crs || []).includes(v.crsLead)));
+  const noLead = hoItems(id, "visit").filter(v => !visitOff(v) && !(v.crsLead && (v.crs || []).includes(v.crsLead)));
   if (k === "out" && (eq.length || miss.length || aiN || inc.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
     ${inc.length ? `<div>Aircraft not complete (section 2, frames must be green):</div><ul>${inc.map(x => `<li><b class="mono">${esc(x.v.reg || "")}</b> · ${esc(x.why.join(", "))}</li>`).join("")}</ul>` : ""}
     ${aiN ? `<div>✦ ${plural(aiN, "tâche")} ${esc(tr("du Tech Log encodée(s) par Sindri à vérifier et valider (section 2) :"))}</div><ul>${hoItems(id, "visit").flatMap(v => visitTasks(v).filter(t => t.ai && !t.ok).map(t => `<li><b class="mono">${esc(v.reg || "")}</b> · ${esc(t.text || "")}</li>`)).join("")}</ul>` : ""}
