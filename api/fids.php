@@ -43,8 +43,15 @@ function fids_routes($route, $parts, $method, $who, $role) {
     foreach (array_slice((array) ($b['flights'] ?? []), 0, 120) as $f) { $n = fids_norm($f); if (preg_match('/^[A-Z0-9]{2,3}\d{1,4}[A-Z]?$/', $n)) $want[$n] = true; }
     if ($parts[1] === 'board') {
         foreach (array_slice((array) ($b['airlines'] ?? []), 0, 60) as $a) { $a = strtoupper(trim((string) $a)); if (preg_match('/^[A-Z0-9]{2,3}$/', $a)) $als[$a] = true; }
+        // compagnies sans code IATA : par le nom (« CHALLENGE AIRLINES » du FIDS ⊂ « Challenge Airlines Malta » du client)
+        $words = fn($s) => array_values(array_filter(preg_split('/[^A-Z0-9]+/', strtoupper((string) $s)), fn($w) => strlen($w) > 1));
+        $names = []; foreach (array_slice((array) ($b['names'] ?? []), 0, 60) as $n) { $w = $words($n); if ($w) $names[] = $w; }
+        $byName = function ($rn) use ($names, $words) { $r = $words($rn); if (!$r) return false;
+            foreach ($names as $c) { $short = count($r) <= count($c) ? $r : $c; $long = $short === $r ? $c : $r;
+                if (count($short) >= 2 || strlen($short[0]) >= 5) { if (!array_diff($short, $long)) return true; } }
+            return false; };
         $rows = [];
-        try { foreach (fids_rows() as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']])) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
+        try { foreach (fids_rows() as $r) if (isset($als[$r['al'] ?? '']) || isset($want[$r['f']]) || ($names && $byName($r['name'] ?? ''))) { $r['fl'] = $r['f']; unset($r['f']); $rows[] = $r; } }
         catch (Throwable $e) { out(['rows' => [], 'error' => fids_msg($e), 'at' => gmdate('c')]); }
         usort($rows, fn($x, $y) => strcmp($x['est'] ?: $x['sched'], $y['est'] ?: $y['sched']));
         out(['rows' => $rows, 'at' => gmdate('c')]);

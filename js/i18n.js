@@ -38,27 +38,31 @@ function tr(s, lang = LANG) {
 }
 /* --- application au DOM --- */
 const NO_TR = "script,style,textarea,input,.plate,.fleetno,[data-noi18n],.ogm";
+/* Données aviation toujours en anglais (règle de l'utilisateur, 2026-11-22) : les écrans aviation (body.avi-route) et les blocs .avi
+   sont traduits en anglais même quand l'interface est en français. */
+const AVI_ROUTES = new Set(["avions", "shift", "mur", "fids", "charge", "pieces", "etalonnage", "expirations", "rapport"]);
+const enHere = n => { if (UI_LANG === "en") return true; const e = n && (n.nodeType === 1 ? n : n.parentElement); return !!e && (!!e.closest(".avi") || document.body.classList.contains("avi-route") && !!e.closest("#main, #modal-root, .toasts")); };
 function trNode(n) {
-  if (UI_LANG !== "en") return;
+  if (!enHere(n)) return;
   if (n.nodeType === 3) {
     const p = n.parentElement; if (!p || p.closest(NO_TR)) return;
-    const t = tr(n.data, UI_LANG); if (t !== n.data) n.data = t;
+    const t = tr(n.data, "en"); if (t !== n.data) n.data = t;
     return;
   }
   if (n.nodeType !== 1) return;
   if (n.matches && n.matches(NO_TR) && n.tagName !== "INPUT" && n.tagName !== "TEXTAREA") return;
-  for (const a of ["placeholder", "title", "aria-label"]) if (n.hasAttribute && n.hasAttribute(a)) { const v = n.getAttribute(a), t = tr(v, UI_LANG); if (t !== v) n.setAttribute(a, t); }
-  if (n.tagName === "INPUT" && (n.type === "button" || n.type === "submit")) { const t = tr(n.value, UI_LANG); if (t !== n.value) n.value = t; }
+  for (const a of ["placeholder", "title", "aria-label"]) if (n.hasAttribute && n.hasAttribute(a)) { const v = n.getAttribute(a), t = tr(v, "en"); if (t !== v) n.setAttribute(a, t); }
+  if (n.tagName === "INPUT" && (n.type === "button" || n.type === "submit")) { const t = tr(n.value, "en"); if (t !== n.value) n.value = t; }
   const w = document.createTreeWalker(n, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT);
   let c = w.nextNode();
   while (c) {
     if (c.nodeType === 3) trNode(c);
-    else for (const a of ["placeholder", "title", "aria-label"]) if (c.hasAttribute(a)) { const v = c.getAttribute(a), t = tr(v, UI_LANG); if (t !== v) c.setAttribute(a, t); }
+    else for (const a of ["placeholder", "title", "aria-label"]) if (c.hasAttribute(a)) { const v = c.getAttribute(a), t = tr(v, "en"); if (t !== v) c.setAttribute(a, t); }
     c = w.nextNode();
   }
 }
 const i18nObserver = new MutationObserver(muts => {
-  if (UI_LANG !== "en") return;
+  if (UI_LANG !== "en" && !document.body.classList.contains("avi-route") && !document.querySelector(".avi")) return;
   for (const m of muts) {
     if (m.type === "characterData") trNode(m.target);
     else for (const n of m.addedNodes) trNode(n);

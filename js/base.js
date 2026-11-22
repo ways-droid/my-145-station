@@ -23,7 +23,7 @@ ACTIONS["client-form"] = el => {
   const c = client(el.dataset.id) || {};
   const isNew = !c.id;
   const m = modal(`${mHead(isNew ? "Nouveau client" : esc(c.name))}<form id="f-client"><div class="body"><div class="fields">
-    ${field("c-name", "Nom de la compagnie", c.name, { required: true })}${field("c-code", "Code court (Charge Sheet)", c.code, { ph: "MT, BE, IL…", cls: "mono" })}${field("c-icao", "Code compagnie OACI", c.icao, { ph: "CHG, ICL…", cls: "mono" })}${field("c-iata", "Code compagnie IATA (FIDS)", c.iata, { ph: "5C, LY…", cls: "mono" })}
+    ${field("c-name", "Nom de la compagnie", c.name, { required: true })}${field("c-code", "Code court (Charge Sheet)", c.code, { ph: "MT, BE, IL…", cls: "mono" })}${field("c-icao", "Code compagnie OACI", c.icao, { ph: "CHG, ICL…", cls: "mono" })}${field("c-iata", "Code compagnie IATA (FIDS)", c.iata, { cls: "mono" })}
     ${field("c-regs", "Préfixes d'immatriculation", c.regPrefixes, { ph: "9H- OO- OE-", cls: "mono" })}${field("c-vat", "N° TVA", c.vat)}
     ${field("c-contact", "Personne de contact", c.contact)}${field("c-email", "E-mail", c.email, { type: "email" })}
     ${field("c-lang", "Langue de communication", c.lang || "en", { type: "select", options: [["fr", "Français"], ["en", "English"]] })}${field("c-phone", "Téléphone", c.phone)}${field("c-address", "Adresse", c.address)}${field("c-city", "Code postal et ville", c.city)}

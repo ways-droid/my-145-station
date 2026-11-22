@@ -36,43 +36,63 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && ["mur", "f
 setInterval(() => { if (route() === "mur") render(true); }, 60000);
 
 /* ======================= FIDS DE LA STATION =======================
-   Tableau type aéroport, seulement « nos » vols : compagnies clientes (code IATA de la fiche client) et vols des avions
-   des shifts en cours (n° Flightradar24 ou saisi). Source : FIDS de Ben Gourion (TLV). Rafraîchi toutes les 5 minutes. */
-let FIDSB = null, FIDSB_T = 0, FIDSB_Q = "";
+   Tableau type aéroport, seulement « nos » vols. Nos avions volent souvent sous le code d'une autre compagnie (sous-traitance) :
+   on part donc d'abord de l'IMMATRICULATION (toute la flotte du module Avions + avions du shift) → n° de vol Flightradar24 → FIDS.
+   Le vol retour est cherché au n° voisin (X6 600 → X6 601, 5C 102 → 5C 101), marqué « ? ». En plus : compagnies clientes
+   (code IATA, sinon nom). Source : FIDS de Ben Gourion (TLV). FIDS relu toutes les 5 min, Flightradar24 toutes les 15 min. */
+let FIDSB = null, FIDSB_T = 0, FIDSB_Q = "", FB_FLEET = {}, FB_FLEET_T = 0, FB_FLEET_Q = "", FB_FR24ERR = "";
+const fbNear = f => { const m = f.match(/^([A-Z0-9]{2}[A-Z]?)(\d{1,4})$/); return m ? [m[1] + (+m[2] + 1), +m[2] > 1 ? m[1] + (+m[2] - 1) : ""].filter(Boolean) : []; };
+async function fbFleet(force) {
+  const regs = [...new Set([...(S.aircraft || []).filter(a => a.active !== false && a.reg).map(a => normReg(a.reg)), ...fbVisits().map(v => normReg(v.reg))])].slice(0, 60);
+  if (!regs.length || !force && regs.join() === FB_FLEET_Q && Date.now() - FB_FLEET_T < 15 * 60000) return;
+  FB_FLEET_T = Date.now(); FB_FLEET_Q = regs.join();
+  try { const r = await API.call("POST", "fr24/track", { regs, station: stationIata() }), key = s => String(s || "").toUpperCase().replace(/[^A-Z0-9-]/g, ""), m = {};
+    for (const g of regs) { const x = r.items[key(g)]; if (!x) continue;
+      for (const f of [x.live && x.live.flight, x.arr && x.arr.flight, x.dep && x.dep.flight, x.last && x.last.flight].map(fidsNorm).filter(Boolean)) m[f] = g; }
+    FB_FLEET = m; FB_FR24ERR = ""; }
+  catch (e) { FB_FR24ERR = e.message; }
+}
+/* n° de vol → immatriculation : sûr (shift, Flightradar24) ou probable (n° voisin) */
+function fbRegs() {
+  const sure = Object.assign({}, FB_FLEET); for (const v of fbVisits()) for (const f of fbFls(v)) sure[f] = normReg(v.reg);
+  const likely = {}; for (const [f, g] of Object.entries(sure)) for (const n of fbNear(f)) if (!sure[n]) likely[n] = g;
+  return { sure, likely };
+}
 const fbVisits = () => { const [d, sh] = currentShift(), ids = [hoId(d, sh), hoId(...prevShift(d, sh))]; return S.shiftItems.filter(x => x.kind === "visit" && ids.includes(x.ho) && x.reg); };
 const fbFls = v => { const x = v.fr24 || {}; return [v.flight, x.live && x.live.flight, x.arr && x.arr.flight, x.dep && x.dep.flight, x.last && x.last.flight, v.fids && v.fids.arr && v.fids.arr.fl, v.fids && v.fids.dep && v.fids.dep.fl].map(fidsNorm).filter(Boolean); };
 async function fbLoad(force) {
   const airlines = [...new Set(S.clients.map(c => String(c.iata || "").toUpperCase().trim()).filter(Boolean))];
-  const flights = [...new Set(fbVisits().flatMap(fbFls))], q = JSON.stringify([airlines, flights]);
+  const names = S.clients.filter(c => !c.iata).map(c => c.name).filter(Boolean);   // sans code IATA : rapprochement par le nom de la compagnie
+  await fbFleet(force);
+  const { sure, likely } = fbRegs(), flights = [...new Set([...Object.keys(sure), ...Object.keys(likely)])].slice(0, 120), q = JSON.stringify([airlines, names, flights]);
   if (!force && FIDSB && q === FIDSB_Q && Date.now() - FIDSB_T < 5 * 60000) return;   // relu si les compagnies ou les vols du shift changent
   FIDSB_T = Date.now(); FIDSB_Q = q;
-  if (!airlines.length && !flights.length) { FIDSB = { rows: [] }; return; }
-  try { FIDSB = await API.call("POST", "fids/board", { airlines, flights }); } catch (e) { FIDSB = { rows: [], error: e.message }; }
+  if (!airlines.length && !names.length && !flights.length) { FIDSB = { rows: [] }; return; }
+  try { FIDSB = await API.call("POST", "fids/board", { airlines, names, flights }); } catch (e) { FIDSB = { rows: [], error: e.message }; }
   if (route() === "fids") render(true);
 }
-function fbRow(x, regOf) {
+function fbRow(x, R) {
   const t = x.est || x.sched, late = x.est && x.sched && x.est !== x.sched, st = String(x.status || "").toUpperCase();
   const cls = /CANCEL/.test(st) ? "bad" : /DELAY/.test(st) ? "warn" : /LAND|DEPART|ARRIV/.test(st) ? "good" : "";
-  const reg = regOf[x.fl];
+  const reg = R.sure[x.fl] || R.likely[x.fl], guess = !R.sure[x.fl] && !!R.likely[x.fl];
   return `<tr><td class="fb-time">${esc(fidsHM(x.sched))}</td><td class="fb-time ${late ? "late" : ""}">${late ? esc(fidsHM(t)) : ""}</td>
     <td class="fb-fl">${esc(x.fl)}</td><td>${esc(x.name || x.al || "")}</td><td>${esc(x.city || x.other || "")}${x.other && x.city ? ` <span class="fb-iata">${esc(x.other)}</span>` : ""}</td>
-    <td class="fb-reg">${reg ? esc(reg) : ""}</td><td>${esc(x.terminal || "")}</td><td class="fb-st ${cls}">${esc(x.status || "")}</td></tr>`;
+    <td class="fb-reg">${reg ? esc(reg) + (guess ? ` <span class="fb-iata" title="Likely: next/previous flight number of this aircraft">?</span>` : "") : ""}</td><td>${esc(x.terminal || "")}</td><td class="fb-st ${cls}">${esc(x.status || "")}</td></tr>`;
 }
 VIEWS.fids = {
   render() {
-    const regOf = {}; for (const v of fbVisits()) for (const f of fbFls(v)) regOf[f] = normReg(v.reg);
+    const R = fbRegs();
     const now = Date.now(), keep = x => { const m = ltMs(x.est || x.sched); return m == null || (m > now - 3 * 3600000 && m < now + 24 * 3600000); };
     const rows = ((FIDSB && FIDSB.rows) || []).filter(keep);
     const tab = (dir, title) => { const r = rows.filter(x => x.dir === dir);
       return `<section class="fb-sec"><h2>${dir === "A" ? "🛬" : "🛫"} ${title}</h2><table class="fb"><thead><tr><th>${"Sched."}</th><th>${"Est."}</th><th>${"Flight"}</th><th>${"Airline"}</th><th>${dir === "A" ? "From" : "To"}</th><th>${"Reg."}</th><th>T</th><th>${"Status"}</th></tr></thead>
-        <tbody>${r.map(x => fbRow(x, regOf)).join("") || `<tr><td colspan="8" class="fb-none">${"No flights"}</td></tr>`}</tbody></table></section>`; };
-    const noCodes = !S.clients.some(c => c.iata);
-    return `<div class="fb-wrap"><div class="wall-top"><div><div class="wall-st">FIDS ${esc(stationIata())}</div><div class="wall-sh">${"Our flights only"}${FIDSB && FIDSB.at ? ` · ${"updated"} ${esc(wallClock(stationTz() || undefined))}` : ""}</div></div>
+        <tbody>${r.map(x => fbRow(x, R)).join("") || `<tr><td colspan="8" class="fb-none">${"No flights"}</td></tr>`}</tbody></table></section>`; };
+    return `<div class="fb-wrap"><div class="wall-top"><div><div class="wall-st">FIDS ${esc(stationIata())}</div><div class="wall-sh">${"Our aircraft (by registration) and our customers' flights"}${FIDSB && FIDSB.at ? ` · ${"updated"} ${esc(wallClock(stationTz() || undefined))}` : ""}</div></div>
         <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${"Local"} (LT)</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC (Z)</span></div>
         <button class="btn sm" data-a="fb-refresh">↻</button><button class="btn sm" data-a="wall-exit">${"Exit"}</button></div></div>` +
       (stationIata() !== "TLV" ? `<div class="wall-empty">${"FIDS is only available for the TLV station."}</div>` :
       (FIDSB && FIDSB.error ? `<div class="banner warn">FIDS TLV : ${esc(tr(FIDSB.error))}</div>` : "") +
-      (noCodes ? `<div class="banner">${"Add the airline IATA code in each Customer record to see all their flights."}</div>` : "") +
+      (FB_FR24ERR ? `<div class="banner info">Flightradar24: ${esc(tr(FB_FR24ERR))} – only airline codes are used.</div>` : "") +
       (!FIDSB ? `<div class="wall-empty">${"Loading…"}</div>` : tab("A", "Arrivals") + tab("D", "Departures"))) + `</div>`;
   },
   after() { if (stationIata() === "TLV") fbLoad(); }
