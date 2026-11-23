@@ -580,6 +580,7 @@ document.addEventListener("change", e => {
   if (t.id === "ho-ckn") hoPatch(hoId(...UI.shift), { checkNote: t.value.trim() });
   if (t.id === "ho-fm") hoPatch(hoId(...UI.shift), { foreman: t.value });
   if (t.id === "ho-add" && t.value) { const id = hoId(...UI.shift); hoPatch(id, { extra: Array.from(new Set([...(hoDoc(id)?.extra || []), t.value])) }); }
+  if (t.id === "wall-date" && t.value) { UI.wallShift = [t.value, (UI.wallShift || currentShift())[1]]; render(true); }
   if (t.id === "shift-date" && t.value) { UI.shift = [t.value, UI.shift[1]]; UI.shiftPinned = true; render(true); }
 });
 
