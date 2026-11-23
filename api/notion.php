@@ -47,6 +47,22 @@ function nt_txt($s) {   // texte riche (Notion : 2000 caractères au plus par mo
     $out = []; foreach (mb_str_split($s, 1900) as $p) $out[] = ['type' => 'text', 'text' => ['content' => $p]];
     return array_slice($out, 0, 50);
 }
+/* Work Planned / Work Done : les tâches spéciales (non maintenance) en vert souligné, comme dans le handover Notion */
+function nt_work(array $v, bool $done) {
+    $tasks = array_values(array_filter((array) ($v['tasks'] ?? []), 'is_array'));
+    if (!array_filter($tasks, fn($t) => !empty($t['sp']))) return nt_rt((string) ($v[$done ? 'done' : 'planned'] ?? ''));
+    $out = []; $n = 0;
+    foreach ($tasks as $t) {
+        $sp = !empty($t['sp']); $tx = trim((string) ($t['text'] ?? ''));
+        if ($done ? ($sp ? empty($t['spDone']) : trim((string) ($t['action'] ?? '')) === '') : ($tx === '')) continue;
+        if ($sp) $s = mb_strtoupper($tx) . ($done ? ' : done' : '');
+        else $s = $done ? ($tx !== '' ? $tx . ' : ' : '') . trim((string) ($t['action'] ?? '')) : implode(' · ', array_filter([$tx, ($t['logPage'] ?? '') !== '' ? 'LP ' . $t['logPage'] : '', ($t['wo'] ?? '') !== '' ? 'WO ' . $t['wo'] : '']));
+        $seg = ['type' => 'text', 'text' => ['content' => ($n++ ? "\n" : '') . '- ' . mb_substr($s, 0, 1800)]];
+        if ($sp) $seg['annotations'] = ['bold' => true, 'underline' => true, 'color' => 'green'];
+        $out[] = $seg;
+    }
+    return ['rich_text' => array_slice($out, 0, 100)];
+}
 function nt_title($s) { return ['title' => nt_txt($s)]; }
 function nt_rt($s) { return ['rich_text' => nt_txt($s)]; }
 function nt_ms(array $names) { $o = []; foreach (array_unique(array_filter(array_map(fn($n) => str_replace(',', ' ', trim((string) $n)), $names))) as $n) $o[] = ['name' => mb_substr($n, 0, 100)]; return ['multi_select' => $o]; }
@@ -94,7 +110,7 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
         'MHRS' => $rt, 'LOG PAGE ATL' => $rt, 'Work Planned' => $rt, 'Work Done' => $rt, 'Notes' => $rt, 'CHT Covers' => $rt, 'Files' => ['files' => (object) []], 'Date' => ['date' => (object) []]]);
     foreach ($visits as $v) nt_row($db['id'], ['A/C REG' => nt_title((string) ($v['reg'] ?? '')), 'A/C TYPE' => nt_rt((string) ($v['acType'] ?? '')), 'ARR UTC' => nt_rt((string) ($v['arr'] ?? '')), 'DEP UTC' => nt_rt((string) ($v['dep'] ?? '')),
         'CRS' => nt_ms(array_map($nm, (array) ($v['crs'] ?? []))), 'MECH' => nt_ms(array_map($nm, (array) ($v['mech'] ?? []))), 'MHRS' => nt_rt((string) ($v['mhrs'] ?? '')), 'LOG PAGE ATL' => nt_rt((string) ($v['atl'] ?? '')),
-        'Work Planned' => nt_rt((string) ($v['planned'] ?? '')), 'Work Done' => nt_rt((string) ($v['done'] ?? '')), 'Notes' => nt_rt((string) ($v['notes'] ?? '')), 'CHT Covers' => nt_rt(!empty($v['chtOff']) ? 'No – covered by ' . (string) ($v['chtBy'] ?? '') : ((string) ($v['cht'] ?? '') !== '' ? (string) $v['cht'] : 'Yes')),
+        'Work Planned' => nt_work($v, false), 'Work Done' => nt_work($v, true), 'Notes' => nt_rt((string) ($v['notes'] ?? '')), 'CHT Covers' => nt_rt(!empty($v['chtOff']) ? 'No – covered by ' . (string) ($v['chtBy'] ?? '') : ((string) ($v['cht'] ?? '') !== '' ? (string) $v['cht'] : 'Yes')),
         'Date' => ['date' => ['start' => $date]]]);
 
     // 3. équipement et matériel
