@@ -64,8 +64,9 @@ VIEWS.shift = {
         ${isCur ? `<span class="chip good">Shift en cours</span>` : `<button class="btn sm" data-a="shift-now">Shift en cours</button>`}
         ${h.notion?.url ? `<a class="btn sm" href="${esc(h.notion.url)}" target="_blank" rel="noopener" title="${esc(tr("Envoyé par") + " " + (h.notion.by || "") + " · " + fmtDT(h.notion.at))}">Page Notion ↗</a>` : ""}
         ${NOTION && NOTION.configured && h.date && !readOnly ? `<button class="btn sm" data-a="ho-notion" data-ho="${id}">${h.notion?.url ? "Renvoyer vers Notion" : "Envoyer vers Notion"}</button>` : ""}</div>`);
-    const tabsH = (typeof wxBanner === "function" ? wxBanner() : "") + tabs("shift", [["shift", "Shift"], ["briefing", "Briefing"]]);
+    const tabsH = (typeof wxBanner === "function" ? wxBanner() : "") + tabs("shift", [["shift", "Shift"], ["briefing", "Briefing"], ["all", "All shifts"]]);
     if (curTab("shift", "shift") === "briefing" && typeof shiftBriefing === "function") return top + tabsH + shiftBriefing(id, date, sh);
+    if (curTab("shift", "shift") === "all") return top + tabsH + shiftMonthList(date);
     return top + tabsH +
       (prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? `<div class="ho-lockbar" role="status">🔒 ${esc(tr("Ce shift peut être préparé et encodé, mais pas encore remis ni repris : le shift précédent"))} <button class="linkbtn" data-a="shift-go" data-n="-1">${esc(shiftLabel(prevBlock(id)))}</button> ${esc(tr("n'est pas encore remis et repris."))}</div>` : "") +
       (h.out && h.out.at ? (hoLocked(h) ? `<div class="ho-lockbar ho-done" role="status">🔒 ${esc(tr("Shift remis par"))} ${esc(h.out.by || "?")} (${fmtDT(h.out.at)}) : ${esc(tr("plus aucune modification possible."))} ${canReopenShift() && !readOnly ? `<button class="btn sm" data-a="ho-reopen">${esc(tr("Réactiver la modification"))}</button>` : `<span class="small">${esc(tr("Le Station Lead peut le réactiver."))}</span>`}</div>`
@@ -77,6 +78,29 @@ VIEWS.shift = {
         : (shiftChecks(id, h) + shiftCrew(id, date, sh, h)).replace('id="ho-ckn"', 'id="ho-ckn" disabled').replace('id="ho-fm"', 'id="ho-fm" disabled')) + `</div>`;
   }
 };
+/* tous les shifts d'un mois, une ligne par shift comme la page mensuelle Notion (« TLV - NOV 2026 ») ; un clic ouvre le shift */
+const MON3 = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+const STATION_FLAG = { TLV: "🇮🇱", ETM: "🇮🇱", HFA: "🇮🇱", LGG: "🇧🇪", BRU: "🇧🇪", CRL: "🇧🇪", MLA: "🇲🇹" };
+function shiftMonthList(date) {
+  const ym = UI.shiftMonth || date.slice(0, 7), [y, m] = ym.split("-").map(Number), days = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const st = stationIata(), flag = STATION_FLAG[st] || "✈", cur = currentShift(), sel = UI.shift || cur;
+  const rows = [];
+  for (let d = 1; d <= days; d++) for (const sh of ["day", "night"]) {
+    const ds = `${ym}-${String(d).padStart(2, "0")}`, id = hoId(ds, sh), h = hoDoc(id) || {}, n = hoItems(id, "visit").length;
+    const state = hoClosed(h) ? ["good", "Handed over and received"] : h.out && h.out.at ? ["warn", "Handed over · not received"] : n || (h.checks && Object.keys(h.checks).length) ? ["info", "In progress"] : null;
+    const isCur = cur[0] === ds && cur[1] === sh, isSel = sel[0] === ds && sel[1] === sh;
+    rows.push(`<button type="button" class="sm-row${isCur ? " cur" : ""}${isSel ? " sel" : ""}" data-a="shift-open" data-d="${ds}" data-sh="${sh}"><span class="sm-flag" aria-hidden="true">${flag}</span>
+      <span class="sm-t">${String(d).padStart(2, "0")} ${MON3[m - 1]} ${String(y).slice(2)} ${sh === "day" ? "DAY HANDOVER 08:00LT TO 20:00LT" : "NIGHT HANDOVER 20:00LT TO 08:00LT"}</span>
+      ${isCur ? `<span class="chip sm good">Current shift</span>` : ""}${n ? `<span class="chip sm">${n} aircraft</span>` : ""}${state ? `<span class="chip sm ${state[0]}">${state[1]}</span>` : ""}${h.notion?.url ? `<span class="chip sm" title="Sent to Notion">Notion ✓</span>` : ""}</button>`);
+  }
+  return `<div class="card sm-card"><div class="row-g wrap sm-head"><button class="btn sm" data-a="shift-month" data-n="-1" aria-label="Previous month">‹</button><h2 class="sm-title">${esc(st || "STATION")} - ${MON3[m - 1]} ${y}</h2><button class="btn sm" data-a="shift-month" data-n="1" aria-label="Next month">›</button>
+    ${ym !== cur[0].slice(0, 7) ? `<button class="btn sm" data-a="shift-month" data-n="0">This month</button>` : ""}</div><div class="sm-list">${rows.join("")}</div></div>`;
+}
+ACTIONS["shift-month"] = el => { const n = +el.dataset.n, base = UI.shiftMonth || (UI.shift || currentShift())[0].slice(0, 7);
+  if (!n) UI.shiftMonth = currentShift()[0].slice(0, 7); else { const [y, m] = base.split("-").map(Number), d = new Date(Date.UTC(y, m - 1 + n, 1)); UI.shiftMonth = d.toISOString().slice(0, 7); }
+  render(true); };
+ACTIONS["shift-open"] = el => { UI.shift = [el.dataset.d, el.dataset.sh]; UI.shiftMonth = null; UI.shiftPinned = true; UI.tab.shift = "shift"; render(true); window.scrollTo(0, 0); };
+
 /* shift remis (out) : verrouillé pour tous tant que le Station Lead (ou un Shift Foreman qu'il autorise) ne le réactive pas */
 const hoLocked = h => !!(h && h.out && h.out.at && !(h.reopen && h.reopen.at));
 const canReopenShift = () => { if (isAdmin()) return true; const p = typeof meStaff === "function" ? meStaff() : null; return !!p && (p.function === "lead" || (p.function === "foreman" && !!settings().reopenForemen)); };
@@ -654,9 +678,9 @@ ACTIONS["ho-sign"] = el => {
     async () => { await hoPatch(id, { [k]: { by: meName(), at: new Date().toISOString() } }); render(true); }, k === "out" ? "Remettre" : "Reprendre");
 };
 ACTIONS["ho-unsign"] = () => confirmBox("Annuler les signatures de ce shift ?", async () => { await hoPatch(hoId(...UI.shift), { out: null, in: null }); render(true); }, "Annuler les signatures");
-ACTIONS["shift-go"] = el => { UI.shiftPinned = true; UI.shift = (+el.dataset.n < 0 ? prevShift : nextShift)(...(UI.shift || currentShift())); render(true); };
+ACTIONS["shift-go"] = el => { UI.shiftPinned = true; UI.shiftMonth = null; UI.shift = (+el.dataset.n < 0 ? prevShift : nextShift)(...(UI.shift || currentShift())); render(true); };
 ACTIONS["shift-sh"] = el => { UI.shiftPinned = true; UI.shift = [(UI.shift || currentShift())[0], el.dataset.sh]; render(true); };
-ACTIONS["shift-now"] = () => { UI.shiftPinned = false; UI.shift = currentShift(); render(true); };
+ACTIONS["shift-now"] = () => { UI.shiftPinned = false; UI.shiftMonth = null; UI.shift = currentShift(); render(true); };
 /* page ouverte au changement de shift (08:00 / 20:00 heure de la station) : on passe au nouveau shift en cours,
    sauf si l'utilisateur regarde volontairement un autre shift */
 setInterval(() => { try { if (!UI.shift || UI.shiftPinned || document.getElementById("modal-root")?.innerHTML) return; const c = currentShift();
