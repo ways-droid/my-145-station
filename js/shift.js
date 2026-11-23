@@ -74,7 +74,7 @@ VIEWS.shift = {
       (hoClosed(h) ? `<div class="banner good">Handover terminé : remis par ${esc(h.out?.by || "?")} et repris par ${esc(h.in.by)} (${fmtDT(h.in.at)}).</div>` : "") +
       (bad ? `<div class="banner warn">${plural(bad, "avion")} sans CRS qualifié affecté : voir la section 2.</div>` : "") +
       (typeof shiftSituations === "function" ? shiftSituations() : "") +
-      `<div class="${prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + (hoEd(id) ? shiftChecks(id, h) + shiftCrew(id, date, sh, h)
+      shiftManpower(id, date, sh, h) + `<div class="${prevBlock(id) && !hoClosed(h) && !(h.out && h.out.at) ? "ho-locked" : ""}">` + shiftTodo(id, date, sh) + shiftVisits(id) + shiftEquip(id) + (hoEd(id) ? shiftChecks(id, h) + shiftCrew(id, date, sh, h)
         : (shiftChecks(id, h) + shiftCrew(id, date, sh, h)).replace('id="ho-ckn"', 'id="ho-ckn" disabled').replace('id="ho-fm"', 'id="ho-fm" disabled')) + `</div>`;
   }
 };
@@ -617,10 +617,32 @@ document.addEventListener("change", e => {
   if (t.id === "shift-date" && t.value) { UI.shift = [t.value, UI.shift[1]]; UI.shiftPinned = true; render(true); }
 });
 
+/* en tête du shift : tout le personnel disponible, par fonction ; un commentaire possible par personne (nom surligné) */
+const shiftCrewList = (date, sh, h) => { const ros = onShift(date, sh), extra = (h.extra || []).map(staff).filter(Boolean).filter(p => !ros.includes(p)); return [...ros, ...extra].sort(staffSort); };
+function shiftManpower(id, date, sh, h) {
+  const crew = shiftCrewList(date, sh, h), notes = h.crewNotes || {}, ed = hoEd(id) && !readOnly;
+  const fm = staff(h.foreman) || crew.find(p => ["lead", "foreman"].includes(p.function));
+  const groups = []; crew.forEach(p => { const k = p.function || "other"; let g = groups.find(x => x.k === k); if (!g) groups.push(g = { k, l: STAFF_FN[k] || "Other", list: [] }); g.list.push(p); });
+  const chip = p => { const n = (notes[p.id] || "").trim();
+    return `<${ed ? "button type=\"button\" data-a=\"crew-note\"" : "span"} data-id="${p.id}" class="mp-chip${n ? " has-note" : ""}" ${ed ? `title="${esc(tr(n ? "Edit the comment" : "Add a comment"))}"` : ""}><b>${esc(p.name)}</b>${n ? `<span class="mp-note">${esc(n)}</span>` : ""}</${ed ? "button" : "span"}>`; };
+  return `<section class="panel ho-mp"><div class="pad"><div class="row-sb"><h3>👷 ${esc(tr("Manpower on shift"))} <span class="muted small">(${crew.length})</span></h3>${fm ? `<span class="small">${esc(tr("Shift Foreman / Lead Engineer"))} : <b>${esc(fm.name)}</b></span>` : ""}</div>
+    ${crew.length ? `<div class="mp-groups">${groups.map(g => `<div class="mp-g"><div class="mp-gl small muted">${esc(tr(g.l))}</div><div class="mp-list">${g.list.map(chip).join("")}</div></div>`).join("")}</div>
+    ${ed ? `<div class="small muted">${esc(tr("Click a name to add a comment (e.g. only night shifts until 04 Dec). Names with a comment are highlighted."))}</div>` : ""}`
+    : `<div class="muted small">${esc(tr("Nobody on the roster for this shift."))}</div>`}</div></section>`;
+}
+ACTIONS["crew-note"] = el => {
+  const id = hoId(...UI.shift), h = hoDoc(id) || {}, p = staff(el.dataset.id); if (!p) return;
+  if (!hoEd(id)) { toast(tr("Ce shift a été remis : il est verrouillé.")); return; }
+  const m = modal(`${mHead(esc(p.name))}<form><div class="body">${field("cn-text", "Comment for this shift", (h.crewNotes || {})[p.id] || "", { type: "textarea", wide: true })}</div>
+    <footer><button type="button" class="btn" data-close>${esc(tr("Annuler"))}</button><button class="btn primary">${esc(tr("Enregistrer"))}</button></footer></form>`);
+  m.querySelector("#cn-text").focus();
+  m.querySelector("form").onsubmit = async e => { e.preventDefault(); const t = val("cn-text").trim().slice(0, 300), cn = Object.assign({}, hoDoc(id)?.crewNotes || {});
+    if (t) cn[p.id] = t; else delete cn[p.id]; await hoPatch(id, { crewNotes: cn }); closeModal(); render(true); };
+};
 /* 5. manpower et signatures */
 function shiftCrew(id, date, sh, h) {
   const ed = hoEd(id), ros = onShift(date, sh), extra = (h.extra || []).map(staff).filter(Boolean).filter(p => !ros.includes(p));
-  const crew = [...ros, ...extra].sort(staffSort), fms = crew.filter(p => ["lead", "foreman"].includes(p.function));
+  const crew = shiftCrewList(date, sh, h), fms = crew.filter(p => ["lead", "foreman"].includes(p.function));
   const others = staffActive().filter(p => !crew.includes(p)).sort(staffSort);
   const nxt = nextShift(date, sh);
   return sec(5, "Manpower et signatures", "Personnel du shift d'après le roster. La signature confirme la remise du shift, pas un travail sur avion.", "",
@@ -796,7 +818,7 @@ let NOTION = null;
 async function notionStatus() { if (!SERVER || !API || !ME) return null; if (NOTION) return NOTION; try { NOTION = await API.call("GET", "notion/status"); } catch { NOTION = { configured: false }; } return NOTION; }
 ACTIONS["ho-notion"] = el => {
   const id = el.dataset.ho, h = hoDoc(id) || {}, [date, sh] = [id.slice(0, 10), id.slice(11)];
-  const crew = Array.from(new Set([...onShift(date, sh).map(p => p.id), ...(h.extra || [])]));
+  const crew = shiftCrewList(date, sh, h).map(p => p.id);
   confirmBox(`${h.notion?.url ? "Renvoyer" : "Envoyer"} le handover ${esc(shiftName(date, sh))} vers Notion ?<div class="muted small" style="margin-top:6px">${esc(tr(h.notion?.url ? "La page déjà envoyée pour ce shift sera remplacée (l'ancienne va dans la corbeille de Notion)." : "Une page est créée sous la page Notion choisie dans Paramètres, avec les 5 sections."))}</div>`, async () => {
     el.disabled = true;
     try { const r = await API.call("POST", "notion/push", { ho: id, crew, checks: stationChecks() }); toast(r.replaced ? "Page Notion remplacée" : "Handover envoyé vers Notion"); }
