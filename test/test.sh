@@ -670,6 +670,14 @@ pkill -f "127.0.0.1:8772" || true
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["ai_usage_".gmdate("Y-m"),json_encode(["in"=>0,"out"=>0,"usd"=>9,"q"=>3])]);' $T/t.db
 ok "plafond mensuel" "$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Encore ?"}]}' $U/assistant/chat)" 'Plafond mensuel'
 pkill -f "127.0.0.1:8770" || true
+echo "> shift → roster"
+curl -s -H "$A" -X PUT -d '{"staffId":"s1","month":"2026-12","days":{"16":{"c":"OFF"}}}' $U/docs/roster/s1_2026-12 >/dev/null
+curl -s -H "$A" -X PUT -d '{"date":"2026-12-15","shift":"night","extra":["s1"]}' $U/docs/handovers/2026-12-15-night >/dev/null
+ok "ajouté au shift de nuit : N au roster" "$(curl -s -H "$A" $U/docs/roster/s1_2026-12)" '"15":{"c":"N","fromShift":"2026-12-15-night"}'
+curl -s -H "$A" -X PATCH -d '{"date":"2026-12-16","shift":"day","extra":["s1"]}' $U/docs/handovers/2026-12-16-day >/dev/null
+ok "ajouté au shift de jour : D, ancienne case gardée" "$(curl -s -H "$A" $U/docs/roster/s1_2026-12)" '"16":{"c":"D","fromShift":"2026-12-16-day","prev":{"c":"OFF"}}'
+curl -s -H "$A" -X PATCH -d '{"extra":[]}' $U/docs/handovers/2026-12-16-day >/dev/null; curl -s -H "$A" -X PATCH -d '{"extra":[]}' $U/docs/handovers/2026-12-15-night >/dev/null
+R=$(curl -s -H "$A" $U/docs/roster/s1_2026-12); ok "retiré du shift : ancienne case revenue" "$R" '"16":{"c":"OFF"}'; no "retiré du shift : N enlevé" "$R" '"15":'
 echo "> liens"
 ok "lien entre fiches" "$(curl -s -H "$B" -X PUT -d '{"a":{"coll":"vehicles","id":"v1"},"b":{"coll":"clients","id":"c-001"}}' $U/docs/links/lk-1)" '"ok":true'
 echo "> sécurité de la connexion"

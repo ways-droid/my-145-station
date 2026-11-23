@@ -612,13 +612,13 @@ document.addEventListener("change", e => {
   if (["ho-ckn", "ho-fm", "ho-add"].includes(t.id) && UI.shift && !hoEd(hoId(...UI.shift))) { toast(tr("Ce shift a été remis : il est verrouillé.")); render(true); return; }
   if (t.id === "ho-ckn") hoPatch(hoId(...UI.shift), { checkNote: t.value.trim() });
   if (t.id === "ho-fm") hoPatch(hoId(...UI.shift), { foreman: t.value });
-  if (t.id === "ho-add" && t.value) { const id = hoId(...UI.shift); hoPatch(id, { extra: Array.from(new Set([...(hoDoc(id)?.extra || []), t.value])) }); }
+  if (t.id === "ho-add" && t.value) { const id = hoId(...UI.shift); hoPatch(id, { extra: Array.from(new Set([...(hoDoc(id)?.extra || []), t.value])) }).then(() => typeof API !== "undefined" && API && API.refresh && API.refresh()); }
   if (t.id === "wall-date" && t.value) { UI.wallShift = [t.value, (UI.wallShift || currentShift())[1]]; render(true); }
   if (t.id === "shift-date" && t.value) { UI.shift = [t.value, UI.shift[1]]; UI.shiftPinned = true; render(true); }
 });
 
 /* en tête du shift : tout le personnel disponible, par fonction ; un commentaire possible par personne (nom surligné) */
-const shiftCrewList = (date, sh, h) => { const ros = onShift(date, sh), extra = (h.extra || []).map(staff).filter(Boolean).filter(p => !ros.includes(p)); return [...ros, ...extra].sort(staffSort); };
+const shiftCrewList = (date, sh, h) => { const ros = onShift(date, sh), extra = (h.extra || []).map(staff).filter(Boolean); return [...new Set([...ros, ...extra])].sort(staffSort); };
 function shiftManpower(id, date, sh, h) {
   const crew = shiftCrewList(date, sh, h), notes = h.crewNotes || {}, ed = hoEd(id) && !readOnly;
   const fm = staff(h.foreman) || crew.find(p => ["lead", "foreman"].includes(p.function));
@@ -641,7 +641,7 @@ ACTIONS["crew-note"] = el => {
 };
 /* 5. manpower et signatures */
 function shiftCrew(id, date, sh, h) {
-  const ed = hoEd(id), ros = onShift(date, sh), extra = (h.extra || []).map(staff).filter(Boolean).filter(p => !ros.includes(p));
+  const ed = hoEd(id), extra = (h.extra || []).map(staff).filter(Boolean);
   const crew = shiftCrewList(date, sh, h), fms = crew.filter(p => ["lead", "foreman"].includes(p.function));
   const others = staffActive().filter(p => !crew.includes(p)).sort(staffSort);
   const nxt = nextShift(date, sh);
@@ -649,7 +649,7 @@ function shiftCrew(id, date, sh, h) {
     `<div class="pad stack"><div class="fields">${field("ho-fm", "Shift Foreman", h.foreman || (fms[0] && fms[0].id) || "", { type: "select", options: [["", "—"], ...crew.map(p => [p.id, p.name])] })}
       ${ed && others.length ? `<label class="f">Ajouter au shift<select id="ho-add"><option value="">—</option>${others.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join("")}</select></label>` : ""}</div>
     <div class="tablewrap"><table><thead><tr><th>Nom</th><th>Fonction</th><th>Qualifications</th><th></th></tr></thead><tbody>${crew.map(p => { const x = rcell(p.id, date); return `<tr><td><b>${esc(p.name)}</b></td><td class="small">${esc(STAFF_FN[p.function] || "")}</td><td>${ratingChips(p)}</td>
-      <td class="small">${extra.includes(p) ? `<span class="chip sm">Ajouté</span>${ed ? ` <button class="x" data-a="ho-rm" data-id="${p.id}" aria-label="Retirer">×</button>` : ""}` : x && rcode(x.c).k === "custom" ? esc(cellTxt(x)) : ""}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Personne au roster pour ce shift.</td></tr>`}</tbody></table></div>
+      <td class="small">${extra.includes(p) ? `<span class="chip sm" title="${esc(tr("Added to this shift: the roster was updated automatically"))}">${esc(tr("Added · roster updated"))}</span>${ed ? ` <button class="x" data-a="ho-rm" data-id="${p.id}" aria-label="Retirer">×</button>` : ""}` : x && rcode(x.c).k === "custom" ? esc(cellTxt(x)) : ""}</td></tr>`; }).join("") || `<tr><td colspan="4" class="muted">Personne au roster pour ce shift.</td></tr>`}</tbody></table></div>
     <div class="ho-sum"><div class="row-sb"><b>${esc(tr("Résumé du shift"))}</b>${ed && !readOnly ? `<span class="row-g">${typeof AI !== "undefined" || SERVER ? `<button class="btn sm" data-a="ho-sum" data-ai="1">✦ ${esc(tr(h.summary?.text ? "Refaire avec Sindri" : "Rédiger avec Sindri"))}</button>` : ""}<button class="btn sm" data-a="ho-sum">${esc(tr(h.summary?.text ? "Modifier" : "Écrire"))}</button></span>` : ""}</div>
       ${h.summary?.text ? `<div class="pre">${esc(h.summary.text)}</div><div class="small muted">${h.summary.ai ? `✦ ${esc(tr("Brouillon de Sindri, relu et validé par"))}` : esc(tr("Écrit par"))} ${esc(h.summary.by || "")} · ${fmtDT(h.summary.at)} · ${esc(tr("envoyé avec la page Notion"))}</div>`
         : `<div class="small muted">${esc(tr("Quelques lignes pour le shift suivant : Sindri peut proposer un brouillon à partir du shift, vous le relisez avant de l'enregistrer."))}</div>`}</div>
@@ -678,7 +678,7 @@ ACTIONS["ho-sum"] = async el => {
   if (el.dataset.ai && SERVER && API) draft();
 };
 ACTIONS["hs-ai"] = () => { };
-ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }); };
+ACTIONS["ho-rm"] = el => { const id = hoId(...UI.shift); hoPatch(id, { extra: (hoDoc(id)?.extra || []).filter(x => x !== el.dataset.id) }).then(() => typeof API !== "undefined" && API && API.refresh && API.refresh()); };
 ACTIONS["ho-sign"] = el => {
   const id = hoId(...UI.shift), k = el.dataset.k, open = hoItems(id, "visit").filter(v => !visitOff(v) && !visitCheck(v).ok).length;
   /* garde-fou : un équipement coché dans le Tech Log doit être renseigné avant de remettre le shift */
