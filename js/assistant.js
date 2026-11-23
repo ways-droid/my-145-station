@@ -125,8 +125,8 @@ function aiRender() {
   const tAt = ms => fmtLT(ms, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
   const topicAt = {}; topics.forEach(t => topicAt[t.i] = t);
   const msg = (m, mi) => (topicAt[mi] ? `<div class="ai-topic" id="ai-t-${mi}"><span>${esc(topicAt[mi].title)}</span><span class="muted">${esc(tAt(topicAt[mi].at))}</span></div>` : "") +
-    (m.role === "user" ? `<div class="ai-m me" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${(m.files || []).map(f => `<div class="ai-file">📎 ${esc(f.name)}</div>`).join("")}${esc(m.text)}</div>`
-      : `<div class="ai-m bot ${m.err ? "err" : ""}" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${m.err ? esc(m.text) : aiMd(m.text)}${aiActions(m.actions, mi)}</div>`);
+    (m.role === "user" ? `<div class="ai-m me" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${(m.files || []).map(f => `<div class="ai-file">📎 ${esc(f.name)}</div>`).join("")}<div class="ai-txt">${esc(m.text)}</div></div>`
+      : `<div class="ai-m bot ${m.err ? "err" : ""}" id="ai-m-${mi}">${m.via === "whatsapp" ? `<div class="ai-via">WhatsApp</div>` : ""}${m.err ? esc(tr(m.text)) : `<div class="ai-txt">${aiMd(m.text)}</div>`}${aiActions(m.actions, mi)}</div>`);
   const body = !AI || !TH ? `<div class="muted pad">Chargement…</div>`
     : !ready ? `<div class="pad stack-s"><div>Sindri n'est pas encore configuré.</div>${isAdmin() ? `<div><a class="btn sm primary" href="#parametres" data-ai-close>Configurer dans Paramètres</a></div>` : `<div class="muted">Un administrateur doit saisir la clé API dans Paramètres.</div>`}</div>`
     : view.length ? view.map(msg).join("") + (aiNewTopic ? `<div class="ai-topic new"><span>${esc(tr("Nouveau sujet"))}</span><span class="muted">${esc(tr("posez votre question"))}</span></div>` : "")

@@ -678,10 +678,10 @@ function fr24Line(v) {
   const f = v.fr24; if (!f) return "";
   const st = stationIata(), L = f.live, P = f.last;
   let t = "";
-  if (L) t = `En vol ${L.from || "?"} → ${L.to || "?"}${L.eta ? " · ETA " + utcHM(L.eta) + "Z" : ""}`;
-  else if (P && P.landed) t = `Atterri ${utcHM(P.landed)}Z${P.to ? " à " + P.to : ""}${P.from ? " (de " + P.from + ")" : ""}`;
-  else if (P && P.takeoff) t = `Parti ${utcHM(P.takeoff)}Z${P.from ? " de " + P.from : ""}${P.to ? " vers " + P.to : ""}`;
-  else t = "Aucun vol depuis 72 h (FR24 ne donne pas les vols prévus)";
+  if (L) t = `Airborne ${L.from || "?"} → ${L.to || "?"}${L.eta ? " · ETA " + utcHM(L.eta) + "Z" : ""}`;
+  else if (P && P.landed) t = `Landed ${utcHM(P.landed)}Z${P.to ? " at " + P.to : ""}${P.from ? " (from " + P.from + ")" : ""}`;
+  else if (P && P.takeoff) t = `Departed ${utcHM(P.takeoff)}Z${P.from ? " from " + P.from : ""}${P.to ? " to " + P.to : ""}`;
+  else t = "No flight in the last 72 h (FR24 does not give scheduled flights)";
   return `<div class="small ${L && st && L.to && L.to !== st ? "txt-warn" : "muted"}" title="Flightradar24 · ${esc(fmtDT(f.at))}">FR24 · ${esc(tr(t))}</div>`;
 }
 /* heure locale de la station → instant UTC (ms) */
