@@ -256,7 +256,8 @@ function ai_system($who, $role) {
         . (function_exists('wa_relay_for') && ($rl = wa_relay_for((string) ($who['user']['id'] ?? ''))) ? "- Pour contexte : le " . date('d/m H:i', $rl['at']) . ", tu as transmis à cette personne sur WhatsApp ce message de {$rl['from']} : « " . mb_substr($rl['text'], 0, 400) . " ». Si elle y répond, propose de transmettre sa réponse à {$rl['from']} (propose_whatsapp_message).\n" : '')
         . "- Si un résultat d'outil indique qu'il n'a pas été conservé ou a été raccourci, relance l'outil au lieu de supposer son contenu. N'affirme jamais avoir vérifié quelque chose que tu n'as pas vu.\n"
         . "- Après une écriture, dis en une phrase ce que tu as fait et cite la fiche ; l'utilisateur voit un bouton pour l'ouvrir ou l'annuler.\n"
-        . "- Fichier joint sans consigne : identifie ce que c'est (contrôle technique, carte verte, certificat d'immatriculation, contrat de leasing…), lis les informations utiles (plaque, VIN, dates, organisme, n°, défauts), retrouve le véhicule avec search_records (collection vehicles, par plaque ou VIN) et range-le avec add_vehicle_document. "
+        . "- Fichier joint (photo, capture d'écran, PDF, Excel, Word, CSV) : lis-le et utilise-le pour la question. Exemples station : page de Tech Log ou de LogBook (immatriculation, défauts, actions, LogPage n°, WO n°) → propose de remplir le Tech Log de l'avion dans le shift ; planning de vols ou liste de rotations → propose les avions du shift (ARR/DEP UTC) ; roster ou liste de formations → propose les mises à jour. Montre ce que tu as lu et demande avant d'écrire si ce n'est pas demandé clairement. Les données aviation restent en anglais.\n"
+        . "- Fichier joint sans consigne et document de véhicule : identifie ce que c'est (contrôle technique, carte verte, certificat d'immatriculation, contrat de leasing…), lis les informations utiles (plaque, VIN, dates, organisme, n°, défauts), retrouve le véhicule avec search_records (collection vehicles, par plaque ou VIN) et range-le avec add_vehicle_document. "
         . "Si le véhicule n'est pas trouvé ou s'il y a plusieurs candidats, si le type est incertain, ou si ce n'est pas un document de véhicule, explique ce que tu as lu et demande quoi faire. Pour un contrôle technique, la date d'expiration est la date limite du prochain contrôle.\n"
         . "- Quand on te corrige ou qu'on t'explique une façon de faire de l'entreprise, retiens-la avec remember (règle générale, jamais de détail personnel). Ce qui se dit dans une conversation reste privé entre toi et cette personne.\n"
         . (($pc = array_filter(ai_confirm_list($who), fn($p) => time() - $p['at'] < AI_CONFIRM_TTL && !empty($p['shown']))) ? "\nActions proposées (suppressions, partages, messages), en attente de la réponse de la personne (confirm_action seulement si elle a dit oui) :\n" . implode("\n", array_map(fn($p) => "- token " . $p['token'] . " : " . $p['label'] . " ($p[coll])", $pc)) . "\n\n" : '')
@@ -320,6 +321,34 @@ function ai_fix_msgs($msgs) {
     }
     return $out;
 }
+/* texte d'un fichier Excel / Word / CSV joint (lu côté serveur, Claude ne lit pas ces formats directement) */
+function ai_office_text($path, $mime, $name) {
+    $ext = strtolower(pathinfo((string) $name, PATHINFO_EXTENSION));
+    if (str_starts_with($mime, 'text/') || in_array($ext, ['csv', 'txt', 'tsv'], true)) return (string) file_get_contents($path, false, null, 0, 300000);
+    if (!class_exists('ZipArchive')) return null;
+    $z = new ZipArchive(); if ($z->open($path) !== true) return null;
+    $out = '';
+    if ($ext === 'xlsx' || str_contains($mime, 'spreadsheetml')) {
+        $ss = []; if (($x = $z->getFromName('xl/sharedStrings.xml')) !== false && ($d = @simplexml_load_string($x))) foreach ($d->si as $si) $ss[] = trim(implode('', array_map('strval', $si->xpath('.//*[local-name()="t"]') ?: [])));
+        $names = []; if (($w = $z->getFromName('xl/workbook.xml')) !== false && ($d = @simplexml_load_string($w))) foreach ($d->sheets->sheet ?? [] as $s) $names[] = (string) $s['name'];
+        for ($i = 1; $i <= 6 && ($x = $z->getFromName("xl/worksheets/sheet$i.xml")) !== false; $i++) {
+            $d = @simplexml_load_string($x); if (!$d) continue;
+            $out .= "## Sheet " . ($names[$i - 1] ?? $i) . "\n";
+            foreach ($d->sheetData->row ?? [] as $row) {
+                $cells = []; foreach ($row->c as $c) { $v = (string) $c->v; $t = (string) $c['t'];
+                    if ($t === 's') $v = $ss[(int) $v] ?? ''; elseif ($t === 'inlineStr') $v = trim(implode('', array_map('strval', $c->xpath('.//*[local-name()="t"]') ?: [])));
+                    $cells[preg_replace('/\d+/', '', (string) $c['r'])] = str_replace(["\t", "\n"], ' ', $v); }
+                if (array_filter($cells, fn($v) => $v !== '')) $out .= implode("\t", array_map(fn($k, $v) => "$k=$v", array_keys($cells), $cells)) . "\n";
+                if (strlen($out) > 300000) break 2;
+            }
+        }
+    } elseif ($ext === 'docx' || str_contains($mime, 'wordprocessingml')) {
+        if (($x = $z->getFromName('word/document.xml')) !== false) $out = trim(html_entity_decode(strip_tags(preg_replace(['/<\/w:p>/', '/<w:tab\/>/'], ["\n", "\t"], $x)), ENT_QUOTES | ENT_XML1, 'UTF-8'));
+    } else { $z->close(); return null; }
+    $z->close();
+    return $out;
+}
+
 /* fichier joint → bloc document (PDF) ou image pour Claude ; seulement pour la question en cours */
 function ai_file_blocks($files, $expand) {
     $blocks = []; $dir = cfg('upload_dir');
@@ -334,7 +363,8 @@ function ai_file_blocks($files, $expand) {
             $data = base64_encode(file_get_contents("$dir/$id"));
             if ($mime === 'application/pdf') $blocks[] = ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => $data]];
             elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) $blocks[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => $data]];
-            else { $blocks[] = ['type' => 'text', 'text' => "$label (format non lisible : envoyez un PDF ou une photo)"]; continue; }
+            elseif (($txt = ai_office_text("$dir/$id", $mime, (string) $meta['name'])) !== null && trim($txt) !== '') $blocks[] = ['type' => 'document', 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => mb_substr($txt, 0, 150000)], 'title' => mb_substr((string) $meta['name'], 0, 200)];
+            else { $blocks[] = ['type' => 'text', 'text' => "$label (format non lisible : envoyez un PDF, une photo, un Excel, un Word ou un CSV)"]; continue; }
         }
         $blocks[] = ['type' => 'text', 'text' => $label . ($expand ? '' : ' (déjà lu plus haut)')];
     }
