@@ -346,6 +346,7 @@ ok "Notion : shift inconnu" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-01-01-da
 CK='["Tool Check Per MOE 2.6.5","Cleanliness of Office","Temp / Humidity Per MOE 2.3.1","Line Vans Cleaned and Restocked","Outillage"]'
 curl -s -H "$B" -X PUT -d '{"ho":"2026-11-19-day","kind":"todo","reg":"9H-ABC","text":"Roue n°3 à changer","note":"Pièce attendue"}' $U/docs/shiftItems/t1 >/dev/null
 curl -s -H "$B" -X PUT -d '{"ho":"2026-11-19-day","kind":"equip","user":"MT","reg":"9H-ABC","item":"GPU","qty":2,"unit":"HR"}' $U/docs/shiftItems/e1 >/dev/null
+php -r '$p=new PDO("sqlite:".$argv[1]); $r=json_decode($p->query("SELECT data FROM ways_docs WHERE coll=\"handovers\" AND id=\"2026-11-19-day\"")->fetchColumn(),true); $r["crewNotes"]=["s2"=>"only nights till 04 Dec"]; $q=$p->prepare("UPDATE ways_docs SET data=? WHERE coll=\"handovers\" AND id=\"2026-11-19-day\""); $q->execute([json_encode($r)]);' $T/t.db
 R=$(curl -s -H "$HT" -X POST -d "{\"ho\":\"2026-11-19-day\",\"crew\":[\"s1\",\"s2\"],\"checks\":$CK}" $U/notion/push)
 ok "Notion : le terrain envoie le handover (shift clôturé)" "$R" '"ok":true'; ok "Notion : lien de la page" "$R" 'notion.so'
 NS=$(curl -s -H "Authorization: Bearer $NG" -H "Notion-Version: 2022-06-28" http://127.0.0.1:8774/v1/_dump)
@@ -359,6 +360,7 @@ ok "Notion : matériel par client" "$(J 'foreach($o as $x) if(($x["title"]??"")=
 R=$(J 'foreach($o as $x) if(($x["title"]??"")==="Station Control") echo json_encode($x["rows"],JSON_UNESCAPED_UNICODE);')
 ok "Notion : Station Control en deux colonnes" "$R" '"Name":"Tool Check Per MOE 2.6.5","Done ✅":false,"Name.":"Cleanliness of Office"'
 ok "Notion : contrôle coché reporté" "$R" '"Name":"Outillage","Done ✅":true,"Name.":"","Done ✅.":false'
+ok "Notion : manpower en tête, commentaire" "$(J 'foreach($o as $x) if(str_ends_with($x["title"]??"","Day Shift")) echo $x["children"][1]["text"];')" 'Manpower on Shift : MARC TERRAIN, AUTRE PERSONNE (only nights till 04 Dec)'
 ok "Notion : manpower" "$(J 'foreach($o as $x) if(($x["title"]??"")==="Manpower") echo json_encode($x["rows"]);')" '"Name":"Marc Terrain","Function":"Mechanic","Type ratings":"B767 E"'
 ok "Notion : lien gardé sur le shift" "$(curl -s -H "$HT" $U/docs/handovers/2026-11-19-day)" '"notion":{"url":"https:\/\/www.notion.so'
 R=$(curl -s -H "$B" -X POST -d "{\"ho\":\"2026-11-19-day\",\"crew\":[\"s1\"],\"checks\":$CK}" $U/notion/push)

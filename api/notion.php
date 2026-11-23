@@ -67,6 +67,16 @@ function nt_title($s) { return ['title' => nt_txt($s)]; }
 function nt_rt($s) { return ['rich_text' => nt_txt($s)]; }
 function nt_ms(array $names) { $o = []; foreach (array_unique(array_filter(array_map(fn($n) => str_replace(',', ' ', trim((string) $n)), $names))) as $n) $o[] = ['name' => mb_substr($n, 0, 100)]; return ['multi_select' => $o]; }
 function nt_block($type, $text) { return ['object' => 'block', 'type' => $type, $type => ['rich_text' => nt_txt($text)]]; }
+function nt_manpower(array $crew, array $staff, array $notes) {   // « Manpower on Shift : ANDRE, VALENTIN (only nights till 04 Dec) » ; nom surligné s'il y a un commentaire
+    $rt = [['type' => 'text', 'text' => ['content' => 'Manpower on Shift : ']]]; $i = 0;
+    foreach ($crew as $sid) { $p = $staff[$sid] ?? null; if (!$p) continue;
+        if ($i++) $rt[] = ['type' => 'text', 'text' => ['content' => ', ']];
+        $n = mb_substr(trim((string) ($notes[$sid] ?? '')), 0, 300); $name = mb_strtoupper((string) ($p['name'] ?? ''));
+        $rt[] = ['type' => 'text', 'text' => ['content' => $name . ($n !== '' ? " ($n)" : '')]] + ($n !== '' ? ['annotations' => ['color' => 'yellow_background', 'bold' => true]] : []);
+        if (count($rt) > 95) break; }
+    if ($i === 0) $rt[] = ['type' => 'text', 'text' => ['content' => '—']];
+    return ['object' => 'block', 'type' => 'paragraph', 'paragraph' => ['rich_text' => $rt]];
+}
 function nt_db($pageId, $title, array $props) {
     return notion_http('POST', 'databases', ['parent' => ['type' => 'page_id', 'page_id' => $pageId], 'is_inline' => true, 'title' => nt_txt($title), 'properties' => $props]);
 }
@@ -92,7 +102,7 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
 
     $fm = $nm($h['foreman'] ?? '');
     $page = notion_http('POST', 'pages', ['parent' => ['type' => 'page_id', 'page_id' => $parent], 'properties' => ['title' => nt_title($title)],
-        'children' => [nt_block('paragraph', 'Shift Foreman : ' . ($fm !== '' ? $fm : '—') . ' · written by my-145-station (CRS stays in AMOS)'),
+        'children' => [nt_block('paragraph', 'Shift Foreman / Lead Engineer : ' . ($fm !== '' ? $fm : '—') . ' · written by my-145-station (CRS stays in AMOS)'), nt_manpower($crew, $staff, (array) ($h['crewNotes'] ?? [])),
             ...((string) ($h['summary']['text'] ?? '') !== '' ? [nt_block('paragraph', 'Shift summary : ' . mb_substr((string) $h['summary']['text'], 0, 1900))] : []), nt_block('heading_2', '1. Uncompleted work')]]);
     $pid = str_replace('-', '', (string) ($page['id'] ?? '')); if ($pid === '') throw new RuntimeException('Notion : page non créée.');
 
