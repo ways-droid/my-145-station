@@ -27,17 +27,17 @@ function rx_shared(ZipArchive $z) {
     return $ss;
 }
 /* grille d'un onglet : $g[ligne][colonne] = texte (cellules non vides) */
-function rx_grid(ZipArchive $z, $path, $ss, $maxRows = 400) {
+function rx_grid(ZipArchive $z, $path, $ss, $maxRows = 400, &$sty = null) {
     $x = $z->getFromName($path); if ($x === false) return [];
     $d = @simplexml_load_string($x); if (!$d) return [];
-    $g = [];
+    $g = []; $sty = [];
     foreach ($d->sheetData->row ?? [] as $row) {
         $r = (int) $row['r']; if ($r > $maxRows) break;
         foreach ($row->c as $c) {
             $t = (string) $c['t']; $v = (string) $c->v;
             if ($t === 's') $v = $ss[(int) $v] ?? ''; elseif ($t === 'inlineStr') $v = trim(implode('', array_map('strval', $c->xpath('.//*[local-name()="t"]') ?: [])));
             elseif ($t === 'b') $v = $v === '1' ? 'TRUE' : 'FALSE';
-            $v = trim(str_replace(["\r", "\n", "\t"], ' ', $v)); if ($v !== '') $g[$r][rx_col((string) $c['r'])] = $v;
+            $v = trim(str_replace(["\r", "\n", "\t"], ' ', $v)); if ($v !== '') { $g[$r][rx_col((string) $c['r'])] = $v; if ((string) $c['s'] !== '') $sty[$r][rx_col((string) $c['r'])] = (int) $c['s']; }
         }
     }
     return $g;
@@ -56,8 +56,27 @@ function rx_clean_name($v) {
     while (preg_match('/^(.*\S)\s+([A-Z0-9\/+]{2,}|Only)$/u', $s, $m) && str_contains($m[1], ' ')) $s = $m[1];   // FAA, DL, FAA Only…
     return $s;
 }
+/* cadres épais du roster : noir = flight mech, bleu = détaché en outstation ; index de style → 'fm' | 'out' */
+function rx_duty_styles(ZipArchive $z) {
+    $x = $z->getFromName('xl/styles.xml'); if ($x === false) return [];
+    $d = @simplexml_load_string($x); if (!$d) return [];
+    $kind = function ($e) {
+        if (!in_array((string) ($e['style'] ?? ''), ['thick', 'medium'], true)) return null;
+        $c = $e->color; if (!$c) return 'fm';
+        if ((string) $c['auto'] === '1' || (string) $c['indexed'] === '64' || (string) $c['indexed'] === '8') return 'fm';
+        if ((string) $c['indexed'] === '12' || (string) $c['indexed'] === '30') return 'out';
+        $rgb = (string) $c['rgb']; if (!preg_match('/^(?:[0-9A-F]{2})?([0-9A-F]{2})([0-9A-F]{2})([0-9A-F]{2})$/i', $rgb, $m)) return null;
+        [$r, $g, $b] = [hexdec($m[1]), hexdec($m[2]), hexdec($m[3])];
+        if (max($r, $g, $b) < 0x50) return 'fm';
+        if ($b >= 0x99 && $r < 0x60 && $b > $g) return 'out';
+        return null;
+    };
+    $bd = []; foreach ($d->borders->border ?? [] as $b) { $t = $kind($b->top); $bo = $kind($b->bottom); $bd[] = ($t && $t === $bo) ? $t : null; }
+    $out = []; $i = 0; foreach ($d->cellXfs->xf ?? [] as $xf) { $k = $bd[(int) $xf['borderId']] ?? null; if ($k) $out[$i] = $k; $i++; }
+    return $out;
+}
 /* lit un onglet ; null si ce n'est pas un roster */
-function rx_parse_grid($g) {
+function rx_parse_grid($g, $sty = [], $dst = []) {
     $best = 0; $dayRow = 0;
     foreach (array_slice(array_keys($g), 0, 25) as $r) { $n = 0; foreach ($g[$r] as $v) if (preg_match('/^\d{1,2}$/', $v) && (int) $v >= 1 && (int) $v <= 31) $n++; if ($n > $best) { $best = $n; $dayRow = $r; } }
     if ($best < 28) return null;
@@ -79,9 +98,9 @@ function rx_parse_grid($g) {
         if ($seen && !preg_match('/\p{Ll}/u', $v) && mb_strlen($v) >= 12) break;   // OPERATION / RESOURCES, ENGINEERS ON DUTY…
         $name = rx_clean_name($v);
         if (!preg_match('/\p{Ll}/u', $v) || str_starts_with(ltrim($v), '-') || !str_contains($name, ' ')) continue;
-        $seen = true; $days = [];
-        foreach ($cols as $c => $d) if (isset($g[$r][$c])) $days[$d] = $g[$r][$c];
-        $people[] = ['row' => $r, 'raw' => $v, 'name' => $name, 'days' => $days];
+        $seen = true; $days = []; $duty = [];
+        foreach ($cols as $c => $d) if (isset($g[$r][$c])) { $days[$d] = $g[$r][$c]; $k = $dst[$sty[$r][$c] ?? -1] ?? null; if ($k) $duty[$d] = $k; }
+        $people[] = ['row' => $r, 'raw' => $v, 'name' => $name, 'days' => $days, 'duty' => $duty];
     }
     if (count($people) < 2) return null;
     $months = array_values(array_unique(array_map(fn($d) => substr($d, 0, 7), $cols)));
@@ -91,11 +110,11 @@ function rx_parse_grid($g) {
 function rx_parse_file($path, $want = '') {
     if (!class_exists('ZipArchive')) return null;
     $z = new ZipArchive(); if ($z->open($path) !== true) return null;
-    $ss = rx_shared($z); $best = null; $bs = -1; $names = [];
+    $ss = rx_shared($z); $dst = rx_duty_styles($z); $best = null; $bs = -1; $names = [];
     foreach (rx_sheets($z) as [$name, $hidden, $xml]) {
         $names[] = $name . ($hidden ? ' (hidden)' : '');
         if ($want !== '' ? mb_strtolower($name) !== mb_strtolower($want) : $hidden) continue;
-        $p = rx_parse_grid(rx_grid($z, $xml, $ss)); if (!$p) continue;
+        $grid = rx_grid($z, $xml, $ss, 400, $sty); $p = rx_parse_grid($grid, $sty, $dst); if (!$p) continue;
         $s = (stripos($name, 'official') !== false ? 2 : 0) + (in_array(gmdate('Y-m'), $p['months'], true) ? 4 : 0) + (int) substr(end($p['months']), 0, 4) / 10000;
         if ($s > $bs) { $bs = $s; $best = ['sheet' => $name] + $p; }
     }
@@ -139,6 +158,7 @@ function rx_plan($parsed, $from, $to) {
             $new = [];
             foreach ($pp['days'] as $d => $v) { if (substr($d, 0, 7) !== $ym) continue;
                 $cell = rx_code($v); if ($cell === false) { $unknown[$v] = ($unknown[$v] ?? 0) + 1; continue; } if ($cell === null) continue;
+                if (!empty($pp['duty'][$d]) && $cell['c'] !== 'T') $cell['duty'] = $pp['duty'][$d];   // cadre noir / bleu
                 $k = (string) (int) substr($d, 8); $o = $oldDays[$k] ?? null;
                 if (is_array($o) && ($o['c'] ?? '') === $cell['c'] && !isset($cell['note']) && isset($o['note'])) $cell['note'] = $o['note'];   // remarque du bureau gardée
                 $new[$k] = $cell; }
@@ -157,7 +177,7 @@ function rx_plan($parsed, $from, $to) {
 /* « 1-10 D/N · 11 T · 12 TLV » */
 function rx_runs($days) {
     $out = []; $cur = null; $a = $b = 0;
-    foreach ($days as $k => $c) { $code = $c['c'] . (($c['c'] === 'C' && !empty($c['start'])) ? " {$c['start']}-{$c['end']}" : '');
+    foreach ($days as $k => $c) { $code = $c['c'] . (($c['c'] === 'C' && !empty($c['start'])) ? " {$c['start']}-{$c['end']}" : '') . (!empty($c['duty']) ? ($c['duty'] === 'fm' ? ' [flight mech]' : ' [outstation]') : '');
         if ($cur === $code && (int) $k === $b + 1) { $b = (int) $k; continue; }
         if ($cur !== null) $out[] = ($a === $b ? $a : "$a-$b") . " $cur"; $cur = $code; $a = $b = (int) $k; }
     if ($cur !== null) $out[] = ($a === $b ? $a : "$a-$b") . " $cur";
@@ -198,7 +218,7 @@ function rx_propose_import($who, $role, $in) {
     $plan = rx_plan($p, $from, $to);
     if (!$plan['months']) return ['error' => "Aucun mois du fichier entre $from et $to. Mois du fichier : " . $p['months'][0] . ' à ' . end($p['months'])];
     $base = ['sheet' => $p['sheet'], 'months' => $plan['months'][0] . ' → ' . end($plan['months']), 'people' => $plan['people'], 'notInStaff' => $plan['unmatched'], 'unknownCodesNotImported' => $plan['unknownCodes'],
-        'codes' => 'D/N!!, D/N? → D/N (remark kept) · E → C 16:00-00:30 · T+D / D+T → D (remark) · FLT → T · 3-letter airport → detached at that station · empty cell → day cleared'];
+        'codes' => 'thick black frame → flight mech duty, thick blue frame → outstation duty · D/N!!, D/N? → D/N (remark kept) · E → C 16:00-00:30 · T+D / D+T → D (remark) · FLT → T · 3-letter airport → detached at that station · empty cell → day cleared'];
     if (!$plan['docs']) return ['ok' => true, 'noChange' => true] + $base + ['todo' => "Le roster de l'outil est déjà identique au fichier pour ces mois : dis-le simplement."];
     $tok = rx_pending_add($who, ['kind' => 'roster', 'coll' => 'roster', 'id' => '', 'fileId' => $f[0], 'sheet' => $p['sheet'], 'from' => $from, 'to' => $to, 'sig' => $plan['sig'],
         'label' => 'Roster ' . $plan['months'][0] . ' → ' . end($plan['months'])]);
@@ -215,6 +235,7 @@ function rx_propose_changes($who, $role, $in) {
         $c = strtoupper(trim((string) ($x['code'] ?? '')));
         if ($c !== '' && !in_array($c, ['D', 'N', 'D/N', 'C', 'T', 'TLV', 'OJT', 'TRNG', 'OFF'], true) && !preg_match('/^[A-Z]{3}$/', $c)) { $err[] = "code inconnu : $c"; continue; }
         $cell = $c === '' ? null : ['c' => $c] + ($c === 'C' ? ['start' => (string) ($x['start'] ?? '06:00'), 'end' => (string) ($x['end'] ?? '18:00')] : []) + (trim((string) ($x['note'] ?? '')) !== '' ? ['note' => mb_substr(trim((string) $x['note']), 0, 300)] : []);
+        if ($cell && in_array((string) ($x['duty'] ?? ''), ['fm', 'out'], true)) $cell['duty'] = (string) $x['duty'];
         for ($t = $d, $i = 0; $t <= $to && $i < 92; $t = gmdate('Y-m-d', strtotime("$t +1 day")), $i++) $ch[] = [$sid, $t, $cell];
     }
     if (!$ch) return ['error' => 'Aucun changement valable.' . ($err ? ' ' . implode(' ; ', $err) : '')];
