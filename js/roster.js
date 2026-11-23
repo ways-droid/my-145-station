@@ -92,7 +92,7 @@ function rosterMonth() {
     ${fridayOff() ? `<label class="small row-g">${esc(tr("Vendredi"))} <input type="range" id="r-fri" min="0" max="100" step="5" value="${UI.rfri}" style="width:110px" aria-label="${esc(tr("Intensité du moucheté du vendredi"))}"></label>` : ""}</div>`;
   return `${bar}${view}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}" style="--fri-a:${(UI.rfri / 100 * 0.6).toFixed(3)}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["S", "M", "T", "W", "T", "F", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
     ${ppl.map(p => `<tr><th class="rname"><a href="#" data-a="staff-open" data-id="${p.id}">${esc(p.name)}</a><div class="muted small">${esc([STAFF_FN[p.function], Object.entries(p.ratings || {}).map(([t, l]) => t.replace(/^B/, "") + " " + l).join(" · ")].filter(Boolean).join(" · "))}</div></th>
-      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; const fa = (fat[p.id] || {})[d]; return `<td class="rc ${c ? "rc-" + c.col : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}${fa ? " rfat" : ""}" data-rc="${p.id}|${d}" title="${esc([c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "", ...(fa || []).map(a => "⚠ " + a)].filter(Boolean).join("\n"))}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
+      ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; const fa = (fat[p.id] || {})[d]; return `<td class="rc ${c ? "rc-" + c.col : ""}${x && x.duty ? " rd-" + x.duty : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}${fa ? " rfat" : ""}" data-rc="${p.id}|${d}" title="${esc([c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "", x && x.duty && typeof DUTY !== "undefined" ? DUTY[x.duty].l : "", ...(fa || []).map(a => "⚠ " + a)].filter(Boolean).join("\n"))}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
     ${covRows}<tr class="rcov"><th class="rname small">D/N à affecter</th>${dates.map((d, i) => { const k = cov[i] ? toAssign(d).length : 0; return `<td class="${k ? "todo" : ""}">${k || ""}</td>`; }).join("")}</tr></tbody></table></div><div class="pad hint">Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
 }
 function rosterToday() {
@@ -159,7 +159,7 @@ document.addEventListener("pointerdown", e => {
 document.addEventListener("pointerover", e => { if (!rPaint) return; const td = e.target.closest && e.target.closest("td[data-rc]"); if (td) paintTd(td); });
 document.addEventListener("pointerup", async () => {
   if (!rPaint) return; const keys = [...rPaint]; rPaint = null; const x = brushCell();
-  await rosterSet(keys.map(k => { const [sid, d] = k.split("|"); const old = rcell(sid, d); return [sid, d, x ? Object.assign({}, x, old && old.c === x.c ? { start: old.start || x.start, end: old.end || x.end } : {}, old?.note ? { note: old.note } : {}) : null]; }));
+  await rosterSet(keys.map(k => { const [sid, d] = k.split("|"); const old = rcell(sid, d); return [sid, d, x ? Object.assign({}, x, old && old.c === x.c ? { start: old.start || x.start, end: old.end || x.end } : {}, old?.note ? { note: old.note } : {}, old?.duty ? { duty: old.duty } : {}) : null]; }));
 });
 document.addEventListener("click", e => {
   const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td || UI.rbrush != null) return;
@@ -170,17 +170,19 @@ document.addEventListener("click", e => {
     ${field("rc-code", "Code", away ? "?" : x.c || "", { type: "select", options: [["", "— (vide)"], ...rcodes().map(c => [c.c, c.c + " · " + tr(c.l)]), ["?", tr("Autre station (détaché / flight mech)")]] })}
     ${field("rc-st", "Code de la station", away ? x.c : "", { ph: "LGG", cls: "mono" })}
     ${field("rc-start", "Début", x.start || "06:00", { type: "time" })}${field("rc-end", "Fin", x.end || "18:00", { type: "time" })}</div>
+    ${field("rc-duty", "Duty frame", x.duty || "", { type: "select", options: [["", "— (none)"], ["fm", "✈ Flight mech (black frame)"], ["out", "🏢 Outstation (blue frame)"]] })}
     ${isOffice() ? field("rc-note", "Remarque (visible du bureau seulement)", x.note, { type: "textarea" }) : ""}
+    ${typeof rosterCellLinks === "function" ? rosterCellLinks(sid, d, x) : ""}
     ${ed ? `<label class="chk"><input type="checkbox" id="rc-until"> Appliquer jusqu'au <input type="date" id="rc-to" value="${esc(d)}" min="${esc(d)}"></label>` : ""}</div>
     <footer><button type="button" class="btn" data-close>Fermer</button>${ed ? `<button class="btn primary">Enregistrer</button>` : ""}</footer></form>`, "sm");
   const sync = () => { const c = val("rc-code"); m.querySelector("#rc-st").closest("label").style.display = c === "?" ? "" : "none";
     const cu = c && c !== "?" && rcode(c).k === "custom"; m.querySelector("#rc-start").closest("label").style.display = m.querySelector("#rc-end").closest("label").style.display = cu ? "" : "none"; };
   m.querySelector("#rc-code").onchange = sync; sync();
-  if (!ed) m.querySelectorAll("input,select,textarea").forEach(i => i.disabled = true);
+  if (!ed) m.querySelectorAll(".body input,.body select,.body textarea").forEach(i => i.disabled = true);
   m.querySelector("form").onsubmit = async ev => {
     ev.preventDefault();
     let c = val("rc-code"); if (c === "?") { c = val("rc-st").toUpperCase(); if (!/^[A-Z]{3}$/.test(c)) { toast("Code de station : 3 lettres, ex. LGG."); return; } }
-    const cell = c ? Object.assign({ c }, rcode(c).k === "custom" ? { start: val("rc-start"), end: val("rc-end") } : {}, val("rc-note") ? { note: val("rc-note") } : {}) : null;
+    const cell = c ? Object.assign({ c }, rcode(c).k === "custom" ? { start: val("rc-start"), end: val("rc-end") } : {}, val("rc-note") ? { note: val("rc-note") } : {}, val("rc-duty") ? { duty: val("rc-duty") } : {}) : null;
     const to = m.querySelector("#rc-until")?.checked ? val("rc-to") : d, ch = [];
     for (let x2 = d; x2 <= to && ch.length < 370; x2 = addDays(x2, 1)) ch.push([sid, x2, cell]);
     closeModal(); await rosterSet(ch); toast("Roster enregistré");

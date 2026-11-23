@@ -20,7 +20,9 @@ function travelToBook(days = 60) {
     if (!x || x.c !== "T") continue;
     const date = `${r.month}-${String(d).padStart(2, "0")}`; if (date < today() || date > end) continue;
     const p = staff(r.staffId); if (!p || p.active === false) continue;
-    const ok = trFlights().some(f => trActive(f) && f.staffId === r.staffId && f.date && Math.abs(daysBetween(f.date, date)) <= 1);
+    const du = typeof dutyFor === "function" ? dutyFor(r.staffId, date) : null;   // T d'un déplacement flight mech / outstation : vol dans la fiche duty
+    const ok = du ? [du.out, du.back].some(f => f && (f.flightNo || f.pnr) && Math.abs(daysBetween(f.date || date, date)) <= 1)
+      : trFlights().some(f => trActive(f) && f.staffId === r.staffId && f.date && Math.abs(daysBetween(f.date, date)) <= 1);
     if (!ok) out.push({ staffId: r.staffId, date });
   }
   return out.sort((a, b) => a.date.localeCompare(b.date) || sName(a.staffId).localeCompare(sName(b.staffId)));
@@ -34,8 +36,8 @@ VIEWS.voyages = {
       `<div class="pipeline"><div class="panel tile c-blue"><div class="lbl">Vols à venir</div><div class="val">${fut.length}</div><div class="note">${fut.filter(f => f.date <= addDays(today(), 7)).length} dans les 7 jours</div></div>
         <div class="panel tile c-teal"><div class="lbl">À l'hôtel cette nuit</div><div class="val">${tonight.length}</div></div>
         ${isOffice() ? `<div class="panel tile c-orange ${tb.length ? "alert" : ""}"><div class="lbl">Voyages à organiser</div><div class="val">${tb.length}</div><div class="note">Jours T du roster sans vol</div></div>` : ""}</div>` +
-      tabs("voyages", [["vols", "Vols", fut.length], ["sejours", "Hôtel", trStays().filter(x => trActive(x) && x.checkOut >= today()).length], ...(isOffice() ? [["organiser", "À organiser", tb.length, tb.length > 0], ["hotels", "Hôtels", (S.hotels || []).length || ""]] : [])]) +
-      ({ vols: trFlightList, sejours: trStayList, organiser: trToBookList, hotels: trHotelList })[tab]();
+      tabs("voyages", [["vols", "Vols", fut.length], ["sejours", "Hôtel", trStays().filter(x => trActive(x) && x.checkOut >= today()).length], ["duties", "Duties", dutyDocs().filter(x => trActive(x) && x.to >= today()).length], ...(isOffice() ? [["organiser", "À organiser", tb.length, tb.length > 0], ["hotels", "Hôtels", (S.hotels || []).length || ""], ["costs", "Costs"]] : [])]) +
+      ({ vols: trFlightList, sejours: trStayList, duties: trDutyList, organiser: trToBookList, hotels: trHotelList, costs: trCostList })[tab]();
   }
 };
 const trPast = () => UI.filter === "passe";
@@ -68,7 +70,7 @@ function trToBookList() {
   const rows = travelToBook();
   return `<div class="panel"><div class="pad muted small">Jours T (voyage) des 60 prochains jours dans le roster, sans vol enregistré pour la personne ce jour-là, la veille ou le lendemain.</div>
     ${rows.length ? `<div class="tablewrap"><table><thead><tr><th>Date</th><th>Personne</th><th>Fonction</th><th></th></tr></thead><tbody>${rows.map(r => `<tr><td class="num">${fmtDate(r.date)}</td><td><b>${esc(sName(r.staffId))}</b></td><td class="small">${esc(STAFF_FN[staff(r.staffId)?.function] || "")}</td>
-      <td class="r">${readOnly ? "" : `<button class="btn sm primary" data-a="tr-form" data-kind="flight" data-staff="${r.staffId}" data-date="${r.date}">Ajouter le vol</button>`}</td></tr>`).join("")}</tbody></table></div>`
+      <td class="r">${readOnly ? "" : `${typeof dutyFor === "function" && dutyFor(r.staffId, r.date) ? `<button class="btn sm primary" data-a="duty-open" data-staff="${r.staffId}" data-date="${r.date}">${esc(tr("Open the duty sheet"))}</button>` : `<button class="btn sm primary" data-a="tr-form" data-kind="flight" data-staff="${r.staffId}" data-date="${r.date}">Ajouter le vol</button>`}`}</td></tr>`).join("")}</tbody></table></div>`
       : `<div class="empty">Tous les jours de voyage du roster ont un vol.</div>`}</div>`;
 }
 function trHotelList() {
@@ -92,7 +94,7 @@ ACTIONS["tr-form"] = el => {
       : `${field("tr-hotel", "Hôtel", x.hotelId, { type: "select", required: true, options: [["", hs.length ? "Choisir…" : "Ajoutez d'abord un hôtel (onglet Hôtels)"], ...hs.map(h => [h.id, h.name])] })}${field("tr-in", "Arrivée (check-in)", x.checkIn, { type: "date", required: true })}${field("tr-out", "Départ (check-out)", x.checkOut, { type: "date", required: true })}
       ${field("tr-room", "Chambre", x.room, { cls: "mono" })}${field("tr-conf", "N° de confirmation", x.conf, { cls: "mono" })}`}
     ${isOffice() ? `${field("tr-cost", "Coût", x.cost, { type: "number", step: "0.01" })}${field("tr-cur", "Devise", x.currency || "EUR", { type: "select", options: ["EUR", "USD", "ILS"].map(c => [c, c]) })}` : ""}</div>
-    ${field("tr-notes", "Notes", x.notes, { type: "textarea", wide: true })}</fieldset><div class="err" id="tr-err"></div></div>
+    ${field("tr-notes", "Notes", x.notes, { type: "textarea", wide: true })}</fieldset>${f && x.staffId && typeof travelRosterNote === "function" ? travelRosterNote(x) : ""}<div class="err" id="tr-err"></div></div>
     <footer>${x.id && !ro ? `<div class="left"><button type="button" class="btn danger" data-a="tr-del" data-id="${x.id}">Supprimer</button>${trActive(x) ? ` <button type="button" class="btn" data-a="tr-cancel" data-id="${x.id}">Annulé</button>` : ""}</div>` : ""}<button type="button" class="btn" data-close>${ro ? "Fermer" : "Annuler"}</button>${ro ? "" : `<button class="btn primary">Enregistrer</button>`}</footer></form>`, "lg");
   if (ro) return;
   m.querySelector("form").onsubmit = async e => {

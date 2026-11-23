@@ -651,10 +651,10 @@ if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
   R=$(curl -s -H "$A" -X POST -d "{\"text\":\"\",\"files\":[{\"id\":\"$FID\",\"name\":\"TLV Roster OFFICIAL.xlsx\"}]}" $U/assistant/say)
   ok "roster Excel reconnu (onglet OFFICIAL)" "$(grep 'ROSTER au format' $T/ai.log | tail -1)" 'TLV-2026 OFFICIAL-Bis'
   ok "roster : résumé, rien écrit" "$R" 'mode .*dition'; ok "roster : personne reconnue" "$R" 'Marc Terrain'; ok "roster : absent de Personnel signalé" "$R" 'Unknown Guy'
-  ok "roster : aperçu converti" "$R" '1-3 D/N · 4 T · 5 C 16:00-00:30 · 6 CGN · 7 D/N'; ok "roster : code inconnu signalé" "$R" 'XYZQ'
+  ok "roster : aperçu converti" "$R" '1-3 D/N · 4 T · 5 C 16:00-00:30 · 6 CGN \[flight mech\] · 7 D/N'; ok "roster : code inconnu signalé" "$R" 'XYZQ'
   no "roster : rien avant le oui" "$(curl -s -H "$A" $U/docs/roster/s1_2026-11)" 'CGN'
   R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "roster écrit après oui" "$R" 'rosterMonthsWritten'
-  V=$(curl -s -H "$A" $U/docs/roster/s1_2026-11); ok "roster : jours écrits" "$V" '"6":{"c":"CGN"}'; ok "roster : remarque gardée" "$V" 'D/N !!'
+  V=$(curl -s -H "$A" $U/docs/roster/s1_2026-11); ok "roster : cadre noir = flight mech" "$V" '"6":{"c":"CGN","duty":"fm"}'; ok "roster : cadre bleu = outstation" "$V" '"9":{"c":"BOM","duty":"out"}'; ok "roster : remarque gardée" "$V" 'D/N !!'
   ok "roster : décembre (T+D → D)" "$(curl -s -H "$A" $U/docs/roster/s2_2026-12)" '"2":{"c":"D","note":"T+D"}'
 fi
 R=$(curl -s -H "$A" -X POST -d '{"text":"Roster direct"}' $U/assistant/say); ok "roster : pas d'écriture directe par Sindri" "$R" 'mode .*dition'
