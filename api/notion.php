@@ -92,7 +92,7 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
 
     $fm = $nm($h['foreman'] ?? '');
     $page = notion_http('POST', 'pages', ['parent' => ['type' => 'page_id', 'page_id' => $parent], 'properties' => ['title' => nt_title($title)],
-        'children' => [nt_block('paragraph', 'Shift Foreman : ' . ($fm !== '' ? $fm : '—') . ' · écrit par my-145-station (la CRS reste dans AMOS)'),
+        'children' => [nt_block('paragraph', 'Shift Foreman : ' . ($fm !== '' ? $fm : '—') . ' · written by my-145-station (CRS stays in AMOS)'),
             ...((string) ($h['summary']['text'] ?? '') !== '' ? [nt_block('paragraph', 'Shift summary : ' . mb_substr((string) $h['summary']['text'], 0, 1900))] : []), nt_block('heading_2', '1. Uncompleted work')]]);
     $pid = str_replace('-', '', (string) ($page['id'] ?? '')); if ($pid === '') throw new RuntimeException('Notion : page non créée.');
 
@@ -101,7 +101,7 @@ function notion_write_handover($hoId, array $h, array $items, array $crew, array
     $todo = $kind('todo'); usort($todo, $byOrder);
     foreach ($todo as $x) nt_row($db['id'], ['Work' => nt_title((string) ($x['text'] ?? '')), 'A/C REG' => nt_rt((string) ($x['reg'] ?? '')), 'Note' => nt_rt((string) ($x['note'] ?? '')), 'Done' => ['checkbox' => !empty($x['done'])]]);
     $visits = $kind('visit'); usort($visits, $byOrder);
-    foreach ($visits as $v) if (!empty($v['open'])) nt_row($db['id'], ['Work' => nt_title(trim((string) ($v['planned'] ?? '')) ?: 'Travail non terminé'), 'A/C REG' => nt_rt((string) ($v['reg'] ?? '')), 'Note' => nt_rt((string) ($v['notes'] ?? '')), 'Done' => ['checkbox' => false]]);
+    foreach ($visits as $v) if (!empty($v['open'])) nt_row($db['id'], ['Work' => nt_title(trim((string) ($v['planned'] ?? '')) ?: 'Uncompleted work'), 'A/C REG' => nt_rt((string) ($v['reg'] ?? '')), 'Note' => nt_rt((string) ($v['notes'] ?? '')), 'Done' => ['checkbox' => false]]);
 
     // 2. travail prévu / fait, un avion par ligne
     nt_append($pid, [nt_block('heading_2', '2. Shift Work Planned/Done')]);
