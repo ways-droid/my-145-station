@@ -641,6 +641,12 @@ php -r '$p=new PDO("sqlite:".$argv[1]); $p->exec("UPDATE ways_kv SET v=\"1\" WHE
 curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say >/dev/null
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "hors 24 h : envoyé par le modèle" "$R" 'par le mod'
 ok "modèle avec nom et texte" "$(cat $T/meta.log)" '"type":"template","template":{"name":"message_equipe"'
+# planning lu dans une capture (rotations) : proposition, puis création après oui
+R=$(curl -s -H "$A" -X POST -d '{"text":"Planning rotations"}' $U/assistant/say); ok "rotations lues, rien créé" "$R" '2026-11-24-day'; ok "heure locale calculée" "$R" '18:30'
+no "pas de visite avant le oui" "$(curl -s -H "$A" $U/docs/shiftItems)" '4X-ICA'
+R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "rotations créées après oui" "$R" 'Fait'
+V=$(curl -s -H "$A" $U/docs/shiftItems); ok "visite créée dans le bon shift" "$V" '"ho":"2026-11-24-day"'; ok "arrivée UTC gardée" "$V" '"arr":"16:30"'
+R=$(curl -s -H "$A" -X POST -d '{"text":"Planning rotations"}' $U/assistant/say); ok "doublon détecté" "$R" 'duplicateOf'
 pkill -f "127.0.0.1:8772" || true
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["ai_usage_".gmdate("Y-m"),json_encode(["in"=>0,"out"=>0,"usd"=>9,"q"=>3])]);' $T/t.db
 ok "plafond mensuel" "$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Encore ?"}]}' $U/assistant/chat)" 'Plafond mensuel'

@@ -41,6 +41,7 @@ if (str_contains($question, 'Supprime vite')) {
     if ($lastRes !== null) { $say('Résultat : ' . $lastRes); exit; }
     $tu('tu_pd2', 'propose_delete', ['collection' => 'faults', 'id' => 'f-ax2', 'summary' => 'test']); exit;
 }
+if (str_contains($question, 'Planning rotations')) { if ($lastRes !== null) { $say('Lu : ' . $lastRes); exit; } $tu('tu_rot', 'propose_rotations', ['rotations' => [['reg' => '4X-ICA', 'arrUtc' => '2026-11-24 16:30', 'from' => 'LGG', 'flightIn' => 'ICL101', 'depUtc' => '2026-11-24 21:00', 'to' => 'JFK', 'flightOut' => 'ICL102'], ['reg' => '4X-ICB', 'arrUtc' => '2026-11-25 03:10', 'from' => 'CDG', 'depUtc' => '2026-11-25 07:40', 'to' => 'LGG']]]); exit; }
 if ($question === 'oui' || $question === 'Supprime-la') {
     if ($lastRes !== null) { $say('Fait : ' . $lastRes); exit; }
     preg_match_all('/token ([a-f0-9]{8})/', json_encode($b['system'] ?? '', JSON_UNESCAPED_UNICODE), $tk); $tu('tu_cd', 'confirm_delete', ['token' => end($tk[1]) ?: 'x']); exit;
