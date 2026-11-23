@@ -451,6 +451,9 @@ table.visits tbody.vgrp tr.vo-other td { border-bottom-color: transparent; }
 /* Tech Log : défaut / tâche à gauche, action à droite */
 .tl { display: grid; gap: 4px; min-width: 420px; } .tl-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 3px 0; border-top: 1px dashed var(--line); } .tl-row:first-child { border-top: 0; }
 .tl-d, .tl-a { white-space: pre-wrap; } .tl-open { color: var(--orange-ink, #9a4a00); font-style: italic; }
+.sp-chip { background: #dcfce7; color: #166534; font-weight: 800; letter-spacing: .5px; } .sp-txt { color: #15803d; font-weight: 700; text-decoration: underline; text-transform: uppercase; }
+.tl-card.tl-sp { border-style: dashed; border-color: #15803d; } .tl-card.tl-sp.full { border-style: solid; } .tl-row.tl-box.tl-sp { border-style: dashed; border-color: #15803d; } .tl-row.tl-box.tl-sp.full { border-style: solid; }
+.btn.sp-add { border-color: #15803d; color: #15803d; font-weight: 700; } .sp-done { font-weight: 700; } .wall-tasks li.sp { color: #15803d; text-decoration: underline; text-transform: uppercase; font-weight: 700; }
 .tl-ed { display: grid; gap: 10px; } .tl-card { border: 2px solid var(--ink, #111); border-radius: 10px; transition: border-color .2s, background .2s; padding: 10px; display: grid; gap: 8px; } .tl-card.full { border-color: var(--good, #16a34a); background: var(--green-bg); } .tl-row.tl-box { border: 1.5px solid var(--ink, #111); border-radius: 8px; padding: 6px 8px; } .tl-row.tl-box.full { border-color: var(--good, #16a34a); background: var(--green-bg); }
 .tl-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; } @media (max-width: 640px) { .tl-2 { grid-template-columns: 1fr; } }
 .tl-meta { align-items: flex-end; } .tl-meta .f input { width: 110px; } .tl-techs { flex: 1; min-width: 240px; }

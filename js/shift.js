@@ -321,7 +321,9 @@ function techLogHtml(v) {
   const ts = visitTasks(v);
   if (!ts.length) return `<span class="muted">—</span>`;
   const taken = new Set(S.shiftItems.filter(x => x.kind === "visit" && x.ho !== v.ho && visitGid(x) === visitGid(v)).flatMap(x => (x.tasks || []).map(t => t.from)).filter(Boolean));
-  return `<div class="tl">${ts.map(t => { const meta = [t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · "), who = (t.techs || []).map(x => sName(x.id) + (numH(x.h) ? " " + fmtH(numH(x.h)) + "h" : "")).join(", ");
+  return `<div class="tl">${ts.map(t => { if (t.sp) return `<div class="tl-row tl-box tl-sp${tlFull(t) ? " full" : ""}"><div class="tl-d"><span class="chip sm sp-chip">SPECIAL TASK</span> <span class="sp-txt">${esc(t.text || "—")}</span></div>
+      <div class="tl-a ${t.spDone ? "" : "tl-open"}">${t.spDone ? `✔ Done · ${esc(t.spDone.by || "")}` : "To do"}</div></div>`;
+    const meta = [t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · "), who = (t.techs || []).map(x => sName(x.id) + (numH(x.h) ? " " + fmtH(numH(x.h)) + "h" : "")).join(", ");
     return `<div class="tl-row tl-box${tlFull(t) ? " full" : ""} ${t.unc ? "tl-row-unc" : ""} ${t.ai && !t.ok ? "tl-row-ai" : ""}"><div class="tl-d">${aiTaskChip(v, t)}${t.unc ? `<span class="chip sm bad unc-chip">✔ ${esc(tr("Non terminée · passée au shift suivant"))}</span> ` : ""}${t.from && uncSrc(t.from) ? `<span class="chip sm warn">${esc(tr("Reprise du shift précédent"))}</span> ` : ""}${esc(t.text || "—")}${meta ? `<div class="mono muted">${esc(meta)}</div>` : ""}</div>
       <div class="tl-a ${t.action || taken.has(t.id) ? "" : "tl-open"}">${t.action ? esc(t.action) : taken.has(t.id) ? `<span class="muted">${esc(tr("Reprise par un shift suivant"))}</span>` : esc(tr("À faire"))}${who || taskH(t) ? `<div class="muted">${[who ? esc(who) : "", taskH(t) ? `<b>${fmtH(taskH(t))} h</b>` : ""].filter(Boolean).join(" · ")}</div>` : ""}</div></div>`; }).join("")}</div>`;
 }
@@ -370,7 +372,8 @@ function crsLeadUi(m, t) {
   box.querySelectorAll(".crs-it").forEach(x => x.classList.toggle("lead", !!x.querySelector('input[type="radio"]:checked')));
 }
 /* tâche du Tech Log complète : cadre vert (défaut, action, LogPage, WO, au moins un technicien, heures) */
-const tlFull = t => !!(String(t.text || "").trim() && String(t.action || "").trim() && String(t.logPage || "").trim() && String(t.wo || "").trim() && (t.techs || []).length && taskH(t) > 0);
+/* tâche spéciale (non maintenance, ex. COMAT offload) : verte quand décrite et cochée « Done » */
+const tlFull = t => t.sp ? !!(String(t.text || "").trim() && t.spDone) : !!(String(t.text || "").trim() && String(t.action || "").trim() && String(t.logPage || "").trim() && String(t.wo || "").trim() && (t.techs || []).length && taskH(t) > 0);
 const crsLeadOf = m => { const r = m.querySelector('#vi-crs input[type="radio"]:checked'), crs = picked(m, "vi-crs"), l = r && crs.includes(r.value) ? r.value : "";
   return { crs: crs.sort((a, b) => (b === l) - (a === l)), crsLead: l }; };
 const picked = (m, id) => [...m.querySelectorAll(`#${id} input[type="checkbox"]:checked`)].map(i => i.value);
@@ -418,7 +421,11 @@ ACTIONS["visit-form"] = el => {
   const $t = m.querySelector("#vi-tasks");
   const drawTasks = () => {
     const tot = tasks.reduce((a, t) => a + taskH(t), 0), people = crewNow();
-    $t.innerHTML = tasks.map((t, i) => `<div class="tl-card${tlFull(t) ? " full" : ""}" data-ti="${i}" title="Frame turns green when Defect / Task, Action taken, LogPage no., WO no., a technician and the hours are filled">
+    $t.innerHTML = tasks.map((t, i) => t.sp ? `<div class="tl-card tl-sp${tlFull(t) ? " full" : ""}" data-ti="${i}" title="Special task (not maintenance): frame turns green when described and ticked Done">
+      <div class="row-g wrap"><span class="chip sm sp-chip">SPECIAL TASK · not maintenance</span></div>
+      <label class="f"><span>Task</span><textarea data-k="text" rows="2" class="sp-txt" placeholder="e.g. Offload COMAT from bulk and place in stores">${esc(t.text || "")}</textarea></label>
+      <div class="row-g wrap"><label class="chk sp-done"><input type="checkbox" data-k="spDone" ${t.spDone ? "checked" : ""}> Done${t.spDone ? ` · ${esc(t.spDone.by || "")}` : ""}</label>
+        <button type="button" class="btn sm danger tl-del" data-tidel="${i}">${esc(tr("Retirer"))}</button></div></div>` : `<div class="tl-card${tlFull(t) ? " full" : ""}" data-ti="${i}" title="Frame turns green when Defect / Task, Action taken, LogPage no., WO no., a technician and the hours are filled">
       ${t.ai ? `<div class="${t.ok ? "ai-ok" : "ai-todo"}">${t.ok ? `✔ ${esc(tr("Vérifié et validé par"))} ${esc(t.ok.by || "")}` : `<span class="chip sm warn">✦ ${esc(tr("Encodée par Sindri – à vérifier"))}</span>`} <label class="chk ai-chk"><input type="checkbox" data-k="ok" ${t.ok ? "checked" : ""}> ${esc(tr("J'ai vérifié, c'est validé"))}</label></div>` : ""}
       <div class="tl-2"><label class="f"><span>${esc(tr("Défaut / tâche"))}</span><textarea data-k="text" rows="2">${esc(t.text || "")}</textarea></label>
         <label class="f"><span>${esc(tr("Action / travail fait"))}</span><textarea data-k="action" rows="2" placeholder="${esc(tr("Vide = à faire"))}">${esc(t.action || "")}</textarea></label></div>
@@ -429,10 +436,11 @@ ACTIONS["visit-form"] = el => {
         <label class="chk tl-eq" title="${esc(tr("Crée une ligne à remplir dans la section 3 · Équipement et matériel"))}"><input type="checkbox" data-k="equip" ${t.equip ? "checked" : ""}> ${esc(tr("Équipement utilisé"))}</label>
         <label class="chk tl-unc ${t.unc ? "on" : ""}" title="${esc(tr("La tâche passe au shift suivant : section 1 et Tech Log de l'avion"))}"><input type="checkbox" data-k="unc" ${t.unc ? "checked" : ""}> ${esc(tr("Uncompleted maintenance task – to hand over"))}</label>
         <button type="button" class="btn sm danger tl-del" data-tidel="${i}">${esc(tr("Retirer"))}</button></div></div>`).join("") +
-      `<div class="row-g wrap tl-add"><button type="button" class="btn sm" data-tnew="">+ ${esc(tr("Ligne"))}</button>${taskPresets().map(p => `<button type="button" class="btn sm" data-tnew="${esc(p)}">+ ${esc(p)}</button>`).join("")}
+      `<div class="row-g wrap tl-add"><button type="button" class="btn sm" data-tnew="">+ ${esc(tr("Ligne"))}</button>${taskPresets().map(p => `<button type="button" class="btn sm" data-tnew="${esc(p)}">+ ${esc(p)}</button>`).join("")}<button type="button" class="btn sm sp-add" data-tsp="1" title="A task that is not maintenance (e.g. COMAT offload): the aircraft frame turns green only once it is done">+ Special task</button>
         <span class="muted small" style="margin-left:auto">${esc(tr("Total MHRS"))} : <b>${fmtH(tot) || "0"}</b></span></div>`;
   };
   $t.addEventListener("input", e => { const c = e.target.closest("[data-ti]"); if (!c) return; const t = tasks[+c.dataset.ti];
+    if (e.target.dataset.k === "spDone") { if (e.target.checked) t.spDone = { by: meName(), at: new Date().toISOString() }; else delete t.spDone; drawTasks(); return; }
     if (e.target.dataset.k === "ok") { if (e.target.checked) t.ok = { by: meName(), at: new Date().toISOString() }; else delete t.ok; drawTasks(); return; }
     if (e.target.dataset.k === "equip") t.equip = e.target.checked; else if (e.target.dataset.k === "unc") { t.unc = e.target.checked; e.target.closest(".tl-unc").classList.toggle("on", t.unc); } else if (e.target.dataset.k) t[e.target.dataset.k] = e.target.value; else if (e.target.dataset.tj != null) t.techs[+e.target.dataset.tj].h = e.target.value;
     if (e.target.dataset.tj != null || e.target.dataset.k === "mhrs") { const b = $t.querySelector(".tl-add b"); if (b) b.textContent = fmtH(tasks.reduce((a, x) => a + taskH(x), 0)) || "0"; }
@@ -440,7 +448,8 @@ ACTIONS["visit-form"] = el => {
   $t.addEventListener("change", e => { if (e.target.matches("[data-tadd]") && e.target.value) { const t = tasks[+e.target.closest("[data-ti]").dataset.ti]; t.techs = [...(t.techs || []), { id: e.target.value, h: "" }]; drawTasks(); }
     if (e.target.dataset.tj != null) drawTasks(); });
   $t.addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return; const c = b.closest("[data-ti]");
-    if (b.dataset.tnew != null) { tasks.push({ id: uid(), text: b.dataset.tnew, action: "", logPage: "", wo: "", techs: [] }); drawTasks(); const ta = $t.querySelectorAll(".tl-card textarea"); if (ta.length) ta[b.dataset.tnew ? ta.length - 1 : ta.length - 2].focus(); }
+    if (b.dataset.tsp) { tasks.push({ id: uid(), sp: true, text: "", action: "", techs: [] }); drawTasks(); const ta = $t.querySelectorAll(".tl-card textarea"); if (ta.length) ta[ta.length - 1].focus(); }
+    else if (b.dataset.tnew != null) { tasks.push({ id: uid(), text: b.dataset.tnew, action: "", logPage: "", wo: "", techs: [] }); drawTasks(); const ta = $t.querySelectorAll(".tl-card textarea"); if (ta.length) ta[b.dataset.tnew ? ta.length - 1 : ta.length - 2].focus(); }
     /* garde-fou : retirer une ligne du Tech Log demande une confirmation */
     else if (b.dataset.tidel != null) { const t = tasks[+b.dataset.tidel];
       b.outerHTML = `<span class="tl-sure"><b>${esc(tr("Êtes-vous sûr de vouloir retirer cette ligne ?"))}</b>${t.text ? ` <span class="muted">(${esc(t.text.slice(0, 40))})</span>` : ""} <button type="button" class="btn sm" data-tino>${esc(tr("Non"))}</button> <button type="button" class="btn sm danger" data-tiyes="${b.dataset.tidel}">${esc(tr("Oui, retirer"))}</button></span>`; }
@@ -451,9 +460,9 @@ ACTIONS["visit-form"] = el => {
   const drawCarry = () => {
     const before = v.id || v.visitId ? visitGroup(v).filter(x => x.id !== v.id && shKey(x.ho) < shKey(v.ho)) : [];
     const later = S.shiftItems.filter(x => x.kind === "visit" && v.id !== x.id && (x.visitId || x.id) === visitGid(v)).flatMap(x => visitTasks(x).map(t => t.from)).filter(Boolean);
-    const open = before.flatMap(x => visitTasks(x).filter(t => t.id !== "legacy" && t.text && !t.action && !later.includes(t.id) && !tasks.some(y => y.from === t.id)).map(t => [x, t]));
+    const open = before.flatMap(x => visitTasks(x).filter(t => t.id !== "legacy" && t.text && (t.sp ? !t.spDone : !t.action) && !later.includes(t.id) && !tasks.some(y => y.from === t.id)).map(t => [x, t]));
     m.querySelector("#vi-carry").innerHTML = open.length ? `<div class="banner warn small"><b>${esc(tr("Tâches ouvertes des shifts précédents"))}</b>${open.map(([x, t]) => `<div class="row-g wrap"><span>${esc(t.text)} <span class="muted">· ${esc(shiftLabel(x.ho))}</span></span><button type="button" class="btn sm" data-carry="${t.id}">${esc(tr("Reprendre"))}</button></div>`).join("")}</div>` : "";
-    m.querySelectorAll("[data-carry]").forEach(b => b.onclick = () => { const t = open.find(([, y]) => y.id === b.dataset.carry)[1]; tasks.push({ id: uid(), text: t.text, action: "", logPage: t.logPage || "", wo: t.wo || "", techs: [], from: t.id }); drawTasks(); drawCarry(); });
+    m.querySelectorAll("[data-carry]").forEach(b => b.onclick = () => { const t = open.find(([, y]) => y.id === b.dataset.carry)[1]; tasks.push(Object.assign({ id: uid(), text: t.text, action: "", logPage: t.logPage || "", wo: t.wo || "", techs: [], from: t.id }, t.sp ? { sp: true } : {})); drawTasks(); drawCarry(); });
   };
   drawTasks(); drawCarry();
   m.querySelector("#vi-mech").onchange = drawTasks;
@@ -481,8 +490,8 @@ ACTIONS["visit-form"] = el => {
       mech: picked(m, "vi-mech"), notes: val("vi-notes"), open: m.querySelector("#vi-open").checked, order: v.order || Date.now() });
     /* Tech Log : lignes vides retirées ; textes prévu / fait et total MHRS recalculés pour la Charge Sheet, Notion et Sindri */
     const tl = tasks.filter(t => t.text.trim() || t.action.trim()).map(t => Object.assign(t, { text: t.text.trim(), action: (t.action || "").trim(), techs: (t.techs || []).filter(x => x.id) }));
-    const line = t => [t.text, t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · ");
-    Object.assign(data, { tasks: tl, planned: tl.map(t => "- " + line(t)).join("\n"), done: tl.filter(t => t.action).map(t => "- " + (t.text ? t.text + " : " : "") + t.action).join("\n"), mhrs: fmtH(tl.reduce((a, t) => a + taskH(t), 0)) });
+    const line = t => t.sp ? "SPECIAL TASK: " + t.text.toUpperCase() : [t.text, t.logPage ? "LP " + t.logPage : "", t.wo ? "WO " + t.wo : ""].filter(Boolean).join(" · ");
+    Object.assign(data, { tasks: tl, planned: tl.map(t => "- " + line(t)).join("\n"), done: tl.filter(t => t.sp ? t.spDone : t.action).map(t => "- " + (t.sp ? "SPECIAL TASK: " + t.text.toUpperCase() + " : done" : (t.text ? t.text + " : " : "") + t.action)).join("\n"), mhrs: fmtH(tl.reduce((a, t) => a + taskH(t), 0)) });
     const id = await save("shiftItems", v.id, data);
     closeModal();
     await visitSync(Object.assign({}, data, { id }));
@@ -633,7 +642,8 @@ ACTIONS["ho-sign"] = el => {
   const eq = equipTodo(id), ck = (hoDoc(id) || {}).checks || {}, miss = stationChecks().filter(c => !ck[c]), aiN = aiTaskPending(id);
   /* chaque avion : Arrival Flight No., Arrival LogBook No. et toutes les tâches du Tech Log complètes (cadres verts) */
   const inc = hoItems(id, "visit").filter(v => !visitOff(v)).map(v => ({ v, why: [!String(v.flight || "").trim() && "Arrival Flight No.", !String(v.atl || "").trim() && "Arrival LogBook No.",
-    visitTasks(v).filter(t => !t.unc && !tlFull(t)).length && `${visitTasks(v).filter(t => !t.unc && !tlFull(t)).length} Tech Log task(s) not complete`].filter(Boolean) })).filter(x => x.why.length);
+    visitTasks(v).filter(t => !t.sp && !t.unc && !tlFull(t)).length && `${visitTasks(v).filter(t => !t.sp && !t.unc && !tlFull(t)).length} Tech Log task(s) not complete`,
+    visitTasks(v).filter(t => t.sp && !tlFull(t)).length && `${visitTasks(v).filter(t => t.sp && !tlFull(t)).length} special task(s) not done`].filter(Boolean) })).filter(x => x.why.length);
   const noLead = hoItems(id, "visit").filter(v => !visitOff(v) && !(v.crsLead && (v.crs || []).includes(v.crsLead)));
   if (k === "out" && (eq.length || miss.length || aiN || inc.length)) { modal(`${mHead(tr("Shift pas encore remis"))}<div class="body stack">
     ${inc.length ? `<div>Aircraft not complete (section 2, frames must be green):</div><ul>${inc.map(x => `<li><b class="mono">${esc(x.v.reg || "")}</b> · ${esc(x.why.join(", "))}</li>`).join("")}</ul>` : ""}
