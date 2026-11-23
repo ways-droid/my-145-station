@@ -424,6 +424,13 @@ body.wall .fb-wrap .fb th { background: transparent; } body.wall .fb-wrap .btn {
 .ind-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line, #eee); } .ind-row.ok > span:first-child { color: var(--good); font-weight: 600; }
 .rp-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 14px; } .rp-box { margin: 0; } .rp-box h3 { margin: 0; } .rp-print-h { display: none; }
 @media print { nav.side, .topline, .head .btn, .head button, .tabs { display: none !important; } .app { display: block; } .rp-print-h { display: block; margin-bottom: 10px; font-size: 16px; } .panel { break-inside: avoid; box-shadow: none; } }
+.redit-bar { position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 0 0 12px; padding: 10px 14px; border-radius: 12px; font-weight: 700; letter-spacing: .02em; color: #fff;
+  background: repeating-linear-gradient(-45deg, #e8590c 0 18px, #d9480f 18px 36px); box-shadow: 0 4px 14px rgba(232,89,12,.35); }
+.redit-bar .btn { background: #fff; color: #d9480f; border-color: #fff; font-weight: 700; }
+.redit-on { outline: 4px solid #e8590c; outline-offset: 4px; border-radius: 14px; animation: redit-pulse 1.6s ease-in-out infinite; }
+@keyframes redit-pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(232,89,12,.45); } 50% { box-shadow: 0 0 0 10px rgba(232,89,12,0); } }
+@media (prefers-reduced-motion: reduce) { .redit-on { animation: none; } }
+.btn.redit-off { background: #e8590c; border-color: #e8590c; color: #fff; }
 .ho-mp h3 { margin: 0; font-size: 16px; } .mp-groups { display: flex; flex-wrap: wrap; gap: 10px 22px; margin: 10px 0 6px; } .mp-g { display: grid; gap: 4px; } .mp-gl { text-transform: uppercase; letter-spacing: .04em; font-size: 11px; }
 .mp-list { display: flex; flex-wrap: wrap; gap: 6px; } .mp-chip { display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; border: 1px solid var(--line, #d9dde4); background: var(--card, #fff); color: inherit; border-radius: 10px; padding: 5px 10px; font: inherit; font-size: 14px; text-align: left; }
 button.mp-chip { cursor: pointer; } button.mp-chip:hover { border-color: #4a7bd0; } .mp-chip.has-note { background: #fff3a8; border-color: #e0c341; color: #3a3000; } .mp-note { font-size: 12px; font-weight: 400; max-width: 260px; }

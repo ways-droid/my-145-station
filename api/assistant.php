@@ -18,6 +18,7 @@ const AI_MODELS = [
 ];
 const AI_VDOC_TYPES = ['assurance' => 'Assurance', 'ct' => 'Contrôle technique', 'immat' => "Certificat d'immatriculation", 'coc' => 'Certificat de conformité',
     'badge' => 'Badge aéroport', 'leasing' => 'Contrat de leasing / location', 'autre' => 'Autre document'];
+require_once __DIR__ . '/rosterx.php';
 const AI_FILE_MAX = 15 * 1048576;
 const AI_DEFAULT_MODEL = 'claude-sonnet-5-5';
 const AI_BUDGET = 40;          // secondes de travail par appel avant de rendre la main au navigateur
@@ -223,10 +224,16 @@ function ai_tools($role) {
 ] : []),
         ['name' => 'remember', 'description' => "Retiens une connaissance utile à toute l'équipe pour les prochaines fois : une façon de faire de l'entreprise, une convention, une préférence de travail, une correction qu'on t'a faite (ex. « Les transports Airside se facturent avec l'article EXP »). Jamais d'information personnelle ni le contenu privé d'une conversation : seulement une règle de travail générale, en une phrase.",
          'input_schema' => ['type' => 'object', 'properties' => ['note' => ['type' => 'string']], 'required' => ['note']]],
-        ['name' => 'confirm_action', 'description' => "Exécute une action proposée plus tôt (propose_delete, propose_share_note, propose_rotations ou message WhatsApp), UNIQUEMENT après que la personne a répondu « oui » dans un message ultérieur. token = celui renvoyé par la proposition. Refusé par le serveur dans la même réponse que la proposition.",
+        ['name' => 'confirm_action', 'description' => "Exécute une action proposée plus tôt (propose_delete, propose_share_note, propose_rotations, propose_roster_import, propose_roster_changes ou message WhatsApp), UNIQUEMENT après que la personne a répondu « oui » dans un message ultérieur. token = celui renvoyé par la proposition. Refusé par le serveur dans la même réponse que la proposition.",
          'input_schema' => ['type' => 'object', 'properties' => ['token' => ['type' => 'string']], 'required' => ['token']]],
         ['name' => 'propose_share_note', 'description' => "Prépare le passage d'une note personnelle de la personne qui te parle en note d'équipe (visible de tous). Rien n'est changé : demande-lui de confirmer (oui / non), puis confirm_action. Seul l'auteur peut partager sa note.",
          'input_schema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']]],
+        ['name' => 'propose_roster_import', 'description' => "Met à jour le roster de l'outil depuis le roster officiel Excel déposé (format « TLV Roster OFFICIAL » : mois côte à côte, une ligne par personne). L'outil lit le fichier lui-même, reconnaît les personnes de Personnel, convertit les codes et compare avec le roster actuel. Rien n'est écrit : montre le résumé et demande la permission d'activer ton mode édition (« oui »), puis confirm_action.",
+         'input_schema' => ['type' => 'object', 'properties' => ['fileId' => ['type' => 'string'], 'sheet' => ['type' => 'string', 'description' => "Nom exact de l'onglet (facultatif : sinon l'onglet OFFICIAL de l'année en cours)"],
+            'from' => ['type' => 'string', 'description' => 'Premier mois AAAA-MM (défaut : mois en cours)'], 'to' => ['type' => 'string', 'description' => 'Dernier mois AAAA-MM (défaut : fin du fichier)']], 'required' => ['fileId']]],
+        ['name' => 'propose_roster_changes', 'description' => "Seule façon de changer le roster depuis le chat (create_record / update_record ne peuvent pas l'écrire). Une ligne par personne et par jour ou période : staffId, date AAAA-MM-JJ, to (facultatif, dernier jour), code (D, N, D/N, C, T, TLV, OJT, TRNG, OFF, code de 3 lettres d'une autre station ; vide = effacer), start/end pour C, note. Rien n'est écrit : montre le tableau et demande la permission d'activer ton mode édition (« oui »), puis confirm_action.",
+         'input_schema' => ['type' => 'object', 'properties' => ['changes' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+            'staffId' => ['type' => 'string'], 'date' => ['type' => 'string'], 'to' => ['type' => 'string'], 'code' => ['type' => 'string'], 'start' => ['type' => 'string'], 'end' => ['type' => 'string'], 'note' => ['type' => 'string']], 'required' => ['staffId', 'date', 'code']]]], 'required' => ['changes']]],
         ['name' => 'propose_rotations', 'description' => "Prépare les avions (rotations) à créer dans les shifts de la station à partir d'un planning (capture Oracle « Aircraft and Crew Management », tableau, PDF…). Donne une ligne par passage à la station : immatriculation, vol et heure d'arrivée à la station, vol et heure de départ de la station (heures UTC / GMT, date complète). Rien n'est créé : l'outil renvoie le tableau converti (heure locale, shift) et un token ; montre-le à la personne, demande « oui », puis confirm_action. 60 rotations au plus par proposition.",
          'input_schema' => ['type' => 'object', 'properties' => ['rotations' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
             'reg' => ['type' => 'string', 'description' => 'Immatriculation, ex. 4X-ICA'], 'arrUtc' => ['type' => 'string', 'description' => "Arrivée à la station, UTC, AAAA-MM-JJ HH:MM (vide si l'avion est déjà là au début du planning)"],
@@ -262,7 +269,7 @@ function ai_system($who, $role) {
         . (function_exists('wa_relay_for') && ($rl = wa_relay_for((string) ($who['user']['id'] ?? ''))) ? "- Pour contexte : le " . date('d/m H:i', $rl['at']) . ", tu as transmis à cette personne sur WhatsApp ce message de {$rl['from']} : « " . mb_substr($rl['text'], 0, 400) . " ». Si elle y répond, propose de transmettre sa réponse à {$rl['from']} (propose_whatsapp_message).\n" : '')
         . "- Si un résultat d'outil indique qu'il n'a pas été conservé ou a été raccourci, relance l'outil au lieu de supposer son contenu. N'affirme jamais avoir vérifié quelque chose que tu n'as pas vu.\n"
         . "- Après une écriture, dis en une phrase ce que tu as fait et cite la fiche ; l'utilisateur voit un bouton pour l'ouvrir ou l'annuler.\n"
-        . "- Fichier joint (photo, capture d'écran, PDF, Excel, Word, CSV) : lis-le et utilise-le pour la question. Exemples station : page de Tech Log ou de LogBook (immatriculation, défauts, actions, LogPage n°, WO n°) → propose de remplir le Tech Log de l'avion dans le shift ; planning de vols ou liste de rotations → propose les avions du shift (ARR/DEP UTC) ; roster ou liste de formations → propose les mises à jour. Montre ce que tu as lu et demande avant d'écrire si ce n'est pas demandé clairement. Les données aviation restent en anglais.\n"
+        . "- Fichier joint (photo, capture d'écran, PDF, Excel, Word, CSV) : lis-le et utilise-le pour la question. Exemples station : page de Tech Log ou de LogBook (immatriculation, défauts, actions, LogPage n°, WO n°) → propose de remplir le Tech Log de l'avion dans le shift ; planning de vols ou liste de rotations → propose les avions du shift (ARR/DEP UTC) ; roster officiel Excel → propose_roster_import ; liste de formations → propose les mises à jour. Montre ce que tu as lu et demande avant d'écrire si ce n'est pas demandé clairement. Les données aviation restent en anglais.\n"
         . "- Planning de vols (capture d'écran Oracle « Aircraft and Crew Management » ou autre diagramme de Gantt) : une ligne par immatriculation (colonne de gauche), axe du temps en haut (jours puis heures ; « Profile time zone GMT » = heures en UTC). Chaque barre de vol porte « STN HH:MM » au départ, le n° de vol au milieu, « HH:MM STN » à l'arrivée, et sous la barre « HH:MM-HH:MM » et « DEP-ARR » (ex. 21:00-07:30 TLV-LGG). Les blocs gris ou colorés sans n° de vol (WEEKLY MAINTENANCE, AOG, BOROSCOPE INSPECTION, A/C NOT AVAILABLE, SPARE, FREIGHTER CONVERSION) ne sont pas des vols : mets-les en note de la rotation concernée. Lis les petits textes dans les tuiles en pleine résolution. Pour la station (" . ai_station_tz()->getName() . ") : une rotation = une barre qui ARRIVE à la station, puis la barre suivante de la même immatriculation qui en REPART (vol, heure). Date de chaque heure = jour de l'axe au-dessus ; un vol qui passe minuit arrive le lendemain. Fais propose_rotations avec toutes les rotations de la période (heures UTC), montre le tableau qu'il renvoie et attends « oui » avant confirm_action. Si un texte est illisible ou ambigu, dis-le plutôt que d'inventer.\n"
         . "- Fichier joint sans consigne et document de véhicule : identifie ce que c'est (contrôle technique, carte verte, certificat d'immatriculation, contrat de leasing…), lis les informations utiles (plaque, VIN, dates, organisme, n°, défauts), retrouve le véhicule avec search_records (collection vehicles, par plaque ou VIN) et range-le avec add_vehicle_document. "
         . "Si le véhicule n'est pas trouvé ou s'il y a plusieurs candidats, si le type est incertain, ou si ce n'est pas un document de véhicule, explique ce que tu as lu et demande quoi faire. Pour un contrôle technique, la date d'expiration est la date limite du prochain contrôle.\n"
@@ -400,6 +407,7 @@ function ai_file_blocks($files, $expand) {
             $data = base64_encode(file_get_contents("$dir/$id"));
             if ($mime === 'application/pdf') $blocks[] = ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => $data]];
             elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) { $blocks[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => $data]]; foreach (ai_image_tiles("$dir/$id", (string) $meta['name']) as $b) $blocks[] = $b; }
+            elseif (preg_match('/\.xlsx$/i', (string) $meta['name']) && ($rs = rx_summary("$dir/$id", (string) $meta['name'], $id)) !== null) { $blocks[] = ['type' => 'text', 'text' => $rs]; continue; }
             elseif (($txt = ai_office_text("$dir/$id", $mime, (string) $meta['name'])) !== null && trim($txt) !== '') $blocks[] = ['type' => 'document', 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => mb_substr($txt, 0, 150000)], 'title' => mb_substr((string) $meta['name'], 0, 200)];
             else { $blocks[] = ['type' => 'text', 'text' => "$label (format non lisible : envoyez un PDF, une photo, un Excel, un Word ou un CSV)"]; continue; }
         }
@@ -483,6 +491,8 @@ function ai_run($who, $role, $msgs) {
         $results = [];
         foreach ($uses as $u) {
             if ($u['name'] === 'remember') $r = ai_remember($who, (array) ($u['input'] ?? []));
+            elseif ($u['name'] === 'propose_roster_import') $r = rx_propose_import($who, $role, (array) ($u['input'] ?? []));
+            elseif ($u['name'] === 'propose_roster_changes') $r = rx_propose_changes($who, $role, (array) ($u['input'] ?? []));
             elseif ($u['name'] === 'propose_rotations') $r = ai_rot_propose($who, $role, (array) ($u['input'] ?? []));
             elseif (in_array($u['name'], ['create_record', 'update_record', 'add_vehicle_document', 'propose_delete', 'confirm_delete', 'confirm_action', 'propose_share_note', 'add_note_file'], true)) $r = ai_write($who, $role, (string) $u['name'], (array) ($u['input'] ?? []), $actions);
             elseif ($u['name'] === 'propose_whatsapp_message') $r = ai_wa_propose($who, $role, (array) ($u['input'] ?? []));
@@ -761,6 +771,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
     $wrole = $role === 'admin' ? 'bureau' : $role;                 // Sindri a les droits d'un employé Bureau
     $coll = $tool === 'add_vehicle_document' ? 'vehicles' : (string) ($in['collection'] ?? '');
     if ($tool === 'propose_share_note') $coll = 'notes';
+    if ($coll === 'roster' && in_array($tool, ['create_record', 'update_record'], true)) return ['error' => "Le roster ne se modifie qu'en mode édition : utilise propose_roster_changes (ou propose_roster_import pour un fichier) et demande la permission."];
     if ($tool === 'add_note_file') {   // pièce jointe ajoutée à une note (même contrôle qu'une modification)
         $fid = preg_replace('/[^a-f0-9]/', '', (string) ($in['fileId'] ?? ''));
         $st = db()->prepare('SELECT name, mime, size FROM ways_files WHERE id = ?'); $st->execute([$fid]); $f = $st->fetch(PDO::FETCH_ASSOC);
@@ -808,6 +819,10 @@ function ai_write($who, $role, $tool, $in, &$actions) {
             if ((int) ($GLOBALS['AI_Q'] ?? 0) <= $p['q']) return ['error' => "Refusé : la personne n'a pas encore répondu. Pose-lui la question et attends sa réponse."];
             if (empty($p['shown'])) return ['error' => "Refusé : la question de confirmation n'a jamais été affichée à la personne (réponse interrompue). Refais propose_delete et pose-lui la question."];
             if (!ai_is_yes((string) ($GLOBALS['AI_QTEXT'] ?? ''))) return ['error' => "Refusé : son dernier message n'est pas un « oui » explicite. Rappelle-lui ce qui sera supprimé et demande-lui de répondre « oui » pour confirmer."];
+            if (($p['kind'] ?? '') === 'roster') {   // roster : mode édition de Sindri, le temps d'appliquer
+                kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
+                return rx_apply($who, $p, $actions);
+            }
             if (($p['kind'] ?? '') === 'rot') {   // rotations lues dans un planning
                 kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
                 return ai_rot_create($who, $p, $actions);
