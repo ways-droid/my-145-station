@@ -6,7 +6,7 @@
 const wallClock = tz => { try { return new Intl.DateTimeFormat("fr-BE", { timeZone: tz, hour: "2-digit", minute: "2-digit" }).format(new Date()); } catch { return ""; } };
 VIEWS.mur = {
   render() {
-    const [date, sh] = currentShift(), id = hoId(date, sh), h = hoDoc(id) || {};
+    const cur = currentShift(), [date, sh] = UI.wallShift || cur, id = hoId(date, sh), h = hoDoc(id) || {}, isCur = cur[0] === date && cur[1] === sh;
     const visits = hoItems(id, "visit").slice().sort((a, b) => String(a.arr || "99").localeCompare(String(b.arr || "99")));
     const crewIds = Array.from(new Set([...onShift(date, sh).map(p => p.id), ...(h.extra || [])]));
     const on = pid => visits.filter(v => (v.crs || []).includes(pid) || (v.mech || []).includes(pid) || visitTasks(v).some(t => (t.techs || []).some(x => x.id === pid))).map(v => v.reg);
@@ -14,7 +14,10 @@ VIEWS.mur = {
     const todo = hoItems(id, "todo").filter(x => !x.done);
     return `<div class="wall-top"><div><div class="wall-st">${esc(stationIata())} · ${esc(settings().stationName || settings().name || "")}</div><div class="wall-sh">${esc(shiftName(date, sh))}${h.foreman ? ` · ${esc(tr("Shift Foreman"))} ${esc(staff(h.foreman)?.name || h.foreman)}` : ""}</div></div>
         <div class="wall-clk"><div><b>${esc(wallClock(stationTz() || undefined))}</b><span>${esc(tr("Local"))} (LT)</span></div><div><b>${esc(wallClock("UTC"))}</b><span>UTC (Z)</span></div>
-        <button class="btn sm" data-a="wall-exit">${esc(tr("Quitter"))}</button></div></div>` +
+        <button class="btn sm" data-a="wall-exit">${esc(tr("Quitter"))}</button></div></div>
+      <div class="row-g wrap wall-sel"><button class="btn sm" data-a="wall-go" data-n="-1" aria-label="Previous shift">‹</button><button class="btn sm" data-a="wall-go" data-n="1" aria-label="Next shift">›</button>
+        <input type="date" id="wall-date" value="${esc(date)}" aria-label="Date"><div class="wall-dn">${Object.keys(SHIFTS).map(k => `<button data-a="wall-sh" data-sh="${k}" class="${k === sh ? "on " : ""}${k}">${k === "day" ? "☀️ DAY" : "🌙 NIGHT"}</button>`).join("")}</div>
+        ${isCur ? `<span class="chip good">Current shift</span>` : `<button class="btn sm primary" data-a="wall-now">Back to current shift</button>`}</div>` +
       (typeof wxBanner === "function" ? wxBanner() : "") +
       `<div class="wall-grid"><div class="wall-acs">${visits.map(v => { const open = visitTasks(v).filter(t => t.text && !tlFull(t)), c = visitCheck(v);   // une tâche reste au Mur tant que son cadre n'est pas vert
         return `<div class="wall-ac ${visitOff(v) ? "v-off" : c.ok ? "" : "warn"}"><div class="wall-reg"><b class="${regState(v)}">${esc(v.reg || "")}</b><span>${esc(v.acType || "")}</span></div>
@@ -32,6 +35,10 @@ VIEWS.mur = {
 /* le Mur s'ouvre dans sa propre fenêtre : en sortir la ferme (sinon retour au Shift) */
 const wallExit = () => { if (history.length <= 1) { window.close(); setTimeout(() => { location.hash = "#shift"; }, 200); } else location.hash = "#shift"; };
 ACTIONS["wall-exit"] = wallExit;
+/* choix du shift affiché sur le Mur (comme sur la page Shift) ; « Back to current shift » revient au direct */
+ACTIONS["wall-go"] = el => { const c = UI.wallShift || currentShift(); UI.wallShift = (+el.dataset.n < 0 ? prevShift : nextShift)(...c); render(true); };
+ACTIONS["wall-sh"] = el => { UI.wallShift = [(UI.wallShift || currentShift())[0], el.dataset.sh]; render(true); };
+ACTIONS["wall-now"] = () => { UI.wallShift = null; render(true); };
 document.addEventListener("keydown", e => { if (e.key === "Escape" && ["mur", "fids"].includes(route()) && !document.getElementById("modal-root").innerHTML) wallExit(); });
 setInterval(() => { if (route() === "mur") render(true); }, 60000);
 

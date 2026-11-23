@@ -394,7 +394,11 @@ tbody tr.vo-other:hover td { background: inherit; }
 .wx-l { margin: 0 0 8px; font-size: 13px; line-height: 1.5; } .wx-l .mono { word-break: break-word; } .wx-alert { font-size: 15px; }
 @media (max-width: 720px) { .brf-grid { grid-template-columns: 1fr; } }
 body.wall .app { grid-template-columns: 1fr; } body.wall nav.side, body.wall .topline, body.wall .sindri-fab, body.wall #ai-fab { display: none !important; } body.wall #main { padding: 18px 24px; max-width: none; }
-.wall-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 14px; } .wall-st { font-size: 34px; font-weight: 800; } .wall-sh { font-size: 20px; color: var(--muted); }
+.wall-top { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-bottom: 14px; } .wall-sel { margin: -6px 0 12px; } .wall-sel input[type=date] { width: auto; }
+.wall-sel { align-items: center; gap: 10px; } .wall-sel > .btn { font-size: 22px; padding: 8px 16px; } .wall-sel input[type=date] { font-size: 18px; padding: 8px; }
+.wall-dn { display: flex; gap: 8px; } .wall-dn button { font-size: 24px; font-weight: 800; padding: 12px 28px; border-radius: 12px; border: 2px solid #ccd; background: #fff; color: #667; cursor: pointer; letter-spacing: 1px; }
+.wall-dn button.day.on { background: #fff3c4; border-color: #f5b301; color: #7a5200; box-shadow: 0 0 0 3px #f5b30155; } .wall-dn button.night.on { background: #1c2a5e; border-color: #1c2a5e; color: #fff; box-shadow: 0 0 0 3px #1c2a5e55; }
+.wall-st { font-size: 34px; font-weight: 800; } .wall-sh { font-size: 20px; color: var(--muted); }
 .wall-clk { display: flex; gap: 22px; align-items: center; } .wall-clk div { text-align: center; } .wall-clk b { display: block; font-size: 40px; line-height: 1; font-variant-numeric: tabular-nums; } .wall-clk span { font-size: 13px; color: var(--muted); }
 .wall-grid { display: grid; grid-template-columns: 1fr 340px; gap: 16px; } .wall-acs { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; align-content: start; }
 .wall-ac { background: var(--card, #fff); border: 1px solid var(--line, #e3e6ec); border-radius: 14px; padding: 14px 16px; font-size: 17px; } .wall-ac.warn { border-color: var(--warn); box-shadow: inset 4px 0 0 var(--warn); }
