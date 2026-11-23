@@ -551,9 +551,10 @@ ok "panne gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime-la"}' $U/assistant/say); ok "nouvelle demande ≠ confirmation" "$R" 'pas un « oui »'
 ok "panne toujours gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "« oui » explicite : supprimée" "$R" 'Fait : .*deleted'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri crée un roster avec l'id personne_mois" "$R" 's1_2027-01'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri : pas d'écriture directe du roster" "$R" 'mode .*dition'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster changes 2027-01"}' $U/assistant/say); ok "Sindri : roster proposé" "$R" 'new..:..D/N'
+curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say >/dev/null
 ok "roster de Sindri lu à sa place" "$(curl -s -H "$A" $U/docs/roster/s1_2027-01)" '"D/N"'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri : roster déjà existant → update_record" "$R" 'existe déjà'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Note sindri"}' $U/assistant/say); ok "Sindri crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
 NAX=$(echo "$R" | grep -o '\\"id\\":\\"ax[0-9a-f]*' | head -1 | grep -o 'ax[0-9a-f]*')
 ok "note de Sindri : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note de Sindri : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
@@ -566,7 +567,7 @@ curl -s -H "$B" -X PUT -d '{"title":"Perso Bea","body":"secret"}' $U/docs/notes/
 R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Sindri ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Sindri lit un PDF Dropbox" "$R" 'Lu : text,document'
 no "fichier lu non gardé dans le fil" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN) ? implode("", $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN)) : "";' $T/t.db)" 'JVBERi0'
-ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":24'
+ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":25'
 echo "> notes"
 curl -s -H "$B" -X PUT -d '{"title":"Code portail","body":"1234","owner":"autre"}' $U/docs/notes/n1 >/dev/null
 ok "note personnelle : auteur imposé" "$(curl -s -H "$B" $U/docs/notes/n1)" '"owner":"u3"'
@@ -643,6 +644,22 @@ php -r '$p=new PDO("sqlite:".$argv[1]); $p->exec("UPDATE ways_kv SET v=\"1\" WHE
 curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say >/dev/null
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "hors 24 h : envoyé par le modèle" "$R" 'par le mod'
 ok "modèle avec nom et texte" "$(cat $T/meta.log)" '"type":"template","template":{"name":"message_equipe"'
+# roster officiel Excel déposé à Sindri : résumé, permission (« mode édition » de Sindri), puis écriture
+if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
+  php test/roster-fixture.php $T/roster.xlsx
+  FID=$(curl -s -H "$A" -F "file=@$T/roster.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
+  R=$(curl -s -H "$A" -X POST -d "{\"text\":\"\",\"files\":[{\"id\":\"$FID\",\"name\":\"TLV Roster OFFICIAL.xlsx\"}]}" $U/assistant/say)
+  ok "roster Excel reconnu (onglet OFFICIAL)" "$(grep 'ROSTER au format' $T/ai.log | tail -1)" 'TLV-2026 OFFICIAL-Bis'
+  ok "roster : résumé, rien écrit" "$R" 'mode .*dition'; ok "roster : personne reconnue" "$R" 'Marc Terrain'; ok "roster : absent de Personnel signalé" "$R" 'Unknown Guy'
+  ok "roster : aperçu converti" "$R" '1-3 D/N · 4 T · 5 C 16:00-00:30 · 6 CGN · 7 D/N'; ok "roster : code inconnu signalé" "$R" 'XYZQ'
+  no "roster : rien avant le oui" "$(curl -s -H "$A" $U/docs/roster/s1_2026-11)" 'CGN'
+  R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "roster écrit après oui" "$R" 'rosterMonthsWritten'
+  V=$(curl -s -H "$A" $U/docs/roster/s1_2026-11); ok "roster : jours écrits" "$V" '"6":{"c":"CGN"}'; ok "roster : remarque gardée" "$V" 'D/N !!'
+  ok "roster : décembre (T+D → D)" "$(curl -s -H "$A" $U/docs/roster/s2_2026-12)" '"2":{"c":"D","note":"T+D"}'
+fi
+R=$(curl -s -H "$A" -X POST -d '{"text":"Roster direct"}' $U/assistant/say); ok "roster : pas d'écriture directe par Sindri" "$R" 'mode .*dition'
+R=$(curl -s -H "$A" -X POST -d '{"text":"Mets Marc OFF"}' $U/assistant/say); ok "roster : changement proposé" "$R" 'new..:..OFF'
+R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "roster : changement écrit après oui" "$(curl -s -H "$A" $U/docs/roster/s1_2026-11)" '"21":{"c":"OFF"}'
 # planning lu dans une capture (rotations) : proposition, puis création après oui
 R=$(curl -s -H "$A" -X POST -d '{"text":"Planning rotations"}' $U/assistant/say); ok "rotations lues, rien créé" "$R" '2026-11-24-day'; ok "heure locale calculée" "$R" '18:30'
 no "pas de visite avant le oui" "$(curl -s -H "$A" $U/docs/shiftItems)" '4X-ICA'

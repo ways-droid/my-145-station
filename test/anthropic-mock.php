@@ -35,6 +35,11 @@ if (str_contains($question, 'Dropbox') && is_array($last['content'] ?? null)) {
 // suppression confirmée dans la conversation
 $say = fn($t) => print(json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'end_turn', 'content' => [['type' => 'text', 'text' => $t]], 'usage' => ['input_tokens' => 1, 'output_tokens' => 1]]));
 $lastRes = is_array($last['content'] ?? null) ? (string) (is_string($last['content'][0]['content'] ?? null) ? $last['content'][0]['content'] : '') : null;
+// roster officiel déposé : propose la mise à jour (mois fixés pour que le test ne dépende pas de la date)
+if (is_array($last['content'] ?? null) && ($last['role'] ?? '') === 'user') {
+    foreach ($last['content'] as $blk) if (($blk['type'] ?? '') === 'text' && str_contains($blk['text'] ?? '', 'ROSTER') && preg_match('/fileId ([a-f0-9]+)/', $blk['text'], $mm)) { $tu('tu_rx', 'propose_roster_import', ['fileId' => $mm[1], 'from' => '2026-11', 'to' => '2026-12']); exit; }
+    if ($lastRes !== null && (str_contains($lastRes, 'notInStaff') || str_contains($lastRes, 'rosterMonthsWritten'))) { $say('Roster : ' . $lastRes); exit; }
+}
 if (str_contains($question, 'Supprime la panne')) { if ($lastRes !== null) { $say('Proposé : ' . $lastRes); exit; } $tu('tu_pd', 'propose_delete', ['collection' => 'faults', 'id' => 'f-ax', 'summary' => 'test']); exit; }
 if (str_contains($question, 'Supprime vite')) {
     if ($lastRes !== null && preg_match('/"token":"([a-f0-9]+)"/', $lastRes, $tk)) { $tu('tu_cd0', 'confirm_delete', ['token' => $tk[1]]); exit; }
@@ -47,6 +52,7 @@ if ($question === 'oui' || $question === 'Supprime-la') {
     preg_match_all('/token ([a-f0-9]{8})/', json_encode($b['system'] ?? '', JSON_UNESCAPED_UNICODE), $tk); $tu('tu_cd', 'confirm_delete', ['token' => end($tk[1]) ?: 'x']); exit;
 }
 if (str_contains($question, 'Note sindri')) { if ($lastRes !== null) { $say('Créée : ' . $lastRes); exit; } $tu('tu_nc', 'create_record', ['collection' => 'notes', 'data' => ['id' => 'nax', 'title' => 'Idée Sindri', 'body' => 'x', 'team' => true]]); exit; }
+if (preg_match('/Roster changes (\d{4}-\d{2})/', $question, $rm)) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rch', 'propose_roster_changes', ['changes' => [['staffId' => 's1', 'date' => $rm[1] . '-01', 'code' => 'D/N']]]); exit; }
 if (preg_match('/Roster sindri (\d{4}-\d{2})/', $question, $rm)) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rc', 'create_record', ['collection' => 'roster', 'data' => ['staffId' => 's1', 'month' => $rm[1], 'days' => ['1' => ['c' => 'D/N']]]]); exit; }
 if (str_contains($question, 'Dis à Bea')) { if ($lastRes !== null) { $say('Proposé : ' . $lastRes); exit; } $tu('tu_wm', 'propose_whatsapp_message', ['to' => 'bea', 'text' => 'Passe au garage avant 16 h, merci']); exit; }
 if (str_contains($question, 'Partage la note')) { if ($lastRes !== null) { $say('Proposé : ' . $lastRes); exit; } preg_match('/note=(\w+)/', $question, $nm); $tu('tu_ns', 'propose_share_note', ['id' => $nm[1] ?? '']); exit; }
@@ -57,6 +63,8 @@ if (str_contains($question, 'Envoie-moi')) {
     if (is_array($last['content'] ?? null)) { echo json_encode(['id' => 'm', 'type' => 'message', 'role' => 'assistant', 'model' => $b['model'], 'stop_reason' => 'end_turn', 'content' => [['type' => 'text', 'text' => 'Envoi : ' . ($last['content'][0]['content'] ?? '')]], 'usage' => ['input_tokens' => 1, 'output_tokens' => 1]]); exit; }
     preg_match_all('/fileId ([a-f0-9]{32})/', json_encode($msgs, JSON_UNESCAPED_UNICODE), $mm); $tu('tu_ws', 'whatsapp_send_file', ['fileId' => end($mm[1]) ?: '', 'caption' => 'Voici']); exit;
 }
+if (str_contains($question, 'Marc OFF')) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rc', 'propose_roster_changes', ['changes' => [['staffId' => 's1', 'date' => '2026-11-20', 'to' => '2026-11-21', 'code' => 'OFF']]]); exit; }
+if (str_contains($question, 'Roster direct')) { if ($lastRes !== null) { $say('Direct : ' . $lastRes); exit; } $tu('tu_rd', 'update_record', ['collection' => 'roster', 'id' => 's1_2026-11', 'changes' => ['days' => []]]); exit; }
 // question avec fichier joint : propose l'ajout au véhicule veh-t
 if (is_array($last['content'] ?? null) && ($last['role'] ?? '') === 'user') {
     $hasDoc = false; $fid = '';

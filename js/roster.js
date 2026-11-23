@@ -12,6 +12,10 @@ const RCODE_DEF = [
 const RKIND_LBL = { day: "Équipe de jour", night: "Équipe de nuit", pending: "Présent, équipe à affecter", station: "Présent, sans équipe", custom: "Horaire libre", travel: "Voyage", other: "Autre", training: "Formation", off: "Repos", away: "Autre station (détaché / flight mech)" };
 const rcodes = () => { const lbl = settings().rosterLabels || {}; return RCODE_DEF.map(([c, l, k, col]) => ({ c, l: lbl[c] || l, k, col })); };
 const rcode = c => rcodes().find(x => x.c === c) || (/^[A-Z]{3}$/.test(c || "") ? { c, l: "Détaché · " + c, k: "away", col: "red" } : { c, l: c, k: "other", col: "grey" });
+/* mode édition : le roster ne se modifie qu'après l'avoir activé (bouton), avec un cadre très visible jusqu'à ce qu'on le désactive */
+const rosterEd = () => isOffice() && !readOnly && !!UI.redit;
+window.addEventListener("hashchange", () => { if (UI.redit && !location.hash.startsWith("#roster")) UI.redit = false; });
+ACTIONS["roster-edit"] = () => { UI.redit = !UI.redit; if (!UI.redit) UI.rbrush = undefined; render(true); };
 const ymOf = d => d.slice(0, 7);
 const ymAdd = (ym, n) => addMonths(ym + "-01", n).slice(0, 7);
 const ymDays = ym => new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
@@ -60,16 +64,17 @@ VIEWS.roster = {
     const tab = curTab("roster", "mois"), ym = UI.rmonth || (UI.rmonth = ymOf(today()));
     const [y, m] = ym.split("-");
     return head("Roster", "Planning de la station : une ligne par personne, un code par jour",
-      `<button class="btn" data-a="roster-export">Exporter (Excel)</button>${isOffice() ? `<button class="btn" data-a="roster-copy" ${dis()}>Reprendre le mois précédent</button>` : ""}`,
+      `<button class="btn" data-a="roster-export">Exporter (Excel)</button>${rosterEd() ? `<button class="btn" data-a="roster-copy" ${dis()}>Reprendre le mois précédent</button>` : ""}${isOffice() && !readOnly ? `<button class="btn ${UI.redit ? "redit-off" : "primary"}" data-a="roster-edit">${UI.redit ? "✓ " + esc(tr("Finish editing")) : "✏️ " + esc(tr("Edit roster"))}</button>` : ""}`,
       `<div class="row-g rnav"><button class="btn sm" data-a="roster-month" data-n="-1" aria-label="Mois précédent">‹</button><b class="rmonth">${MONTHS[+m - 1]}${UI.r2 ? ` ${y !== ymAdd(ym, 1).slice(0, 4) ? y + " " : ""}– ${MONTHS[+ymAdd(ym, 1).slice(5) - 1]} ${ymAdd(ym, 1).slice(0, 4)}` : ` ${y}`}</b><button class="btn sm" data-a="roster-month" data-n="1" aria-label="Mois suivant">›</button>`
         + `<button class="btn sm ${UI.r2 ? "primary" : ""}" data-a="roster-two" title="${esc(tr("Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre"))}">2 mois</button>`
         + `<button class="btn sm" data-a="roster-month" data-n="0" ${ym === ymOf(today()) ? `style="visibility:hidden" tabindex="-1" aria-hidden="true"` : ""}>Aujourd'hui</button></div>`) +
       tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["fatigue", "Fatigue et repos"], ["codes", "Codes"]]) +
-      ({ mois: rosterMonth, jour: rosterToday, fatigue: rosterFatigue, codes: rosterCodes })[tab]();
+      (UI.redit && rosterEd() ? `<div class="redit-bar" role="status">✏️ ${esc(tr("EDIT MODE ON: every change is saved immediately."))} <button class="btn sm" data-a="roster-edit">${esc(tr("Finish editing"))}</button></div>` : "") +
+      `<div class="${UI.redit && rosterEd() ? "redit-on" : ""}">` + ({ mois: rosterMonth, jour: rosterToday, fatigue: rosterFatigue, codes: rosterCodes })[tab]() + `</div>`;
   }
 };
 function rosterMonth() {
-  const ym = UI.rmonth, ppl = rosterStaff().sort(staffSort), ed = isOffice() && !readOnly;
+  const ym = UI.rmonth, ppl = rosterStaff().sort(staffSort), ed = rosterEd();
   if (!S.staff.length) return `<div class="panel pad">Ajoutez d'abord les personnes dans <a href="#personnel">Personnel</a>.</div>`;
   const months = UI.r2 ? [ym, ymAdd(ym, 1)] : [ym];
   const dates = months.flatMap(mm => Array.from({ length: ymDays(mm) }, (_, i) => `${mm}-${pad(i + 1)}`)), wd = d => new Date(d + "T12:00:00").getDay();
@@ -85,7 +90,7 @@ function rosterMonth() {
     return `<td class="${x.n ? "" : "gap"}${mcls(dates[cov.indexOf(c)])}" title="${esc(x.n + " " + (t === "I" ? tr("avec I") : tr("qualifiés")))}">${x.n}</td>`; }).join("")}</tr>`)).join("");
   const view = `<div class="rbar rview"><label class="chk line small"><input type="checkbox" data-a="roster-col" ${UI.rcol ? "checked" : ""}> ${esc(tr("Griser toute la colonne des week-ends"))}${fridayOff() ? esc(tr(" et vendredis")) : ""}</label>
     ${fridayOff() ? `<label class="small row-g">${esc(tr("Vendredi"))} <input type="range" id="r-fri" min="0" max="100" step="5" value="${UI.rfri}" style="width:110px" aria-label="${esc(tr("Intensité du moucheté du vendredi"))}"></label>` : ""}</div>`;
-  return `${bar}${view}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}" style="--fri-a:${(UI.rfri / 100 * 0.6).toFixed(3)}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["D", "L", "M", "M", "J", "V", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
+  return `${bar}${view}<div class="panel"><div class="tablewrap rwrap"><table class="roster ${brush != null ? "painting" : ""}" style="--fri-a:${(UI.rfri / 100 * 0.6).toFixed(3)}"><thead><tr><th class="rname">Nom</th>${dates.map(d => `<th class="${dayCls(d)}${mcls(d)} ${d === today() ? "today" : ""}"${mcls(d) ? ` title="${esc(MONTHS[+d.slice(5, 7) - 1])}"` : ""}><span>${["S", "M", "T", "W", "T", "F", "S"][wd(d)]}</span>${+d.slice(8)}${mcls(d) ? `<em class="rmlbl">${esc(MONTHS[+d.slice(5, 7) - 1].slice(0, 3))}</em>` : ""}</th>`).join("")}</tr></thead><tbody>
     ${ppl.map(p => `<tr><th class="rname"><a href="#" data-a="staff-open" data-id="${p.id}">${esc(p.name)}</a><div class="muted small">${esc([STAFF_FN[p.function], Object.entries(p.ratings || {}).map(([t, l]) => t.replace(/^B/, "") + " " + l).join(" · ")].filter(Boolean).join(" · "))}</div></th>
       ${dates.map(d => { const x = rcell(p.id, d), c = x ? rcode(x.c) : null; const fa = (fat[p.id] || {})[d]; return `<td class="rc ${c ? "rc-" + c.col : ""} ${UI.rcol ? dayCls(d) : ""}${mcls(d)} ${d === today() ? "today" : ""}${fa ? " rfat" : ""}" data-rc="${p.id}|${d}" title="${esc([c ? tr(c.l) + (x.note && isOffice() ? " · " + x.note : "") : "", ...(fa || []).map(a => "⚠ " + a)].filter(Boolean).join("\n"))}">${esc(cellTxt(x))}${x && x.note ? "<i class=\"rnote\"></i>" : ""}</td>`; }).join("")}</tr>`).join("")}
     ${covRows}<tr class="rcov"><th class="rname small">D/N à affecter</th>${dates.map((d, i) => { const k = cov[i] ? toAssign(d).length : 0; return `<td class="${k ? "todo" : ""}">${k || ""}</td>`; }).join("")}</tr></tbody></table></div><div class="pad hint">Couverture : nombre de personnes présentes qualifiées sur le type, par équipe. En rouge : personne de qualifié (ou personne avec I pour signer les 4X-). Les autorisations de signer restent dans AMOS.</div></div>`;
@@ -148,7 +153,7 @@ function paintTd(td) {
   td.className = `rc ${c ? "rc-" + c.col : ""} painted`; td.textContent = cellTxt(x);
 }
 document.addEventListener("pointerdown", e => {
-  const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td || UI.rbrush == null || !isOffice() || readOnly) return;
+  const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td || UI.rbrush == null || !rosterEd()) return;
   e.preventDefault(); rPaint = new Set(); paintTd(td);
 });
 document.addEventListener("pointerover", e => { if (!rPaint) return; const td = e.target.closest && e.target.closest("td[data-rc]"); if (td) paintTd(td); });
@@ -158,7 +163,7 @@ document.addEventListener("pointerup", async () => {
 });
 document.addEventListener("click", e => {
   const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td || UI.rbrush != null) return;
-  const [sid, d] = td.dataset.rc.split("|"), p = staff(sid), x = rcell(sid, d) || {}, ed = isOffice() && !readOnly;
+  const [sid, d] = td.dataset.rc.split("|"), p = staff(sid), x = rcell(sid, d) || {}, ed = rosterEd();
   if (!p) return;
   const away = x.c && rcode(x.c).k === "away";
   const m = modal(`${mHead(esc(p.name) + " · " + fmtDate(d))}<form><div class="body"><div class="fields">
