@@ -260,7 +260,7 @@ function rx_apply($who, $p, &$actions) {
     $n = 0; $errs = [];
     foreach ($docs as $id => $data) {
         $r = get_doc('roster', $id); $old = ($r && !$r['deleted']) ? (json_decode($r['data'], true) ?: []) : null;
-        $data = json_decode(json_encode($data), true); if (!$data['days']) $data['days'] = (object) [];
+        $data = json_decode(json_encode($data), true);
         try { $data = perm_write('bureau', 'roster', 'put', $old, $data, null, $id); } catch (Throwable $e) { $errs[] = "$id : " . $e->getMessage(); continue; }
         db()->beginTransaction(); write_doc('roster', $id, $data, $by); db()->commit(); $n++;
         $actions[] = ['op' => $old ? 'update' : 'create', 'coll' => 'roster', 'id' => $id, 'label' => log_label('roster', $data) ?: $id] + ($old ? ['before' => $old] : []);

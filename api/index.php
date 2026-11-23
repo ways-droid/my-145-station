@@ -94,6 +94,7 @@ try {
             $old = ($r && !$r['deleted']) ? (json_decode($r['data'], true) ?: []) : null;
             $data = perm_write($role, $coll, 'put', $old, $data, null, $id);
             $rev = write_doc($coll, $id, $data, $user);
+            if ($coll === 'handovers') ho_roster_sync($id, $old, $data, $user);
             $pdo->commit();
             out(['ok' => true, 'rev' => $rev]);
         }
@@ -104,6 +105,7 @@ try {
             $old = ($r && !$r['deleted']) ? (json_decode($r['data'], true) ?: []) : null;
             $data = perm_write($role, $coll, 'patch', $old, deep_merge($old ?: [], $patch), $patch, $id);
             $rev = write_doc($coll, $id, $data, $user);
+            if ($coll === 'handovers') ho_roster_sync($id, $old, $data, $user);
             $pdo->commit();
             out(['ok' => true, 'rev' => $rev]);
         }

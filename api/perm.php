@@ -221,3 +221,31 @@ function tools_terrain_write($op, $old, $new) {
     } else unset($out['out']);
     return $out;
 }
+
+/* personne ajoutée à un shift (handovers.extra) : le roster suit tout seul, sans le mode édition du roster.
+   La case reçoit D (jour) ou N (nuit) avec fromShift et l'ancienne case (prev) ; si on la retire du shift, l'ancienne case revient.
+   Une case qui couvre déjà ce shift (D, N, horaire libre) ne change pas. */
+function ho_roster_sync($hoId, $old, $new, $user) {
+    if (!preg_match('/^(\d{4}-\d{2})-(\d{2})-(day|night)$/', (string) $hoId, $m)) return;
+    $ex = fn($d) => array_values(array_unique(array_map('strval', (array) (($d ?? [])['extra'] ?? []))));
+    $add = array_diff($ex($new), $ex($old)); $rm = array_diff($ex($old), $ex($new));
+    if (!$add && !$rm) return;
+    $code = $m[3] === 'day' ? 'D' : 'N'; $k = (string) (int) $m[2]; $staff = coll_docs('staff');
+    foreach (array_merge($add, $rm) as $sid) {
+        if (!isset($staff[$sid])) continue;
+        $id = "{$sid}_{$m[1]}"; $r = get_doc('roster', $id); $doc = ($r && !$r['deleted']) ? (json_decode($r['data'], true) ?: []) : ['staffId' => $sid, 'month' => $m[1], 'days' => []];
+        $days = (array) ($doc['days'] ?? []); $cur = $days[$k] ?? null;
+        if (in_array($sid, $add, true)) {
+            $c = is_array($cur) ? (string) ($cur['c'] ?? '') : '';
+            if ($c === $code || ($c === 'C' && !empty($cur['start'])) ) continue;
+            $cell = ['c' => $code, 'fromShift' => $hoId] + (is_array($cur) && !empty($cur['duty']) ? ['duty' => $cur['duty']] : []);
+            if (is_array($cur)) $cell['prev'] = $cur;
+            $days[$k] = $cell;
+        } else {
+            if (!is_array($cur) || ($cur['fromShift'] ?? '') !== $hoId) continue;
+            if (!empty($cur['prev']) && is_array($cur['prev'])) $days[$k] = $cur['prev']; else unset($days[$k]);
+        }
+        $doc["days"] = $days;
+        write_doc('roster', $id, $doc, $user);
+    }
+}
