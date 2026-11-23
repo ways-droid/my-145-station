@@ -37,7 +37,7 @@ function tr(s, lang = LANG) {
   return m[1] + r + m[3];
 }
 /* --- application au DOM --- */
-const NO_TR = "script,style,textarea,input,.plate,.fleetno,[data-noi18n],.ogm";
+const NO_TR = "script,style,textarea,input,.plate,.fleetno,[data-noi18n],.ogm,.ai-txt,.ai-topic";   // .ai-txt : messages de la conversation avec Sindri (dans la langue de la personne)
 /* Données aviation toujours en anglais (règle de l'utilisateur, 2026-11-22) : les écrans aviation (body.avi-route) et les blocs .avi
    sont traduits en anglais même quand l'interface est en français. */
 const AVI_ROUTES = new Set(["avions", "shift", "mur", "fids", "charge", "pieces", "etalonnage", "expirations", "rapport"]);

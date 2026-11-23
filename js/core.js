@@ -20,7 +20,8 @@ const stationTz = () => { const s = settings(); return s.timeZone || STATION_TZ[
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 /* langue : interface (choix de chaque utilisateur, gardé dans son navigateur) ; LANG peut être changé
    temporairement pour produire un PDF ou un e-mail dans la langue d'un client */
-let UI_LANG = (() => { try { return localStorage.getItem("st-lang") === "en" ? "en" : "fr"; } catch { return "fr"; } })();
+/* interface entièrement en anglais (demande de l'utilisateur, 2026-11-23) : plus de choix de langue ; Sindri répond dans la langue de la question */
+let UI_LANG = "en";
 let LANG = UI_LANG;
 const LOCALES = { fr: "fr-BE", en: "en-IE" };
 const _fmt = {};
@@ -404,7 +405,7 @@ function renderNav() {
     besoins: n => `${plural(n, "besoin")} à approuver`, situations: n => `${plural(n, "situation")} ouverte(s) à ramener à la normale`, expirations: n => `${plural(n, "échéance")} expirée(s)`, consignes: n => `${plural(n, "consigne")} à lire et signer` };
   document.getElementById("nav").innerHTML =
     `<a href="#dashboard" class="brand-wrap" aria-label="Tableau de bord"><span class="logo-tile">${logoSvg()}</span><span><span class="brand">my<i>-</i>145<i>-</i>station</span><span class="brand-sub">${esc([settings().stationCode, settings().name].filter(Boolean).join(" · "))}</span></span></a>` +
-    `<div class="lang-switch" role="group" aria-label="Langue / Language" data-noi18n><button data-a="set-lang" data-l="fr" class="${UI_LANG === "fr" ? "on" : ""}" aria-pressed="${UI_LANG === "fr"}">Français</button><button data-a="set-lang" data-l="en" class="${UI_LANG === "en" ? "on" : ""}" aria-pressed="${UI_LANG === "en"}">English</button></div>` +
+    
     `<div class="lang-switch theme-switch" role="group" aria-label="Thème"><button data-a="set-theme" data-t="light" class="${curTheme() === "light" ? "on" : ""}" aria-pressed="${curTheme() === "light"}">☀ Clair</button><button data-a="set-theme" data-t="dark" class="${curTheme() === "dark" ? "on" : ""}" aria-pressed="${curTheme() === "dark"}">☾ Sombre</button></div>` +
     NAV.map(([h, items]) => [h, items.filter(([k]) => allowed(k))]).filter(([, items]) => items.length).map(([h, items]) => (h ? `<div class="nav-h">${h}</div>` : "") + items.map(([k, l]) =>
       `<a href="#${k}" ${k === "mur" || k === "fids" ? `target="_blank" rel="noopener"` : ""} class="${r === k ? "on" : ""}${AVI_ROUTES.has(k) ? " avi" : ""}" data-c="${NAV_DOT[k] || MOD_COLOR[k] || "grey"}"><span><i class="dot"></i>${l}</span>${badge[k] ? (badgeHidden(k) ? `<span class="cnt muted-cnt" role="button" tabindex="0" data-badge="${k}" title="Compteur masqué jusqu'à ${badgeUntil(k)} · cliquer pour le réafficher" aria-label="Réafficher le compteur">${badge[k]}</span>`
@@ -681,7 +682,7 @@ ACTIONS["sbx-stop"] = async () => {
   ok.onchange = () => yes.disabled = !ok.checked;
   yes.onclick = async () => { yes.disabled = true; try { await API.call("POST", "sandbox/stop", {}); location.reload(); } catch (x) { toast(tr(x.message)); yes.disabled = false; } };
 };
-ACTIONS["set-lang"] = el => setUiLang(el.dataset.l);
+
 /* thème clair / sombre : mémorisé par navigateur ; sans choix, suit le réglage de l'appareil */
 const sysDark = () => window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches;
 const curTheme = () => { try { return localStorage.getItem("st-theme") || (sysDark() ? "dark" : "light"); } catch (e) { return sysDark() ? "dark" : "light"; } };

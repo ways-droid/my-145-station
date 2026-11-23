@@ -1197,3 +1197,115 @@ rule(/^Préparer depuis les shifts \((\d+)\)$/, "Prepare from shifts ($1)"); rul
 rule(/^(.+) · depuis le (.+)$/, "$1 · since $2", true);
 Object.assign(EN, {"Liens": "Links", "Aucun lien.": "No links.", "Lier à une autre fiche : plaque, client, outil, article…": "Link to another record: plate, customer, tool, item…"});
 Object.assign(EN, {"+ technicien": "+ technician", "+ Ligne": "+ Line"});
+/* interface entièrement en anglais (2026-11-23) : textes restés en français */
+Object.assign(EN, {
+  "Nouvelle note": "New note", "+ Nouvelle note": "+ New note", "immobilisés": "off road", "Aucune panne en cours.": "No open fault.", "Toutes les pannes": "All faults", "Toutes les pannes →": "All faults →",
+  "Aucune note.": "No notes.", "Messages système des 3 derniers jours": "System messages from the last 3 days", "Bon après-midi": "Good afternoon", "Bonjour": "Good morning", "Bonsoir": "Good evening", "Bonne nuit": "Good night",
+  "Pannes et défauts": "Faults and defects", "Échéances véhicules": "Vehicle due dates", "Mes notes": "My notes", "Raccourcis": "Shortcuts", "Shift en cours": "Current shift", "Équipes du jour": "Today's crews",
+  "Échéances du personnel": "Staff due dates", "Pièces en cours": "Parts in progress", "Voyages": "Travel", "État des véhicules": "Vehicle status", "Outillage": "Tooling",
+  "Ouvrir Sindri, l'assistant": "Open Sindri, the assistant", "Créer une note…": "Create a note…", "✎ Créer une note…": "✎ Create a note…",
+  "Notes personnelles et notes d'équipe, avec pièces jointes et liens vers les fiches": "Personal and team notes, with attachments and links to records",
+  "Rechercher dans les notes…": "Search notes…", "Rechercher une note": "Search a note", "Personnelles": "Personal", "Votre note…": "Your note…",
+  "Aucune note pour l'instant. Vos notes personnelles ne sont visibles que de vous ; les notes d'équipe, de toute l'équipe.": "No notes yet. Your personal notes are visible only to you; team notes to the whole team.",
+  "📎 Joindre des fichiers": "📎 Attach files", "🔗 Lier à une fiche (plaque, client, outil…)": "🔗 Link to a record (plate, customer, tool…)", "📌 Épingler": "📌 Pin", "Par défaut": "Default",
+  "Rouge": "Red", "Orange": "Orange", "Jaune": "Yellow", "Vert": "Green", "Sarcelle": "Teal", "Bleu": "Blue", "Violet": "Purple", "Gris": "Grey",
+  "🏷 Ajouter une étiquette (Entrée)": "🏷 Add a label (Enter)", "🔒 Note personnelle": "🔒 Personal note", "Visible de vous seul.": "Visible to you only.", "Partager avec l'équipe": "Share with the team",
+  "Rien à afficher.": "Nothing to show.", "Environnement de test": "Test environment",
+  "Pour essayer l'outil (créer des fiches, des données d'exemple…) sans toucher aux vraies données. Le test ne concerne que": "To try the tool (create records, sample data…) without touching real data. The test only affects",
+  "votre session": "your session", ": les autres utilisateurs continuent normalement.": ": other users carry on as usual.", "Activer l'environnement de test": "Turn on the test environment",
+  "Chaque utilisateur se connecte avec son nom et un code reçu par e-mail. Une connexion reste valable 8 heures sur l'appareil.": "Each user signs in with their name and a code received by email. A sign-in stays valid for 8 hours on the device.",
+  "WhatsApp de l'équipe": "Team WhatsApp", "Les tarifs des Charge Sheets se gèrent dans": "Charge Sheet rates are managed in",
+  "Créer des données d'exemple pour tester une partie de l'application. Elles portent le repère": "Create sample data to test part of the application. It carries the mark",
+  "Donnée d'exemple : supprimable en un clic dans Paramètres": "Sample data: can be deleted in one click in Settings", "et se suppriment toutes ensemble.": "and is all deleted together.",
+  "Personnel et roster": "Staff and roster", "5 personnes, licences, qualifications, documents, roster du mois": "5 people, licences, ratings, documents, this month's roster",
+  "3 compagnies aériennes, 6 tarifs": "3 airlines, 6 rates", "4 véhicules, entretiens, panne, pneus": "4 vehicles, services, fault, tyres", "1 laboratoire, 6 outils (au labo, échéance proche ou dépassée…)": "1 lab, 6 tools (at the lab, due soon or overdue…)",
+  "Déposez dans l'ordre les deux fichiers d'une sauvegarde de cet outil. Un import peut être relancé sans créer de doublons.": "Drop the two files of a backup of this tool, in order. An import can be run again without creating duplicates.",
+  "Exporter les données": "Export data", "Exporter les fichiers joints (ZIP)": "Export attached files (ZIP)",
+  "Les fichiers joints (photos, certificats, documents) ne sont pas dans le JSON : le ZIP les contient, chacun nommé par son identifiant.": "Attached files (photos, certificates, documents) are not in the JSON: the ZIP holds them, each named by its ID.",
+  "Second facteur pas encore activé (demandé à la prochaine connexion)": "Second factor not yet enabled (asked at next sign-in)", "2FA à activer": "2FA to enable",
+  "Reliez le compte Dropbox de l'entreprise : documents consultables dans Administration, documents des véhicules copiés automatiquement dans leur dossier, et Sindri peut y chercher. Les identifiants restent sur le serveur.": "Connect the company Dropbox account: documents viewable in Administration, vehicle documents copied automatically to their folder, and Sindri can search it. Credentials stay on the server.",
+  "Connecté au compte Dropbox de l'entreprise, ouvrez": "Signed in to the company Dropbox account, open", "Toujours dans": "Still in", "et l'": "and the", "(« Show ») et collez-les ici.": "(“Show”) and paste them here.",
+  "Cliquez sur « Connecter Dropbox » et acceptez dans la fenêtre Dropbox.": "Click “Connect Dropbox” and accept in the Dropbox window.", "Saisir la clé et le secret de l'app": "Enter the app key and secret",
+  "Un numéro WhatsApp de la station réservé à l'équipe : les collègues écrivent à Sindri comme à un collègue — questions, photos, documents. Sindri répond avec les droits de la personne, et la conversation est la même que dans son panneau Sindri.": "A station WhatsApp number for the team: colleagues write to Sindri like to a colleague — questions, photos, documents. Sindri answers with the person's rights, and the conversation is the same as in their Sindri panel.",
+  "Sur": "On", ", cas d'usage « Connect with customers through WhatsApp », relié au portefeuille Meta Business de l'organisation": ", use case “Connect with customers through WhatsApp”, linked to the organisation's Meta Business portfolio",
+  ": le numéro de la SIM dédiée (jamais utilisée sur WhatsApp), nom affiché : celui de l'organisation, code reçu par SMS (mettez la SIM dans un téléphone le temps de la vérification).": ": the number of the dedicated SIM (never used on WhatsApp), display name: the organisation's, code received by SMS (put the SIM in a phone during verification).",
+  "Copiez le": "Copy the", "et le": "and the", "et": "and",
+  "→ ajoutez un utilisateur système administrateur, donnez-lui l'app et le compte WhatsApp, puis": "→ add an admin system user, give it the app and the WhatsApp account, then",
+  "Saisissez ces 4 éléments ici, puis « Tester » et « Enregistrer le numéro ».": "Enter these 4 items here, then “Test” and “Save number”.", "puis « Verify and save » et abonnez le champ": "then “Verify and save” and subscribe the field",
+  "Ajoutez un moyen de paiement au compte WhatsApp (au-delà des messages gratuits) et passez l'app en mode": "Add a payment method to the WhatsApp account (beyond free messages) and switch the app to",
+  "Saisir les identifiants Meta": "Enter the Meta credentials", "Suivi des avions du shift par immatriculation (en vol, ETA, atterrissage). Il faut une clé de l'": "Tracks the shift's aircraft by registration (airborne, ETA, landing). It needs a key from the",
+  "from Flightradar24 (fr24api.flightradar24.com), différente de l'abonnement Premium de l'application. Sans clé, les heures ARR / DEP se saisissent à la main.": "from Flightradar24 (fr24api.flightradar24.com), separate from the app's Premium subscription. Without a key, ARR / DEP times are entered by hand.",
+  ", un collègue IA pour le": ", an AI colleague for the", "bureau et les administrateurs": "office and administrators",
+  ": il répond aux questions sur les données de l'outil, prépare e-mails et résumés, et crée ou met à jour des fiches avec les droits d'un employé du bureau (suppressions sur confirmation, rien d'envoyé hors de l'outil).": ": answers questions on the tool's data, drafts emails and summaries, and creates or updates records with an office employee's rights (deletions on confirmation, nothing sent outside the tool).",
+  "Créez un compte sur": "Create an account on", "(Anthropic, l'éditeur de Claude) et ajoutez un moyen de paiement : facturation à l'usage.": "(Anthropic, the maker of Claude) and add a payment method: pay as you go.",
+  ", nom « my-145-station ». Copiez la clé (elle commence par": ", name “my-145-station”. Copy the key (it starts with", "Collez-la ici et fixez un plafond mensuel. La clé reste sur le serveur.": "Paste it here and set a monthly cap. The key stays on the server.",
+  "Nom et prénom (tapé à la connexion) *": "Full name (typed at sign-in) *", "E-mail (reçoit les codes) *": "Email (receives the codes) *",
+  "Tout, y compris les utilisateurs et les paramètres de l'organisation": "Everything, including users and organisation settings", "Tous les modules, sans les utilisateurs ni les paramètres de l'organisation": "All modules, without users or organisation settings",
+  "Flotte, pannes, outillage et notes · pas d'administration, de clients, de prix ni de paramètres": "Fleet, faults, tooling and notes · no administration, customers, prices or settings",
+  "Au laboratoire": "At the lab", "Aucun laboratoire. Ajoutez les labos où la station envoie ses outils (par exemple WAYS) : ils pourront être choisis à chaque envoi.": "No lab. Add the labs where the station sends its tools (for example WAYS): they can be picked at each shipment.",
+  "Créé hors ligne": "Created offline", "Intitulé *": "Title *", "Ex. agrément Part-145 CAAI, badge de piste société, assurance RC, inspection extincteurs…": "E.g. CAAI Part-145 approval, company ramp pass, liability insurance, fire extinguisher inspection…",
+  "⚠ Signaler une panne": "⚠ Report a fault", "+ Ajouter un véhicule": "+ Add a vehicle", "Aucun véhicule en service. Ajoutez votre premier véhicule.": "No vehicle in service. Add your first vehicle.",
+  "Véhicule, fournisseur, description…": "Vehicle, supplier, description…", "Garage ou loueur habituel": "Usual garage or rental company",
+  "Courroie de distribution : non applicable (chaîne de distribution, véhicule électrique…)": "Timing belt: not applicable (timing chain, electric vehicle…)", "Dernier remplacement de la distribution (date)": "Last timing belt replacement (date)",
+  "Défaut": "Defect", "Qui a fait quoi, et quand": "Who did what, and when", "Création": "Creation", "Tout le monde": "Everyone", "Lien retiré": "Link removed", "Désarchivage": "Unarchived",
+  "Réponse Peppol": "Peppol reply", "Envoi à Falco": "Sent to Falco", "E-mail préparé": "Email drafted", "PDF téléchargé": "PDF downloaded", "Personnes et systèmes": "People and systems",
+  "Qui a fait quoi, et quand · créations, modifications, suppressions, validations, envois, rapprochements, connexions": "Who did what, and when · creations, changes, deletions, approvals, sends, matches, sign-ins",
+  "Rechercher un client, une plaque, un outil, une personne…": "Search a customer, plate, tool, person…", "Élément": "Item", "Détail": "Detail", "oui": "yes", "non": "no",
+  "Contacts : en-tête du formulaire": "Contacts: form header", "qualifiés": "qualified", "avec I": "with I", "et vendredis": "and Fridays", "D/N à affecter": "D/N to assign",
+  "À qui / de qui": "To / from whom", "Ex. GPU en panne, porte du hangar bloquée…": "E.g. GPU out of order, hangar door stuck…", "Ex. clé dynamométrique 20-100 Nm, gants nitrile, imprimante…": "E.g. torque wrench 20-100 Nm, nitrile gloves, printer…",
+  "Ajouter un hôtel": "Add a hotel", "Retirer": "Remove", "Profil": "Profile"
+});
+rule(/^Retirer (.+)$/, (m, a) => "Remove " + (tr(a) || a));
+rule(/^(Bonjour|Bon après-midi|Bonsoir|Bonne nuit), (.+)$/, (m, a, b) => EN[a] + ", " + b);
+rule(/^(\d+) besoins? à approuver$/, (m, n) => `${n} need${n > 1 ? "s" : ""} to approve`);
+rule(/^(\d+) situations? ouverte\(s\) à ramener à la normale$/, (m, n) => `${n} open situation${n > 1 ? "s" : ""} to bring back to normal`);
+rule(/^(\d+) avions? en service$/, (m, n) => `${n} aircraft in service`); rule(/^(\d+) avions?$/, "$1 aircraft"); rule(/^(\d+) hôtels?$/, (m, n) => `${n} hotel${n > 1 ? "s" : ""}`);
+rule(/^(\d+|…) éléments? → (\d+|…|—) éléments?$/, "$1 items → $2 items"); rule(/^(\d+) éléments? → (—|…)$/, "$1 items → $2"); rule(/^(oui|non) → (oui|non|—)$/, (m, a, b) => `${EN[a]} → ${EN[b] || b}`);
+rule(/^Avion (\S+)( · .+)?$/, "Aircraft $1$2"); rule(/^Shift (\d{4}-\d\d-\d\d) (jour|nuit)$/, (m, d, s) => `Shift ${d} ${s === "jour" ? "day" : "night"}`);
+rule(/^Contact (.+)$/, "Contact $1"); rule(/^Situation (.+)$/, "Situation $1"); rule(/^Outil (.+)$/, "Tool $1"); rule(/^Besoin (.+)$/, "Need $1"); rule(/^Travail non terminé (.+)$/, "Uncompleted work $1");
+rule(/^(\d+) qualifiés$/, "$1 qualified"); rule(/^(\d+) avec I$/, "$1 with I"); rule(/^(.+) et vendredis$/, "$1 and Fridays");
+rule(/^Télécharge toutes les données de l'outil \((\d+) éléments\) dans un fichier JSON\.$/, "Downloads all the tool's data ($1 items) into a JSON file.");
+Object.assign(EN, {
+  "Messages affichés dans ce navigateur au cours des 3 derniers jours.": "Messages shown in this browser over the last 3 days.", "Aucun message.": "No messages.", "Messages système": "System messages",
+  "Connecté depuis": "Signed in since", "Session valable jusqu'à": "Session valid until", "Tout, y compris les utilisateurs et les paramètres": "Everything, including users and settings",
+  "obligatoire pour votre rôle : il sera demandé à la prochaine connexion": "required for your role: it will be asked at next sign-in", "+ Ajouter des widgets": "+ Add widgets", "Rétablir par défaut": "Reset to default",
+  "Glissez un widget par son en-tête pour le placer où vous voulez ; tirez ses bords ou ses coins pour le redimensionner. Votre tableau de bord vous est propre.": "Drag a widget by its header to place it anywhere; pull its edges or corners to resize it. Your dashboard is your own.",
+  "→ nom « my-145-station ».": "→ name “my-145-station”.", "(Clé d'accès)": "(Access key)", "Approuvé par / référence (MOE)": "Approved by / reference (MOE)",
+  "Sindri n'est pas encore configuré : un administrateur doit saisir la clé API dans Paramètres.": "Sindri is not set up yet: an administrator must enter the API key in Settings."
+});
+rule(/^Clé enregistrée (.+)$/, "Key saved $1"); rule(/^Prêté à (.+)$/, "Lent to $1");
+rule(/^(FR24 · )?En vol (.+)$/, "$1Airborne $2"); rule(/^(FR24 · )?Au sol (.+)$/, "$1On ground $2"); rule(/^(FR24 · )?Atterri (.+)$/, "$1Landed $2");
+rule(/^Reprendre le planning de (.+) jour pour jour dans les cases encore vides de ce mois \?$/, "Copy the $1 schedule day by day into this month's empty cells?");
+/* messages du serveur */
+Object.assign(EN, {
+  "Aucun fichier reçu": "No file received", "Ce shift a été remis : il est verrouillé. Le Station Lead peut le réactiver.": "This shift has been handed over: it is locked. The Station Lead can reopen it.",
+  "Ce shift est clôturé : seul le bureau peut encore le modifier.": "This shift is closed: only the office can still change it.", "Cette note personnelle appartient à quelqu'un d'autre.": "This personal note belongs to someone else.",
+  "Clé API invalide": "Invalid API key", "Clé ou secret invalide : copiez-les depuis la console Dropbox (onglet Settings).": "Invalid key or secret: copy them from the Dropbox console (Settings tab).",
+  "Code OACI de la station manquant (Paramètres).": "Station ICAO code missing (Settings).", "Code de l'application incorrect.": "Wrong authenticator code.",
+  "Couleur non permise (le jaune est réservé aux dossiers manuels, le bleu aux dossiers système).": "Colour not allowed (yellow is for manual folders, blue for system folders).",
+  "Dans l'outil, l'assistant est réservé au bureau et aux administrateurs (l'équipe terrain l'utilise sur WhatsApp).": "In the tool, the assistant is for the office and administrators (the line team uses it on WhatsApp).",
+  "Des tâches du Tech Log encodées par Sindri ne sont pas encore vérifiées : une personne doit les valider avant de remettre le shift.": "Tech Log tasks entered by Sindri are not verified yet: a person must approve them before handing over the shift.",
+  "Dossier non autorisé.": "Folder not allowed.", "Dropbox n'est pas relié (Paramètres).": "Dropbox is not connected (Settings).", "Dropbox n'est pas relié.": "Dropbox is not connected.",
+  "Délai dépassé : recommencez.": "Timed out: start again.", "Erreur de base de données": "Database error",
+  "Fiche d'un administrateur système : seul un administrateur peut changer son e-mail ou la supprimer.": "System administrator's record: only an administrator can change its email or delete it.",
+  "Flightradar24 n'est pas configuré : saisissez les heures à la main, ou ajoutez une clé API FR24 dans Paramètres.": "Flightradar24 is not set up: enter times by hand, or add an FR24 API key in Settings.",
+  "Fonction Headquarters : seul un administrateur peut l'octroyer, la retirer ou changer son e-mail.": "Headquarters function: only an administrator can grant it, remove it or change its email.",
+  "Historique réservé au bureau et aux administrateurs": "History is for the office and administrators", "L'assistant n'est pas encore configuré : un administrateur doit saisir la clé API dans Paramètres.": "The assistant is not set up yet: an administrator must enter the API key in Settings.",
+  "La connexion par code n'est pas encore configurée.": "Sign-in by code is not set up yet.", "La formation est déjà signée.": "The training is already signed.",
+  "La personne formée ne valide pas sa propre formation : un formateur le fait.": "Trainees do not approve their own training: a trainer does.", "Le nom est obligatoire.": "Name is required.",
+  "Le second facteur est déjà actif.": "The second factor is already on.", "Méthode non permise": "Method not allowed", "Non autorisé": "Not authorised", "Numéro invalide": "Invalid number",
+  "Plafond mensuel de l'assistant atteint.": "The assistant's monthly cap is reached.", "Préférences d'un autre utilisateur.": "Another user's preferences.",
+  "Réservé au bureau": "Office only", "Réservé au bureau et aux administrateurs": "Office and administrators only", "Réservé aux administrateurs": "Administrators only", "Réservé aux sessions nominatives.": "Named sessions only.", "Réservé à l'administrateur.": "Administrator only.",
+  "Saisissez d'abord la clé et le secret de l'app Dropbox.": "First enter the Dropbox app key and secret.", "Saisissez d'abord le jeton, l'identifiant du numéro et le secret de l'app.": "First enter the token, phone number ID and app secret.",
+  "Session de choix des dossiers expirée : ressaisissez le code maître.": "Folder picking session expired: enter the master code again.",
+  "Seul le Station Lead (ou un Shift Foreman qu'il a autorisé) peut annuler la remise d'un shift.": "Only the Station Lead (or a Shift Foreman they allowed) can cancel a shift handover.",
+  "Seul le Station Lead (ou un Shift Foreman qu'il a autorisé) peut réactiver un shift remis.": "Only the Station Lead (or a Shift Foreman they allowed) can reopen a handed-over shift.",
+  "Seul le Station Lead ou le bureau modifie les consignes.": "Only the Station Lead or the office edits instructions.", "Seul le Station Lead ou le bureau peut approuver, refuser ou commander un besoin.": "Only the Station Lead or the office can approve, refuse or order a need.",
+  "Seul le Station Lead ou le bureau publie les consignes.": "Only the Station Lead or the office publishes instructions.", "Seul son auteur ou le bureau peut supprimer cette note d'équipe.": "Only its author or the office can delete this team note.",
+  "Seul son auteur peut rendre une note d'équipe personnelle.": "Only its author can make a team note personal.", "Seul un administrateur peut importer des données.": "Only an administrator can import data.",
+  "Seul un administrateur peut octroyer ou retirer le droit Administrateur système.": "Only an administrator can grant or remove the System administrator right.",
+  "Trop d'essais : réessayez dans 15 minutes.": "Too many attempts: try again in 15 minutes.", "Trop d'essais depuis cette connexion. Réessayez dans 15 minutes.": "Too many attempts from this connection. Try again in 15 minutes.",
+  "Un point validé ne se modifie pas.": "An approved item cannot be changed.", "Validez en votre nom : votre compte doit être relié à votre fiche Personnel.": "Approve in your own name: your account must be linked to your Staff record (same email).",
+  "Vous ne pouvez signer que pour vous-même, une seule fois.": "You can only sign for yourself, once.", "Étape expirée : recommencez la connexion.": "Step expired: start the sign-in again.", "Événement invalide": "Invalid event"
+});
+rule(/^Plafond mensuel de l'assistant atteint \((.+)\)\.?$/, "The assistant's monthly cap is reached ($1).");
