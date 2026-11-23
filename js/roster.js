@@ -71,7 +71,7 @@ VIEWS.roster = {
         + `<button class="btn sm ${UI.r2 ? "primary" : ""}" data-a="roster-two" title="${esc(tr("Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre"))}">2 mois</button>`
         + `<button class="btn sm" data-a="roster-month" data-n="0" ${ym === ymOf(today()) ? `style="visibility:hidden" tabindex="-1" aria-hidden="true"` : ""}>Aujourd'hui</button></div>`) +
       tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["fatigue", "Fatigue et repos"], ["codes", "Codes"]]) +
-      (UI.redit && rosterEd() ? `<div class="redit-bar" role="status">✏️ ${esc(tr("EDIT MODE ON: every change is saved immediately."))} <button class="btn sm" data-a="roster-edit">${esc(tr("Finish editing"))}</button></div>` : "") +
+      (UI.redit && rosterEd() ? `<div class="redit-bar" role="status">✏️ ${esc(tr("EDIT MODE ON: every change is saved immediately."))} <button class="btn sm" data-a="roster-undo" title="Ctrl+Z">↶ ${esc(tr("Undo"))}</button> <button class="btn sm" data-a="roster-edit">${esc(tr("Finish editing"))}</button></div>` : "") +
       `<div class="${UI.redit && rosterEd() ? "redit-on" : ""}">` + ({ mois: rosterMonth, jour: rosterToday, fatigue: rosterFatigue, codes: rosterCodes })[tab]() + `</div>`;
   }
 };
@@ -120,7 +120,10 @@ document.addEventListener("submit", async e => {
 });
 
 /* ---- saisie ---- */
-async function rosterSet(changes) {   /* changes : [[staffId, date, cell|null]] */
+/* annuler (Ctrl+Z / bouton) : chaque saisie du roster garde les cases d'avant, pour cette page et cette session */
+const rUndo = [];
+async function rosterSet(changes, noUndo) {   /* changes : [[staffId, date, cell|null]] */
+  if (!noUndo && changes.length) { rUndo.push(changes.map(([sid, d]) => { const o = rcell(sid, d); return [sid, d, o ? JSON.parse(JSON.stringify(o)) : null]; })); if (rUndo.length > 50) rUndo.shift(); }
   const by = {};
   for (const [sid, d, x] of changes) { const k = rosterId(sid, ymOf(d)); (by[k] = by[k] || { sid, ym: ymOf(d), set: {} }).set[String(+d.slice(8))] = x; }
   for (const [id, g] of Object.entries(by)) {
@@ -147,7 +150,19 @@ ACTIONS["roster-brush"] = el => {
   }
   UI.rbrush = UI.rbrush === c ? undefined : c; render(true);
 };
-let rPaint = null;
+async function rosterUndo() {
+  if (!rosterEd()) return; const last = rUndo.pop();
+  if (!last) { toast(tr("Nothing to undo.")); return; }
+  await rosterSet(last, true); render(true); toast(tr("Last change undone") + ` (${last.length} ${tr(last.length > 1 ? "cells" : "cell")})`);
+}
+ACTIONS["roster-undo"] = () => rosterUndo();
+document.addEventListener("keydown", e => {
+  if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.key.toLowerCase() !== "z" || !location.hash.startsWith("#roster") || !rosterEd()) return;
+  if (e.target.closest && e.target.closest("input,textarea,select,[contenteditable]") || document.querySelector("#modal-root .modal")) return;
+  e.preventDefault(); rosterUndo();
+});
+/* glisser : seule la ligne où l'on a commencé est peinte, du premier jour au jour sous la souris (sans trou si la souris va vite) */
+let rPaint = null, rRow = null, rFrom = null;
 const brushCell = () => UI.rbrush ? Object.assign({ c: UI.rbrush }, rcode(UI.rbrush).k === "custom" ? { start: "06:00", end: "18:00" } : {}) : null;
 function paintTd(td) {
   if (!rPaint || rPaint.has(td.dataset.rc)) return;
@@ -156,11 +171,15 @@ function paintTd(td) {
 }
 document.addEventListener("pointerdown", e => {
   const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td || UI.rbrush == null || !rosterEd()) return;
-  e.preventDefault(); rPaint = new Set(); paintTd(td);
+  e.preventDefault(); rPaint = new Set(); [rRow, rFrom] = td.dataset.rc.split("|"); paintTd(td);
 });
-document.addEventListener("pointerover", e => { if (!rPaint) return; const td = e.target.closest && e.target.closest("td[data-rc]"); if (td) paintTd(td); });
+document.addEventListener("pointerover", e => {
+  if (!rPaint) return; const td = e.target.closest && e.target.closest("td[data-rc]"); if (!td) return;
+  const to = td.dataset.rc.split("|")[1], [a, b] = to < rFrom ? [to, rFrom] : [rFrom, to];
+  for (let d = a; d <= b; d = addDays(d, 1)) { const c = document.querySelector(`td[data-rc="${rRow}|${d}"]`); if (c) paintTd(c); }
+});
 document.addEventListener("pointerup", async () => {
-  if (!rPaint) return; const keys = [...rPaint]; rPaint = null; const x = brushCell();
+  if (!rPaint) return; const keys = [...rPaint]; rPaint = null; rRow = rFrom = null; const x = brushCell();
   await rosterSet(keys.map(k => { const [sid, d] = k.split("|"); const old = rcell(sid, d); return [sid, d, x ? Object.assign({}, x, old && old.c === x.c ? { start: old.start || x.start, end: old.end || x.end } : {}, old?.note ? { note: old.note } : {}, old?.duty ? { duty: old.duty } : {}) : null]; }));
 });
 document.addEventListener("click", e => {
