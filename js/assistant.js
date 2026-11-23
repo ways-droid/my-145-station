@@ -75,6 +75,15 @@ function aiMount() {
   panel.addEventListener("dragover", over); panel.addEventListener("dragenter", over);
   panel.addEventListener("dragleave", e => { if (!panel.contains(e.relatedTarget)) panel.classList.remove("drop"); });
   panel.addEventListener("drop", e => { e.preventDefault(); panel.classList.remove("drop"); if (AI && AI.configured && e.dataTransfer.files.length) aiAddFiles([...e.dataTransfer.files]); });
+  /* fichier lâché n'importe où sur la page (hors zones de dépôt propres à un écran) : ouvert dans Sindri */
+  const hasF = e => [...(e.dataTransfer?.types || [])].includes("Files");
+  document.addEventListener("dragover", e => { if (hasF(e) && !e.defaultPrevented) { e.preventDefault(); document.body.classList.add("ai-dragging"); } });
+  document.addEventListener("dragleave", e => { if (!e.relatedTarget) document.body.classList.remove("ai-dragging"); });
+  document.addEventListener("drop", e => { document.body.classList.remove("ai-dragging"); if (!hasF(e) || e.defaultPrevented) return; e.preventDefault(); const fs = [...e.dataTransfer.files];   // à lire tout de suite : la liste est vidée après l'événement
+    aiToggle(true).then(() => { if (AI && AI.configured) aiAddFiles(fs); }); });
+  /* coller une capture d'écran (Ctrl+V) dans la zone de texte de Sindri */
+  panel.addEventListener("paste", e => { const fs = [...(e.clipboardData?.files || [])]; if (!fs.length || !(AI && AI.configured)) return; e.preventDefault();
+    aiAddFiles(fs.map((f, i) => f.name && f.name !== "image.png" ? f : new File([f], `screenshot-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}${i ? "-" + i : ""}.${(f.type.split("/")[1] || "png").replace("jpeg", "jpg")}`, { type: f.type }))); });
   fab.addEventListener("dragover", e => { if ([...(e.dataTransfer?.types || [])].includes("Files")) { e.preventDefault(); aiToggle(true); } });
   document.addEventListener("keydown", e => { if (e.key === "Escape" && aiOpen && !document.querySelector(".modal")) aiToggle(false); });
 }
@@ -129,7 +138,7 @@ function aiRender() {
     ${aiTopicsOpen ? `<div class="ai-tlist" role="list">${topics.slice().reverse().map(t => `<button class="ai-tl" role="listitem" data-ai-go="${t.i}"><span>${esc(t.title || tr("(sans titre)"))}</span><span class="muted small nowrap">${esc(tAt(t.at))}</span></button>`).join("")}</div>` : ""}
     <div class="ai-body" id="ai-body">${body}</div>
     ${ready ? `${aiFiles.length ? `<div class="ai-pend">${aiFiles.map((f, k) => `<span class="ai-file">📎 ${esc(f.name)}${f.up ? " …" : ""}<button type="button" class="linkbtn" data-ai-rm="${k}" aria-label="${esc(tr("Retirer"))}">×</button></span>`).join("")}</div>` : ""}
-      ${aiDbxCard()}<form class="ai-f" id="ai-f"><button type="button" class="iconbtn ai-clip" id="ai-clip" title="${esc(tr("Joindre un fichier (PDF ou photo)"))}" aria-label="${esc(tr("Joindre un fichier"))}" ${aiBusy ? "disabled" : ""}>📎</button><input type="file" id="ai-file" accept="application/pdf,image/*" multiple hidden>
+      ${aiDbxCard()}<form class="ai-f" id="ai-f"><button type="button" class="iconbtn ai-clip" id="ai-clip" title="${esc(tr("Joindre un fichier (PDF ou photo)"))}" aria-label="${esc(tr("Joindre un fichier"))}" ${aiBusy ? "disabled" : ""}>📎</button><input type="file" id="ai-file" accept="application/pdf,image/*,.xlsx,.docx,.csv,.txt,.tsv" multiple hidden>
       <textarea id="ai-q" rows="2" placeholder="${esc(tr(aiFiles.length ? "Consigne facultative… (Entrée pour envoyer)" : "Votre question… ou déposez un fichier ici"))}" ${aiBusy ? "disabled" : ""}></textarea><button class="btn primary" ${aiBusy ? "disabled" : ""}>${esc(tr("Envoyer"))}</button></form>
       <div class="ai-foot muted small">${esc(tr("Conversation privée · retrouvée sur tous vos appareils · actions notées dans l'historique"))}</div>` : ""}`;
   const b = p.querySelector("#ai-body"); b.scrollTop = b.scrollHeight;
@@ -186,9 +195,10 @@ async function aiAsk(text) {
   aiBusy = false; await aiRefresh(); aiRender();
 }
 /* fichiers : envoyés au serveur dès qu'ils sont choisis ou déposés, joints à la prochaine question */
+const aiFileOk = f => /^application\/pdf$|^image\/|^text\/(csv|plain|tab-separated-values)$|spreadsheetml|wordprocessingml/.test(f.type || "") || /\.(pdf|png|jpe?g|gif|webp|xlsx|docx|csv|txt|tsv)$/i.test(f.name || "");
 async function aiAddFiles(list) {
   for (const f of list.slice(0, 5)) {
-    if (!/^application\/pdf$|^image\//.test(f.type || "")) { toast(tr("Format non accepté : PDF ou photo.")); continue; }
+    if (!aiFileOk(f)) { toast(tr("Format non accepté : PDF, photo, Excel, Word ou CSV.")); continue; }
     if (f.size > 15 * 1048576) { toast(tr("Fichier trop lourd pour Sindri (15 Mo maximum).")); continue; }
     const e = { name: f.name, mime: f.type, up: true }; aiFiles.push(e); aiRender();
     try { const r = await assets.upload(f); e.id = r.id; e.mime = r.contentType || f.type; } catch { toast(tr("Le fichier n'a pas pu être envoyé.")); aiFiles = aiFiles.filter(x => x !== e); }

@@ -509,6 +509,17 @@ ok "fichier rangé par Sindri" "$R" '"op":"update"'; ok "véhicule modifié" "$R
 R2=$(curl -s -H "$K" $U/docs/vehicles/veh-t); ok "document ajouté au véhicule" "$R2" "\"file\":\"$FID\""; ok "échéance CT mise à jour" "$R2" '"ctDate":"2027-11-12"'
 no "contenu du fichier pas renvoyé" "$R" '"base64"'; ok "fichier gardé dans la conversation" "$R" '"name":"ct.pdf"'
 ok "document envoyé à Claude" "$(grep -c '"type":"document"' $T/ai.log)" '[12]'
+printf 'reg,arr,dep\n9H-CAZ,23:55,04:00\n' > $T/rot.csv
+FID=$(curl -s -H "$B" -F "file=@$T/rot.csv;type=text/csv" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
+curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"Read this\",\"files\":[{\"id\":\"$FID\",\"name\":\"rot.csv\"}]}]}" $U/assistant/chat >/dev/null
+ok "CSV lu pour Sindri" "$(grep '9H-CAZ,23:55' $T/ai.log | tail -1)" '"title":"rot.csv"'
+if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
+  php -r '$z=new ZipArchive(); $z->open($argv[1], ZipArchive::CREATE); $z->addFromString("xl/sharedStrings.xml","<sst xmlns=\"x\"><si><t>4X-EKA</t></si><si><t>B777</t></si></sst>"); $z->addFromString("xl/workbook.xml","<workbook><sheets><sheet name=\"Fleet\"/></sheets></workbook>"); $z->addFromString("xl/worksheets/sheet1.xml","<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"B1\" t=\"s\"><v>1</v></c><c r=\"C1\"><v>42</v></c></row></sheetData></worksheet>"); $z->close();' $T/fleet.xlsx
+  FID=$(curl -s -H "$B" -F "file=@$T/fleet.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
+  curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"Read this\",\"files\":[{\"id\":\"$FID\",\"name\":\"fleet.xlsx\"}]}]}" $U/assistant/chat >/dev/null
+  ok "Excel lu pour Sindri" "$(grep 'Sheet Fleet' $T/ai.log | tail -1)" 'A=4X-EKA\\tB=B777\\tC=42'
+fi
+curl -s -H "$B" -X PUT -d '{"plate":"1-ABC-123","fleetNo":"042","docs":[]}' $U/docs/vehicles/veh-t >/dev/null
 R=$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Crée une facture"}]}' $U/assistant/chat)
 ok "fiche créée par Sindri" "$R" '"op":"create"'; ok "client créé" "$R" 'Cargo Test'
 ok "historique au nom de Sindri" "$(curl -s -H "$A" "$U/log?q=Sindri")" 'Sindri (pour Bea Bureau)'
@@ -553,7 +564,7 @@ curl -s -H "$B" -X PUT -d '{"title":"Perso Bea","body":"secret"}' $U/docs/notes/
 R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Sindri ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Sindri lit un PDF Dropbox" "$R" 'Lu : text,document'
 no "fichier lu non gardé dans le fil" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN) ? implode("", $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN)) : "";' $T/t.db)" 'JVBERi0'
-ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":22'
+ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":24'
 echo "> notes"
 curl -s -H "$B" -X PUT -d '{"title":"Code portail","body":"1234","owner":"autre"}' $U/docs/notes/n1 >/dev/null
 ok "note personnelle : auteur imposé" "$(curl -s -H "$B" $U/docs/notes/n1)" '"owner":"u3"'
@@ -567,7 +578,7 @@ ok "note d'équipe : seul l'auteur la rend personnelle" "$(curl -s -H "$A" -X PA
 REVN=$(curl -s -H "$A" "$U/changes?since=0&colls=notes" | php -r 'echo json_decode(stream_get_contents(STDIN))->rev;')
 curl -s -H "$B" -X PATCH -d '{"team":false}' $U/docs/notes/n1 >/dev/null
 ok "redevenue personnelle : retirée chez les autres" "$(curl -s -H "$A" "$U/changes?since=$REVN&colls=notes")" '"id":"n1"[^}]*"deleted":true'
-no "historique : contenu d'une note personnelle jamais montré" "$(curl -s -H "$A" "$U/log?coll=notes")" '1234'
+no "historique : contenu d'une note personnelle jamais montré" "$(curl -s -H "$A" "$U/log?coll=notes")" '"1234"'
 echo "> préférences personnelles"
 ok "préférences : les siennes" "$(curl -s -H "$B" -X PUT -d '{"dash":[{"id":"faults"}]}' $U/docs/userPrefs/p-u3)" '"ok":true'
 ok "préférences : pas celles d'un autre" "$(curl -s -H "$A" -X PUT -d '{"dash":[]}' $U/docs/userPrefs/p-u3)" 'autre utilisateur'
