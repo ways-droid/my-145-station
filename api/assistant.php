@@ -223,10 +223,16 @@ function ai_tools($role) {
 ] : []),
         ['name' => 'remember', 'description' => "Retiens une connaissance utile à toute l'équipe pour les prochaines fois : une façon de faire de l'entreprise, une convention, une préférence de travail, une correction qu'on t'a faite (ex. « Les transports Airside se facturent avec l'article EXP »). Jamais d'information personnelle ni le contenu privé d'une conversation : seulement une règle de travail générale, en une phrase.",
          'input_schema' => ['type' => 'object', 'properties' => ['note' => ['type' => 'string']], 'required' => ['note']]],
-        ['name' => 'confirm_action', 'description' => "Exécute une action proposée plus tôt (propose_delete ou propose_share_note), UNIQUEMENT après que la personne a répondu « oui » dans un message ultérieur. token = celui renvoyé par la proposition. Refusé par le serveur dans la même réponse que la proposition.",
+        ['name' => 'confirm_action', 'description' => "Exécute une action proposée plus tôt (propose_delete, propose_share_note, propose_rotations ou message WhatsApp), UNIQUEMENT après que la personne a répondu « oui » dans un message ultérieur. token = celui renvoyé par la proposition. Refusé par le serveur dans la même réponse que la proposition.",
          'input_schema' => ['type' => 'object', 'properties' => ['token' => ['type' => 'string']], 'required' => ['token']]],
         ['name' => 'propose_share_note', 'description' => "Prépare le passage d'une note personnelle de la personne qui te parle en note d'équipe (visible de tous). Rien n'est changé : demande-lui de confirmer (oui / non), puis confirm_action. Seul l'auteur peut partager sa note.",
          'input_schema' => ['type' => 'object', 'properties' => ['id' => ['type' => 'string']], 'required' => ['id']]],
+        ['name' => 'propose_rotations', 'description' => "Prépare les avions (rotations) à créer dans les shifts de la station à partir d'un planning (capture Oracle « Aircraft and Crew Management », tableau, PDF…). Donne une ligne par passage à la station : immatriculation, vol et heure d'arrivée à la station, vol et heure de départ de la station (heures UTC / GMT, date complète). Rien n'est créé : l'outil renvoie le tableau converti (heure locale, shift) et un token ; montre-le à la personne, demande « oui », puis confirm_action. 60 rotations au plus par proposition.",
+         'input_schema' => ['type' => 'object', 'properties' => ['rotations' => ['type' => 'array', 'items' => ['type' => 'object', 'properties' => [
+            'reg' => ['type' => 'string', 'description' => 'Immatriculation, ex. 4X-ICA'], 'arrUtc' => ['type' => 'string', 'description' => "Arrivée à la station, UTC, AAAA-MM-JJ HH:MM (vide si l'avion est déjà là au début du planning)"],
+            'from' => ['type' => 'string', 'description' => 'Escale de provenance (IATA)'], 'flightIn' => ['type' => 'string', 'description' => "N° du vol d'arrivée, ex. 5C981"],
+            'depUtc' => ['type' => 'string', 'description' => 'Départ de la station, UTC, AAAA-MM-JJ HH:MM (vide si inconnu)'], 'to' => ['type' => 'string', 'description' => 'Destination (IATA)'], 'flightOut' => ['type' => 'string'],
+            'note' => ['type' => 'string', 'description' => 'Ex. WEEKLY MAINTENANCE prévue, AOG…']], 'required' => ['reg']]]], 'required' => ['rotations']]],
         ['name' => 'propose_delete', 'description' => "Prépare la suppression d'une fiche (une panne, une intervention…). Rien n'est supprimé : demande ensuite à la personne de confirmer (oui / non) en lui rappelant ce qui sera supprimé ; si elle répond oui, appelle confirm_action avec le token. Dans l'outil, elle peut aussi confirmer d'un clic.",
          'input_schema' => ['type' => 'object', 'properties' => ['collection' => ['type' => 'string', 'enum' => array_values(array_intersect(AI_WRITABLE, $colls))], 'id' => ['type' => 'string'], 'summary' => ['type' => 'string']], 'required' => ['collection', 'id', 'summary']]],
         ['name' => 'aggregate', 'description' => "Compte et additionne sur toutes les fiches filtrées (pas de limite) : à utiliser pour tout total, comptage ou classement.",
@@ -257,6 +263,7 @@ function ai_system($who, $role) {
         . "- Si un résultat d'outil indique qu'il n'a pas été conservé ou a été raccourci, relance l'outil au lieu de supposer son contenu. N'affirme jamais avoir vérifié quelque chose que tu n'as pas vu.\n"
         . "- Après une écriture, dis en une phrase ce que tu as fait et cite la fiche ; l'utilisateur voit un bouton pour l'ouvrir ou l'annuler.\n"
         . "- Fichier joint (photo, capture d'écran, PDF, Excel, Word, CSV) : lis-le et utilise-le pour la question. Exemples station : page de Tech Log ou de LogBook (immatriculation, défauts, actions, LogPage n°, WO n°) → propose de remplir le Tech Log de l'avion dans le shift ; planning de vols ou liste de rotations → propose les avions du shift (ARR/DEP UTC) ; roster ou liste de formations → propose les mises à jour. Montre ce que tu as lu et demande avant d'écrire si ce n'est pas demandé clairement. Les données aviation restent en anglais.\n"
+        . "- Planning de vols (capture d'écran Oracle « Aircraft and Crew Management » ou autre diagramme de Gantt) : une ligne par immatriculation (colonne de gauche), axe du temps en haut (jours puis heures ; « Profile time zone GMT » = heures en UTC). Chaque barre de vol porte « STN HH:MM » au départ, le n° de vol au milieu, « HH:MM STN » à l'arrivée, et sous la barre « HH:MM-HH:MM » et « DEP-ARR » (ex. 21:00-07:30 TLV-LGG). Les blocs gris ou colorés sans n° de vol (WEEKLY MAINTENANCE, AOG, BOROSCOPE INSPECTION, A/C NOT AVAILABLE, SPARE, FREIGHTER CONVERSION) ne sont pas des vols : mets-les en note de la rotation concernée. Lis les petits textes dans les tuiles en pleine résolution. Pour la station (" . ai_station_tz()->getName() . ") : une rotation = une barre qui ARRIVE à la station, puis la barre suivante de la même immatriculation qui en REPART (vol, heure). Date de chaque heure = jour de l'axe au-dessus ; un vol qui passe minuit arrive le lendemain. Fais propose_rotations avec toutes les rotations de la période (heures UTC), montre le tableau qu'il renvoie et attends « oui » avant confirm_action. Si un texte est illisible ou ambigu, dis-le plutôt que d'inventer.\n"
         . "- Fichier joint sans consigne et document de véhicule : identifie ce que c'est (contrôle technique, carte verte, certificat d'immatriculation, contrat de leasing…), lis les informations utiles (plaque, VIN, dates, organisme, n°, défauts), retrouve le véhicule avec search_records (collection vehicles, par plaque ou VIN) et range-le avec add_vehicle_document. "
         . "Si le véhicule n'est pas trouvé ou s'il y a plusieurs candidats, si le type est incertain, ou si ce n'est pas un document de véhicule, explique ce que tu as lu et demande quoi faire. Pour un contrôle technique, la date d'expiration est la date limite du prochain contrôle.\n"
         . "- Quand on te corrige ou qu'on t'explique une façon de faire de l'entreprise, retiens-la avec remember (règle générale, jamais de détail personnel). Ce qui se dit dans une conversation reste privé entre toi et cette personne.\n"
@@ -349,6 +356,36 @@ function ai_office_text($path, $mime, $name) {
     return $out;
 }
 
+/* grande image (capture d'écran d'un planning, tableau…) : Claude la réduit à ~1,15 Mpx et les petits textes deviennent illisibles.
+   On ajoute donc des tuiles en pleine résolution ; chaque tuile reprend la bande de gauche (immatriculations) et la bande du haut
+   (axe des dates et heures) de l'image, pour qu'une barre lue dans une tuile garde sa ligne et son heure. */
+function ai_image_tiles($path, $name) {
+    if (!function_exists('imagecreatefromstring')) return [];
+    $info = @getimagesize($path); if (!$info) return [];
+    [$W, $H] = $info; if ($W * $H <= 1400000 && max($W, $H) <= 1600) return [];
+    $src = @imagecreatefromstring((string) file_get_contents($path)); if (!$src) return [];
+    $L = (int) max(60, min(170, round($W * 0.03))); $T = (int) max(50, min(200, round($H * 0.12)));
+    $cw = 1000; $ch = 720; $ov = 80;
+    $cols = (int) max(1, ceil(($W - $L - $ov) / ($cw - $ov))); $rows = (int) max(1, ceil(($H - $T - $ov) / ($ch - $ov)));
+    while ($cols * $rows > 12) { $cw += 200; $ch += 120; $cols = (int) max(1, ceil(($W - $L - $ov) / ($cw - $ov))); $rows = (int) max(1, ceil(($H - $T - $ov) / ($ch - $ov))); }
+    $out = [['type' => 'text', 'text' => "[Image « $name » ({$W}×{$H} px) : l'image entière est réduite ci-dessus ; voici {$cols}×{$rows} tuiles en pleine résolution (lis les petits textes ici). Chaque tuile reprend en haut la bande d'en-tête (axe des dates / heures) et à gauche la colonne des libellés de l'image, au-dessus et à côté de la zone zoomée.]"]];
+    for ($r = 0; $r < $rows; $r++) for ($c = 0; $c < $cols; $c++) {
+        $x0 = $L + $c * ($cw - $ov); $y0 = $T + $r * ($ch - $ov); if ($x0 >= $W || $y0 >= $H) continue;
+        $w = min($cw, $W - $x0); $h = min($ch, $H - $y0);
+        $im = imagecreatetruecolor($L + $w, $T + $h); imagefill($im, 0, 0, imagecolorallocate($im, 255, 255, 255));
+        imagecopy($im, $src, 0, 0, 0, 0, $L, $T);            // coin
+        imagecopy($im, $src, $L, 0, $x0, 0, $w, $T);         // axe du haut
+        imagecopy($im, $src, 0, $T, 0, $y0, $L, $h);         // libellés de gauche
+        imagecopy($im, $src, $L, $T, $x0, $y0, $w, $h);      // zone zoomée
+        $red = imagecolorallocate($im, 255, 0, 0); imageline($im, $L - 1, 0, $L - 1, $T + $h, $red); imageline($im, 0, $T - 1, $L + $w, $T - 1, $red);
+        ob_start(); imagepng($im, null, 6); $png = ob_get_clean(); imagedestroy($im);
+        $out[] = ['type' => 'text', 'text' => 'Tuile ' . ($r + 1) . '/' . $rows . ' (ligne) · ' . ($c + 1) . '/' . $cols . " (colonne) : x {$x0}–" . ($x0 + $w) . ", y {$y0}–" . ($y0 + $h)];
+        $out[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => 'image/png', 'data' => base64_encode($png)]];
+    }
+    imagedestroy($src);
+    return $out;
+}
+
 /* fichier joint → bloc document (PDF) ou image pour Claude ; seulement pour la question en cours */
 function ai_file_blocks($files, $expand) {
     $blocks = []; $dir = cfg('upload_dir');
@@ -362,7 +399,7 @@ function ai_file_blocks($files, $expand) {
             if ($meta['size'] > AI_FILE_MAX) { $blocks[] = ['type' => 'text', 'text' => "$label (trop volumineux pour être lu : 15 Mo maximum)"]; continue; }
             $data = base64_encode(file_get_contents("$dir/$id"));
             if ($mime === 'application/pdf') $blocks[] = ['type' => 'document', 'source' => ['type' => 'base64', 'media_type' => 'application/pdf', 'data' => $data]];
-            elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) $blocks[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => $data]];
+            elseif (in_array($mime, ['image/jpeg', 'image/png', 'image/gif', 'image/webp'], true)) { $blocks[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $mime, 'data' => $data]]; foreach (ai_image_tiles("$dir/$id", (string) $meta['name']) as $b) $blocks[] = $b; }
             elseif (($txt = ai_office_text("$dir/$id", $mime, (string) $meta['name'])) !== null && trim($txt) !== '') $blocks[] = ['type' => 'document', 'source' => ['type' => 'text', 'media_type' => 'text/plain', 'data' => mb_substr($txt, 0, 150000)], 'title' => mb_substr((string) $meta['name'], 0, 200)];
             else { $blocks[] = ['type' => 'text', 'text' => "$label (format non lisible : envoyez un PDF, une photo, un Excel, un Word ou un CSV)"]; continue; }
         }
@@ -446,6 +483,7 @@ function ai_run($who, $role, $msgs) {
         $results = [];
         foreach ($uses as $u) {
             if ($u['name'] === 'remember') $r = ai_remember($who, (array) ($u['input'] ?? []));
+            elseif ($u['name'] === 'propose_rotations') $r = ai_rot_propose($who, $role, (array) ($u['input'] ?? []));
             elseif (in_array($u['name'], ['create_record', 'update_record', 'add_vehicle_document', 'propose_delete', 'confirm_delete', 'confirm_action', 'propose_share_note', 'add_note_file'], true)) $r = ai_write($who, $role, (string) $u['name'], (array) ($u['input'] ?? []), $actions);
             elseif ($u['name'] === 'propose_whatsapp_message') $r = ai_wa_propose($who, $role, (array) ($u['input'] ?? []));
             elseif ($u['name'] === 'whatsapp_send_file') { try { $r = wa_send_file_to_me($who, (array) ($u['input'] ?? [])); } catch (Throwable $e) { $r = ['error' => $e->getMessage()]; } }
@@ -633,6 +671,72 @@ function ai_wa_propose($who, $role, $in) {
     kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_slice($pend, -10), JSON_UNESCAPED_UNICODE));
     return ['ok' => true, 'token' => $tok, 'to' => $t['name'], 'mode' => $open ? 'texte libre' : "modèle « message d'équipe » (le texte sera mis sur une ligne)", 'todo' => "Rien n'est envoyé. Montre à la personne le destinataire ({$t['name']}) et le texte exact entre guillemets, signale qu'il partira signé de son nom, et demande-lui de répondre « oui » pour l'envoyer."];
 }
+/* ---------- rotations lues dans un planning : proposées, puis créées après « oui » ----------
+   Une ligne « visit » par rotation, dans le shift de l'arrivée (heure de la station) ; les shifts suivants couverts par
+   l'escale reçoivent leur ligne à l'ouverture de la page Shift (visitHeal). Doublon = même immatriculation déjà au planning
+   à moins de 3 h de la même arrivée (ou du même départ). */
+function ai_station_tz() {
+    $set = (array) (coll_docs('settings')['company'] ?? []); $stn = strtoupper((string) ($set['stationCode'] ?? '') ?: 'TLV');
+    $tz = (string) ($set['timeZone'] ?? '') ?: (['TLV' => 'Asia/Jerusalem', 'LGG' => 'Europe/Brussels', 'BRU' => 'Europe/Brussels', 'MLA' => 'Europe/Malta'][$stn] ?? 'UTC');
+    try { return new DateTimeZone($tz); } catch (Throwable $e) { return new DateTimeZone('UTC'); }
+}
+function ai_utc($s) { $s = trim((string) $s); if (!preg_match('/^(\d{4}-\d{2}-\d{2})[ T](\d{1,2}):?(\d{2})/', $s, $m)) return null; return new DateTimeImmutable(sprintf('%s %02d:%s:00', $m[1], (int) $m[2], $m[3]), new DateTimeZone('UTC')); }
+function ai_shift_of(DateTimeImmutable $t, DateTimeZone $tz) {
+    $l = $t->setTimezone($tz); $h = (int) $l->format('G'); $d = $l->format('Y-m-d');
+    if ($h >= 20) return "$d-night"; if ($h < 8) return $l->modify('-1 day')->format('Y-m-d') . '-night'; return "$d-day";
+}
+function ai_rot_rows($in) {
+    $tz = ai_station_tz(); $rows = []; $err = [];
+    foreach (array_slice((array) ($in['rotations'] ?? []), 0, 60) as $i => $r) {
+        $reg = strtoupper(preg_replace('/\s+/', '', (string) ($r['reg'] ?? ''))); if ($reg === '') { $err[] = 'ligne ' . ($i + 1) . ' : immatriculation manquante'; continue; }
+        $a = ai_utc($r['arrUtc'] ?? ''); $d = ai_utc($r['depUtc'] ?? '');
+        if (!$a && !$d) { $err[] = "$reg : ni arrivée ni départ"; continue; }
+        if ($a && $d && $d <= $a) { $err[] = "$reg : départ avant l'arrivée"; continue; }
+        $ho = ai_shift_of($a ?: $d, $tz);
+        $dup = '';
+        foreach (coll_docs('shiftItems') as $id => $x) {
+            if (!is_array($x) || ($x['kind'] ?? '') !== 'visit' || strtoupper(preg_replace('/\s+/', '', (string) ($x['reg'] ?? ''))) !== $reg) continue;
+            foreach ([[$a, 'arr', 'arrDate'], [$d, 'dep', 'depDate']] as [$t, $k, $kd]) if ($t && !empty($x[$kd]) && preg_match('/^\d{1,2}:\d{2}$/', (string) ($x[$k] ?? ''))) {
+                $o = ai_utc($x[$kd] . ' ' . $x[$k]); if ($o && abs($o->getTimestamp() - $t->getTimestamp()) <= 3 * 3600) $dup = (string) $id;
+            }
+            if (!$dup && $a && ($x['ho'] ?? '') === $ho && empty($x['arrDate'])) $dup = (string) $id;
+        }
+        $rows[] = ['reg' => $reg, 'ho' => $ho, 'arr' => $a ? $a->format('H:i') : '', 'arrDate' => $a ? $a->format('Y-m-d') : '', 'dep' => $d ? $d->format('H:i') : '', 'depDate' => $d ? $d->format('Y-m-d') : '',
+            'from' => strtoupper(mb_substr((string) ($r['from'] ?? ''), 0, 4)), 'to' => strtoupper(mb_substr((string) ($r['to'] ?? ''), 0, 4)), 'flightIn' => strtoupper(mb_substr(preg_replace('/\s+/', '', (string) ($r['flightIn'] ?? '')), 0, 10)),
+            'flightOut' => strtoupper(mb_substr(preg_replace('/\s+/', '', (string) ($r['flightOut'] ?? '')), 0, 10)), 'note' => mb_substr((string) ($r['note'] ?? ''), 0, 200),
+            'arrLT' => $a ? $a->setTimezone($tz)->format('d M H:i') . ' LT' : '', 'depLT' => $d ? $d->setTimezone($tz)->format('d M H:i') . ' LT' : '', 'duplicateOf' => $dup];
+    }
+    return [$rows, $err];
+}
+function ai_rot_propose($who, $role, $in) {
+    if (!in_array('shiftItems', ai_colls($role), true)) return ['error' => 'Collection non modifiable par l\'assistant : shiftItems'];
+    [$rows, $err] = ai_rot_rows($in);
+    if (!$rows) return ['error' => 'Aucune rotation valable.' . ($err ? ' ' . implode(' ; ', $err) : '')];
+    $new = array_values(array_filter($rows, fn($r) => $r['duplicateOf'] === ''));
+    $tok = bin2hex(random_bytes(4));
+    $pend = array_values(array_filter(ai_confirm_list($who), fn($p) => time() - $p['at'] < AI_CONFIRM_TTL));
+    $pend[] = ['token' => $tok, 'kind' => 'rot', 'coll' => 'shiftItems', 'id' => '', 'rows' => $new, 'label' => count($new) . ' rotation(s) à créer', 'q' => (int) ($GLOBALS['AI_Q'] ?? 0), 'at' => time(), 'shown' => false];
+    kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_slice($pend, -10), JSON_UNESCAPED_UNICODE));
+    $tz = ai_station_tz()->getName();
+    return ['ok' => true, 'token' => $tok, 'stationTimeZone' => $tz, 'toCreate' => count($new), 'alreadyPlanned' => count($rows) - count($new), 'rows' => $rows, 'problems' => $err,
+        'todo' => "Rien n'est créé. Montre un tableau (Reg · ARR flight / from / heure Z et LT · DEP flight / to / heure Z et LT · shift), signale les lignes déjà au planning (duplicateOf) et les problèmes, puis demande « oui » pour créer les " . count($new) . " rotation(s)."];
+}
+function ai_rot_create($who, $p, &$actions) {
+    $by = ai_by($who); $made = []; $ac = [];
+    foreach (coll_docs('aircraft') as $x) if (is_array($x) && !empty($x['reg'])) $ac[strtoupper(preg_replace('/\s+/', '', (string) $x['reg']))] = $x;
+    foreach ((array) ($p['rows'] ?? []) as $i => $r) {
+        $a = $ac[$r['reg']] ?? []; $id = 'rot' . bin2hex(random_bytes(5));
+        $dep = trim($r['flightOut'] . ($r['to'] !== '' ? ' to ' . $r['to'] : ''));
+        $note = implode(' · ', array_filter([$r['from'] !== '' ? 'ARR from ' . $r['from'] : '', $dep !== '' ? 'DEP ' . $dep : '', $r['note'], 'planned by Sindri from the schedule']));
+        $data = ['kind' => 'visit', 'ho' => $r['ho'], 'reg' => $r['reg'], 'acType' => (string) ($a['acType'] ?? ''), 'clientId' => (string) ($a['clientId'] ?? ''), 'arr' => $r['arr'], 'arrDate' => $r['arrDate'], 'dep' => $r['dep'], 'depDate' => $r['depDate'],
+            'flight' => $r['flightIn'], 'crs' => [], 'mech' => [], 'tasks' => [], 'notes' => $note, 'order' => now_ms() + $i];
+        try { $data = perm_write('bureau', 'shiftItems', 'put', null, $data, null, $id); } catch (Throwable $e) { $made[] = $r['reg'] . ' ' . $r['ho'] . ' : ' . $e->getMessage(); continue; }
+        db()->beginTransaction(); write_doc('shiftItems', $id, $data, $by); db()->commit();
+        $actions[] = ['op' => 'create', 'coll' => 'shiftItems', 'id' => $id, 'label' => log_label('shiftItems', $data) ?: $r['reg']];
+        $made[] = $r['reg'] . ' ' . $r['ho'];
+    }
+    return ['ok' => true, 'created' => $made, 'note' => 'Les shifts suivants couverts par chaque escale reçoivent leur ligne automatiquement.'];
+}
 function ai_confirm_list($who) { return json_decode(aik('ai_confirm:' . ai_ukey($who), '[]'), true) ?: []; }
 /* tâches du Tech Log écrites par Sindri (scan d'une log page, chat) : marquées « encodée par Sindri – à vérifier » (ai).
    Seule une personne les valide (ok = {by, at}) ; tant qu'il en reste, le shift ne peut pas être remis (api/perm.php).
@@ -704,6 +808,10 @@ function ai_write($who, $role, $tool, $in, &$actions) {
             if ((int) ($GLOBALS['AI_Q'] ?? 0) <= $p['q']) return ['error' => "Refusé : la personne n'a pas encore répondu. Pose-lui la question et attends sa réponse."];
             if (empty($p['shown'])) return ['error' => "Refusé : la question de confirmation n'a jamais été affichée à la personne (réponse interrompue). Refais propose_delete et pose-lui la question."];
             if (!ai_is_yes((string) ($GLOBALS['AI_QTEXT'] ?? ''))) return ['error' => "Refusé : son dernier message n'est pas un « oui » explicite. Rappelle-lui ce qui sera supprimé et demande-lui de répondre « oui » pour confirmer."];
+            if (($p['kind'] ?? '') === 'rot') {   // rotations lues dans un planning
+                kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
+                return ai_rot_create($who, $p, $actions);
+            }
             if (($p['kind'] ?? '') === 'wa') {   // message WhatsApp à un membre de l'équipe
                 kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
                 $t = null; foreach (wa_team_targets() as $x) if ($x['num'] === $p['num']) $t = $x;
