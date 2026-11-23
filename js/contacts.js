@@ -6,10 +6,10 @@
    contacts/<id> = { cat, org, role, name, phone, phone2, email, hours, notes, order }
    contacts/form = { kind: "form", no, rev, revDate, approval, title } (en-tête du formulaire) */
 const CT_CAT = { emergency: "Urgences", company: "Organisation 145", airport: "Aéroport", authority: "Autorités", customers: "Compagnies clientes", suppliers: "Fournisseurs et services", other: "Autres" };
-const CT_PRESET = [["emergency", "Pompiers de l'aéroport"], ["emergency", "Service médical de l'aéroport"], ["emergency", "Police / sûreté de l'aéroport"],
+const CT_PRESET = [["emergency", "Airport fire service"], ["emergency", "Airport medical service"], ["emergency", "Airport police / security"],
   ["company", "Accountable Manager"], ["company", "Quality Manager"], ["company", "Maintenance Manager"], ["company", "Station Lead"], ["company", "Headquarters / training"],
-  ["airport", "Opérations aéroport"], ["airport", "Handling / piste"], ["airport", "Carburant"], ["airport", "Badges aéroport"],
-  ["authority", "Autorité de l'aviation civile (CAAI)"], ["customers", "MCC / AOG desk"], ["suppliers", "Étalonnage de l'outillage"], ["suppliers", "Transport de pièces (AOG)"]];
+  ["airport", "Airport operations"], ["airport", "Handling / ramp"], ["airport", "Fuel"], ["airport", "Airport badges"],
+  ["authority", "Civil Aviation Authority (CAAI)"], ["customers", "MCC / AOG desk"], ["suppliers", "Tool calibration"], ["suppliers", "Parts transport (AOG)"]];
 const canContacts = () => !readOnly && (isOffice() || meStaff()?.function === "lead");
 const ctForm = () => S.contacts.find(c => c.id === "form") || {};
 const ctList = () => S.contacts.filter(c => c.id !== "form" && c.kind !== "form").sort((a, b) => (a.order ?? 999) - (b.order ?? 999) || String(a.org || a.role || "").localeCompare(String(b.org || b.role || "")));
