@@ -15,7 +15,15 @@ const rcode = c => rcodes().find(x => x.c === c) || (/^[A-Z]{3}$/.test(c || "") 
 /* mode édition : le roster ne se modifie qu'après l'avoir activé (bouton), avec un cadre très visible jusqu'à ce qu'on le désactive */
 const rosterEd = () => isOffice() && !readOnly && !!UI.redit;
 window.addEventListener("hashchange", () => { if (UI.redit && !location.hash.startsWith("#roster")) UI.redit = false; });
-ACTIONS["roster-edit"] = () => { UI.redit = !UI.redit; if (!UI.redit) UI.rbrush = undefined; render(true); };
+ACTIONS["roster-edit"] = () => { UI.redit = !UI.redit; UI.reditHold = false; if (!UI.redit) UI.rbrush = undefined; render(true); };
+/* maintenir Shift (Maj) sur la page du roster = mode édition tant que la touche est tenue ; relâcher le coupe
+   (un glisser en cours se termine d'abord ; rien ne se passe dans un champ ou une fenêtre ouverte) */
+const rHoldOk = e => location.hash.startsWith("#roster") && isOffice() && !readOnly && !(e.target.closest && e.target.closest("input,textarea,select,[contenteditable]")) && !document.querySelector("#modal-root .modal");
+function rHoldOff() { if (!UI.reditHold) return; if (rPaint) { rHoldEnd = true; return; } UI.reditHold = false; UI.redit = false; render(true); }
+let rHoldEnd = false;
+document.addEventListener("keydown", e => { if (e.key !== "Shift" || e.repeat || e.ctrlKey || e.metaKey || e.altKey || UI.redit || !rHoldOk(e)) return; UI.redit = true; UI.reditHold = true; render(true); });
+document.addEventListener("keyup", e => { if (e.key === "Shift") rHoldOff(); });
+window.addEventListener("blur", rHoldOff);
 const ymOf = d => d.slice(0, 7);
 const ymAdd = (ym, n) => addMonths(ym + "-01", n).slice(0, 7);
 const ymDays = ym => new Date(+ym.slice(0, 4), +ym.slice(5, 7), 0).getDate();
@@ -66,12 +74,12 @@ VIEWS.roster = {
     const tab = curTab("roster", "mois"), ym = UI.rmonth || (UI.rmonth = ymOf(today()));
     const [y, m] = ym.split("-");
     return head("Roster", "Planning de la station : une ligne par personne, un code par jour",
-      `<button class="btn" data-a="roster-export">Exporter (Excel)</button>${rosterEd() ? `<button class="btn" data-a="roster-copy" ${dis()}>Reprendre le mois précédent</button>` : ""}${isOffice() && !readOnly ? `<button class="btn ${UI.redit ? "redit-off" : "primary"}" data-a="roster-edit">${UI.redit ? "✓ " + esc(tr("Finish editing")) : "✏️ " + esc(tr("Edit roster"))}</button>` : ""}`,
+      `<button class="btn" data-a="roster-export">Exporter (Excel)</button>${rosterEd() ? `<button class="btn" data-a="roster-copy" ${dis()}>Reprendre le mois précédent</button>` : ""}${isOffice() && !readOnly ? `<button class="btn ${UI.redit ? "redit-off" : "primary"}" data-a="roster-edit">${UI.redit ? "✓ " + esc(tr("Finish editing")) : "✏️ " + esc(tr("Edit roster"))}</button>${!UI.redit ? `<span class="muted small" style="align-self:center">${esc(tr("or hold Shift"))}</span>` : ""}` : ""}`,
       `<div class="row-g rnav"><button class="btn sm" data-a="roster-month" data-n="-1" aria-label="Mois précédent">‹</button><b class="rmonth">${MONTHS[+m - 1]}${UI.r2 ? ` ${y !== ymAdd(ym, 1).slice(0, 4) ? y + " " : ""}– ${MONTHS[+ymAdd(ym, 1).slice(5) - 1]} ${ymAdd(ym, 1).slice(0, 4)}` : ` ${y}`}</b><button class="btn sm" data-a="roster-month" data-n="1" aria-label="Mois suivant">›</button>`
         + `<button class="btn sm ${UI.r2 ? "primary" : ""}" data-a="roster-two" title="${esc(tr("Afficher ce mois et le suivant, pour voir le passage d'un mois à l'autre"))}">2 mois</button>`
         + `<button class="btn sm" data-a="roster-month" data-n="0" ${ym === ymOf(today()) ? `style="visibility:hidden" tabindex="-1" aria-hidden="true"` : ""}>Aujourd'hui</button></div>`) +
       tabs("roster", [["mois", "Mois"], ["jour", "Aujourd'hui"], ["fatigue", "Fatigue et repos"], ["codes", "Codes"]]) +
-      (UI.redit && rosterEd() ? `<div class="redit-bar" role="status">✏️ ${esc(tr("EDIT MODE ON: every change is saved immediately."))} <button class="btn sm" data-a="roster-undo" title="Ctrl+Z">↶ ${esc(tr("Undo"))}</button> <button class="btn sm" data-a="roster-edit">${esc(tr("Finish editing"))}</button></div>` : "") +
+      (UI.redit && rosterEd() ? `<div class="redit-bar" role="status">✏️ ${esc(tr(UI.reditHold ? "EDIT MODE ON while Shift is held: every change is saved immediately." : "EDIT MODE ON: every change is saved immediately."))} <button class="btn sm" data-a="roster-undo" title="Ctrl+Z">↶ ${esc(tr("Undo"))}</button> <button class="btn sm" data-a="roster-edit">${esc(tr("Finish editing"))}</button></div>` : "") +
       `<div class="${UI.redit && rosterEd() ? "redit-on" : ""}">` + ({ mois: rosterMonth, jour: rosterToday, fatigue: rosterFatigue, codes: rosterCodes })[tab]() + `</div>`;
   }
 };
@@ -180,6 +188,7 @@ document.addEventListener("pointerover", e => {
 });
 document.addEventListener("pointerup", async () => {
   if (!rPaint) return; const keys = [...rPaint]; rPaint = null; rRow = rFrom = null; const x = brushCell();
+  if (rHoldEnd) { rHoldEnd = false; setTimeout(rHoldOff, 0); }
   await rosterSet(keys.map(k => { const [sid, d] = k.split("|"); const old = rcell(sid, d); return [sid, d, x ? Object.assign({}, x, old && old.c === x.c ? { start: old.start || x.start, end: old.end || x.end } : {}, old?.note ? { note: old.note } : {}, old?.duty ? { duty: old.duty } : {}) : null]; }));
 });
 document.addEventListener("click", e => {
