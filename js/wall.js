@@ -28,10 +28,40 @@ VIEWS.mur = {
         <aside class="wall-side"><h3>${esc(tr("Équipe"))} (${crewIds.length})</h3>${crewIds.map(staff).filter(Boolean).sort(staffSort).map(p => `<div class="wall-p"><b>${esc(p.name)}</b><span>${on(p.id).map(esc).join(" · ") || `<i>${esc(tr("libre"))}</i>`}</span></div>`).join("") || `<div class="muted">${esc(tr("Personne au roster pour ce shift."))}</div>`}
           ${todo.length ? `<h3>${esc(tr("Travail repris"))}</h3>${todo.map(x => `<div class="wall-p"><b class="mono">${esc(x.reg || "")}</b><span>${esc(x.text || "")}</span></div>`).join("")}` : ""}
           ${sits.length ? `<h3>⚠ ${esc(tr("Situations ouvertes"))}</h3>${sits.map(s => `<div class="wall-p"><b>${esc(sitName(s))}</b><span>${esc(sitParty(s))}</span></div>`).join("")}` : ""}
-          ${WX && WX.metar ? `<h3>Weather (METAR)</h3>${wxPlain(WX.metar.raw)}<div class="mono small muted">${esc(WX.metar.raw)}</div>` : ""}</aside></div>`;
+          ${WX && WX.metar ? `<h3>Weather (METAR)</h3>${wxPlain(WX.metar.raw)}<div class="mono small muted">${esc(WX.metar.raw)}</div>` : ""}</aside></div>` + wallGantt(id);
   },
   after() { if (typeof wxLoad === "function") wxLoad(); }
 };
+/* Gantt du temps au sol : du début du shift - 6 h à la fin + 6 h ; une barre par escale, de l'arrivée au départ (le vol ne compte pas).
+   Les escales des shifts voisins (copiées d'un shift à l'autre) ne sont montrées qu'une fois. */
+const WG_PAD = 6 * 3600000;
+function wallGantt(id) {
+  const [a, b] = shiftWindow(id), w0 = a - WG_PAD, w1 = b + WG_PAD, span = w1 - w0, pct = t => ((Math.min(Math.max(t, w0), w1) - w0) / span * 100).toFixed(3);
+  const seen = new Set(), rows = [];
+  for (const v of S.shiftItems) {
+    if (v.kind !== "visit" || !v.reg) continue;
+    const t = visitTimes(v); if (t.arr == null && t.dep == null) continue;
+    const s0 = t.arr ?? Math.min(t.dep, a), s1 = t.dep ?? Math.max(t.arr, b);
+    if (s1 < w0 || s0 > w1) continue;
+    const k = `${v.reg}|${t.arr ?? ""}|${t.dep ?? ""}`; if (seen.has(k)) continue; seen.add(k);
+    rows.push({ v, s0, s1, arr: t.arr, dep: t.dep });
+  }
+  rows.sort((x, y) => x.s0 - y.s0 || String(x.v.reg).localeCompare(String(y.v.reg)));
+  const hm = (ms, tz) => { try { return new Intl.DateTimeFormat("en-GB", { timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(ms)); } catch { return ""; } };
+  const tz = stationTz() || undefined, ticks = [];
+  for (let t = Math.ceil(w0 / 3600000) * 3600000; t <= w1; t += 3600000) ticks.push(t);
+  const now = Date.now();
+  const grid = ticks.map(t => `<i class="wg-tick${hm(t, tz).endsWith(":00") && (+hm(t, tz).slice(0, 2)) % 3 === 0 ? " maj" : ""}" style="left:${pct(t)}%"></i>`).join("");
+  return `<section class="wall-gantt"><div class="row-sb"><h3>${esc(tr("Ground time"))} <span class="muted small">${esc(tr("shift ± 6 h"))} · ${rows.length} ${esc(tr(rows.length > 1 ? "aircraft" : "aircraft"))}</span></h3>
+      <span class="small muted"><i class="wg-key in"></i> ${esc(tr("this shift"))} <i class="wg-key out"></i> ${esc(tr("before / after"))}</span></div>
+    <div class="wg"><div class="wg-lbl"></div><div class="wg-axis">${ticks.map(t => `<span style="left:${pct(t)}%"><b>${esc(hm(t, tz).slice(0, 2))}</b><em>${esc(hm(t, "UTC").slice(0, 2))}Z</em></span>`).join("")}</div>
+    ${rows.map(r => { const inSh = r.s1 > a && r.s0 < b, cut0 = r.arr == null || r.arr < w0, cut1 = r.dep == null || r.dep > w1;
+      return `<div class="wg-lbl"><b>${esc(r.v.reg)}</b><span>${esc(r.v.acType || "")}</span></div><div class="wg-row"><div class="wg-sh" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>${grid}
+        <div class="wg-bar ${inSh ? "in" : "out"}${cut0 ? " cut0" : ""}${cut1 ? " cut1" : ""}${visitOff(r.v) ? " off" : ""}" style="left:${pct(r.s0)}%;width:${Math.max(0.6, pct(r.s1) - pct(r.s0)).toFixed(3)}%" title="${esc(`${r.v.reg} · ARR ${r.arr != null ? hm(r.arr, "UTC") + "Z / " + hm(r.arr, tz) + " LT" : "?"} · DEP ${r.dep != null ? hm(r.dep, "UTC") + "Z / " + hm(r.dep, tz) + " LT" : "?"}`)}">
+          <span>${r.arr != null ? esc(hm(r.arr, tz)) : "…"}</span><span>${r.dep != null ? esc(hm(r.dep, tz)) : "…"}</span></div>
+        ${now > w0 && now < w1 ? `<i class="wg-now" style="left:${pct(now)}%"></i>` : ""}</div>`; }).join("") || `<div class="wg-lbl"></div><div class="wg-row wg-empty"><div class="wg-sh" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>${grid}<span>${esc(tr("No aircraft on the ground in this window."))}</span></div>`}
+    </div><div class="small muted wg-note">${esc(tr("Bars = ground time, from arrival to departure (local time, LT; UTC under the axis). Shaded = the shift."))}</div></section>`;
+}
 /* le Mur s'ouvre dans sa propre fenêtre : en sortir la ferme (sinon retour au Shift) */
 const wallExit = () => { if (history.length <= 1) { window.close(); setTimeout(() => { location.hash = "#shift"; }, 200); } else location.hash = "#shift"; };
 ACTIONS["wall-exit"] = wallExit;
