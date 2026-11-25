@@ -41,7 +41,9 @@ function wallGantt(id) {
   for (const v of S.shiftItems) {
     if (v.kind !== "visit" || !v.reg) continue;
     const t = visitTimes(v); if (t.arr == null && t.dep == null) continue;
-    const s0 = t.arr ?? Math.min(t.dep, a), s1 = t.dep ?? Math.max(t.arr, b);
+    /* heure manquante : on borne au shift de l'escale elle-même (pas au shift affiché), et la barre est marquée « heure inconnue » */
+    const own = /^\d{4}-\d{2}-\d{2}-(day|night)$/.test(v.ho || "") ? shiftWindow(v.ho) : [a, b];
+    const s0 = t.arr ?? Math.min(t.dep, own[0]), s1 = t.dep ?? Math.max(t.arr, own[1]);
     if (s1 < w0 || s0 > w1) continue;
     const k = `${v.reg}|${t.arr ?? ""}|${t.dep ?? ""}`; if (seen.has(k)) continue; seen.add(k);
     rows.push({ v, s0, s1, arr: t.arr, dep: t.dep });
@@ -52,16 +54,20 @@ function wallGantt(id) {
   for (let t = Math.ceil(w0 / 3600000) * 3600000; t <= w1; t += 3600000) ticks.push(t);
   const now = Date.now();
   const grid = ticks.map(t => `<i class="wg-tick${hm(t, tz).endsWith(":00") && (+hm(t, tz).slice(0, 2)) % 3 === 0 ? " maj" : ""}" style="left:${pct(t)}%"></i>`).join("");
-  return `<section class="wall-gantt"><div class="row-sb"><h3>${esc(tr("Ground time"))} <span class="muted small">${esc(tr("shift ± 6 h"))} · ${rows.length} ${esc(tr(rows.length > 1 ? "aircraft" : "aircraft"))}</span></h3>
+  const closed = wgClosed();
+  return `<section class="wall-gantt${closed ? " wg-closed" : ""}"><div class="row-sb"><h3><button class="wg-tog" data-a="wg-toggle" aria-expanded="${!closed}" title="${esc(tr(closed ? "Show the Gantt" : "Hide the Gantt"))}">${closed ? "▸" : "▾"}</button> ${esc(tr("Ground time"))} <span class="muted small">${esc(tr("shift ± 6 h"))} · ${rows.length} ${esc(tr(rows.length > 1 ? "aircraft" : "aircraft"))}</span></h3>
       <span class="small muted"><i class="wg-key in"></i> ${esc(tr("this shift"))} <i class="wg-key out"></i> ${esc(tr("before / after"))}</span></div>
     <div class="wg"><div class="wg-lbl"></div><div class="wg-axis">${ticks.map(t => `<span style="left:${pct(t)}%"><b>${esc(hm(t, tz).slice(0, 2))}</b><em>${esc(hm(t, "UTC").slice(0, 2))}Z</em></span>`).join("")}</div>
-    ${rows.map(r => { const inSh = r.s1 > a && r.s0 < b, cut0 = r.arr == null || r.arr < w0, cut1 = r.dep == null || r.dep > w1;
+    ${rows.map(r => { const inSh = r.s1 > a && r.s0 < b, cut0 = r.arr == null || r.arr < w0, cut1 = r.dep == null || r.dep > w1, unk = r.arr == null || r.dep == null;
       return `<div class="wg-lbl"><b>${esc(r.v.reg)}</b><span>${esc(r.v.acType || "")}</span></div><div class="wg-row"><div class="wg-sh" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>${grid}
-        <div class="wg-bar ${inSh ? "in" : "out"}${cut0 ? " cut0" : ""}${cut1 ? " cut1" : ""}${visitOff(r.v) ? " off" : ""}" style="left:${pct(r.s0)}%;width:${Math.max(0.6, pct(r.s1) - pct(r.s0)).toFixed(3)}%" title="${esc(`${r.v.reg} · ARR ${r.arr != null ? hm(r.arr, "UTC") + "Z / " + hm(r.arr, tz) + " LT" : "?"} · DEP ${r.dep != null ? hm(r.dep, "UTC") + "Z / " + hm(r.dep, tz) + " LT" : "?"}`)}">
-          <span>${r.arr != null ? esc(hm(r.arr, tz)) : "…"}</span><span>${r.dep != null ? esc(hm(r.dep, tz)) : "…"}</span></div>
+        <div class="wg-bar ${inSh ? "in" : "out"}${cut0 ? " cut0" : ""}${cut1 ? " cut1" : ""}${visitOff(r.v) ? " off" : ""}${unk ? " unk" : ""}" style="left:${pct(r.s0)}%;width:${Math.max(0.6, pct(r.s1) - pct(r.s0)).toFixed(3)}%" title="${esc(`${r.v.reg} · ARR ${r.arr != null ? hm(r.arr, "UTC") + "Z / " + hm(r.arr, tz) + " LT" : "?"} · DEP ${r.dep != null ? hm(r.dep, "UTC") + "Z / " + hm(r.dep, tz) + " LT" : "?"}`)}">
+          <span>${r.arr != null ? esc(hm(r.arr, tz)) : "ARR ?"}</span><span>${r.dep != null ? esc(hm(r.dep, tz)) : "DEP ?"}</span></div>
         ${now > w0 && now < w1 ? `<i class="wg-now" style="left:${pct(now)}%"></i>` : ""}</div>`; }).join("") || `<div class="wg-lbl"></div><div class="wg-row wg-empty"><div class="wg-sh" style="left:${pct(a)}%;width:${(pct(b) - pct(a)).toFixed(3)}%"></div>${grid}<span>${esc(tr("No aircraft on the ground in this window."))}</span></div>`}
-    </div><div class="small muted wg-note">${esc(tr("Bars = ground time, from arrival to departure (local time, LT; UTC under the axis). Shaded = the shift."))}</div></section>`;
+    </div><div class="small muted wg-note">${esc(tr("Bars = ground time, from arrival to departure (local time, LT; UTC under the axis). Shaded = the shift. Faded bar = arrival or departure time unknown, drawn from the start or to the end of that aircraft's own shift."))}</div></section>`;
 }
+/* Gantt repliable ; l'état est retenu sur ce navigateur */
+const wgClosed = () => { try { return localStorage.getItem("st-wg-closed") === "1"; } catch { return false; } };
+ACTIONS["wg-toggle"] = () => { const c = !wgClosed(); try { localStorage.setItem("st-wg-closed", c ? "1" : "0"); } catch {} render(true); };
 /* le Mur s'ouvre dans sa propre fenêtre : en sortir la ferme (sinon retour au Shift) */
 const wallExit = () => { if (history.length <= 1) { window.close(); setTimeout(() => { location.hash = "#shift"; }, 200); } else location.hash = "#shift"; };
 ACTIONS["wall-exit"] = wallExit;
