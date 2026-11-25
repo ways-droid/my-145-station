@@ -27,6 +27,13 @@ const sName = id => staff(id)?.name || "?";
 /* contrôle des qualifications d'un avion : au moins un CRS affecté qui a le droit de le signer. Avec la fiche de l'avion
    (section Avions) : Type Rating sur le type, le modèle et le moteur, conditions ET / OU de la fiche, autorisation compagnie.
    Sans fiche : qualifié sur le type, avec I pour un 4X-. */
+/* qualifiée sur cet avion : peut signer le CRS (fiche avion : type, modèle, moteur, règle ET/OU ; sans fiche : type, + I pour un 4X-) */
+function qualOn(p, reg, acType) {
+  if (!p || !acType) return false;
+  const ac0 = typeof aircraftOf === "function" ? aircraftOf(reg) : null, ac = ac0 && ac0.acType === acType ? ac0 : null;
+  const sp = ac ? acSpec(ac) : { acType, variant: "", engine: "" }, rule = ac ? acRule(ac) : { op: "and", items: /^4X/i.test(reg || "") ? ["I"] : [] };
+  try { return canSign(p, sp, rule); } catch { return false; }
+}
 function visitCheck(v) {
   if (!v.acType) return { ok: true, msg: "" };
   const crs = (v.crs || []).map(staff).filter(Boolean), is4X = /^4X/i.test(v.reg || "");
@@ -379,7 +386,8 @@ function shiftVisits(id) {
       : `<div class="pad muted">Aucun avion pour ce shift.</div>`));
 }
 function staffPick(id, label, sel, list, lead) {
-  const it = p => `<label class="chk"><input type="checkbox" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> ${esc(p.name)} <span class="muted small">${esc(staffTR(p).filter(r => r.t && r.lic).map(r => trName(r) + " " + r.lic + (r.crs === false ? " " + tr("sans CRS") : "")).join(" · "))}</span></label>`;
+  /* plus de liste des licences : le nom passe en turquoise si la personne est qualifiée sur l'avion (mis à jour avec l'immat / le type) */
+  const it = p => `<label class="chk"><input type="checkbox" value="${p.id}" ${sel.includes(p.id) ? "checked" : ""}> <span class="sp-nm" data-sid="${p.id}">${esc(p.name)}</span></label>`;
   if (lead === undefined) return `<div class="f wide"><span>${label}</span><div class="pick" id="${id}">${list.map(it).join("")}</div></div>`;
   /* CRS : case « CRS in charge » (un seul) ; sa ligne passe en tête et en vert */
   const ord = list.slice().sort((a, b) => (b.id === lead) - (a.id === lead));
@@ -437,7 +445,9 @@ ACTIONS["visit-form"] = el => {
   m.querySelector("#vi-arrd").onchange = () => { arrTouched = !!val("vi-arrd"); spanUpd(); };
   m.querySelector("#vi-arr").oninput = () => { arrTouched = false; spanUpd(); }; m.querySelector("#vi-dep").oninput = spanUpd; spanUpd();
   const upd = () => { const c = clientOfReg(val("vi-reg")); m.querySelector("#vi-client").textContent = c ? tr("Client") + " : " + c.name + (c.code ? " (" + c.code + ")" : "") : "";
-    const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg); };
+    const ck = visitCheck(cur()); m.querySelector("#vi-warn").textContent = ck.ok ? "" : tr(ck.msg);
+    const reg = val("vi-reg").toUpperCase(), ty = val("vi-ac");
+    m.querySelectorAll(".sp-nm[data-sid]").forEach(n => { const q = qualOn(staff(n.dataset.sid), reg, ty); n.classList.toggle("q-ok", q); n.title = q ? tr("Qualified on this aircraft") : ""; }); };
   if (v.id) odWire(m, v);
   /* Tech Log : lignes ajoutées à volonté (tâches pré-encodées ou libres) */
   const tasks = visitTasks(v).map(t => Object.assign({}, t, { id: t.id === "legacy" ? uid() : t.id, techs: (t.techs || []).map(x => Object.assign({}, x)) }));
@@ -497,7 +507,7 @@ ACTIONS["visit-form"] = el => {
   const reqUpd = () => m.querySelectorAll(".req-f").forEach(i => { i.classList.toggle("ok", !!i.value.trim()); i.classList.toggle("ko", !i.value.trim()); });
   m.querySelectorAll(".req-f").forEach(i => i.addEventListener("input", () => { if (i.id === "vi-flt") i.classList.remove("auto-f"); reqUpd(); })); reqUpd(); upd();
   const add = m.querySelector("#vi-add");
-  if (add) add.onchange = () => { const p = staff(add.value); if (!p) return; for (const box of ["vi-crs", "vi-mech"]) m.querySelector("#" + box).insertAdjacentHTML("beforeend", `<label class="chk"><input type="checkbox" value="${p.id}"> ${esc(p.name)}</label>`); add.querySelector(`option[value="${p.id}"]`).remove(); add.value = ""; };
+  if (add) add.onchange = () => { const p = staff(add.value); if (!p) return; for (const box of ["vi-crs", "vi-mech"]) m.querySelector("#" + box).insertAdjacentHTML("beforeend", `<label class="chk"><input type="checkbox" value="${p.id}"> <span class="sp-nm" data-sid="${p.id}">${esc(p.name)}</span></label>`); upd(); add.querySelector(`option[value="${p.id}"]`).remove(); add.value = ""; };
   m.querySelector("form").onsubmit = async e => {
     e.preventDefault();
     const c = clientOfReg(val("vi-reg")), reg = val("vi-reg").toUpperCase();
