@@ -51,9 +51,9 @@ if ($question === 'oui' || $question === 'Supprime-la') {
     if ($lastRes !== null) { $say('Fait : ' . $lastRes); exit; }
     preg_match_all('/token ([a-f0-9]{8})/', json_encode($b['system'] ?? '', JSON_UNESCAPED_UNICODE), $tk); $tu('tu_cd', 'confirm_delete', ['token' => end($tk[1]) ?: 'x']); exit;
 }
-if (str_contains($question, 'Note sindri')) { if ($lastRes !== null) { $say('Créée : ' . $lastRes); exit; } $tu('tu_nc', 'create_record', ['collection' => 'notes', 'data' => ['id' => 'nax', 'title' => 'Idée Sindri', 'body' => 'x', 'team' => true]]); exit; }
+if (str_contains($question, 'Note muninn')) { if ($lastRes !== null) { $say('Créée : ' . $lastRes); exit; } $tu('tu_nc', 'create_record', ['collection' => 'notes', 'data' => ['id' => 'nax', 'title' => 'Idée Muninn', 'body' => 'x', 'team' => true]]); exit; }
 if (preg_match('/Roster changes (\d{4}-\d{2})/', $question, $rm)) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rch', 'propose_roster_changes', ['changes' => [['staffId' => 's1', 'date' => $rm[1] . '-01', 'code' => 'D/N']]]); exit; }
-if (preg_match('/Roster sindri (\d{4}-\d{2})/', $question, $rm)) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rc', 'create_record', ['collection' => 'roster', 'data' => ['staffId' => 's1', 'month' => $rm[1], 'days' => ['1' => ['c' => 'D/N']]]]); exit; }
+if (preg_match('/Roster muninn (\d{4}-\d{2})/', $question, $rm)) { if ($lastRes !== null) { $say('Roster : ' . $lastRes); exit; } $tu('tu_rc', 'create_record', ['collection' => 'roster', 'data' => ['staffId' => 's1', 'month' => $rm[1], 'days' => ['1' => ['c' => 'D/N']]]]); exit; }
 if (str_contains($question, 'Dis à Bea')) { if ($lastRes !== null) { $say('Proposé : ' . $lastRes); exit; } $tu('tu_wm', 'propose_whatsapp_message', ['to' => 'bea', 'text' => 'Passe au garage avant 16 h, merci']); exit; }
 if (str_contains($question, 'Partage la note')) { if ($lastRes !== null) { $say('Proposé : ' . $lastRes); exit; } preg_match('/note=(\w+)/', $question, $nm); $tu('tu_ns', 'propose_share_note', ['id' => $nm[1] ?? '']); exit; }
 if (str_contains($question, 'Joins fichier')) { if ($lastRes !== null) { $say('Joint : ' . $lastRes); exit; } preg_match('/note=(\w+) file=(\w+)/', $question, $jm); $tu('tu_nf', 'add_note_file', ['noteId' => $jm[1] ?? '', 'fileId' => $jm[2] ?? '']); exit; }

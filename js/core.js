@@ -20,7 +20,7 @@ const stationTz = () => { const s = settings(); return s.timeZone || STATION_TZ[
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 /* langue : interface (choix de chaque utilisateur, gardé dans son navigateur) ; LANG peut être changé
    temporairement pour produire un PDF ou un e-mail dans la langue d'un client */
-/* interface entièrement en anglais (demande de l'utilisateur, 2026-11-23) : plus de choix de langue ; Sindri répond dans la langue de la question */
+/* interface entièrement en anglais (demande de l'utilisateur, 2026-11-23) : plus de choix de langue ; Muninn répond dans la langue de la question */
 let UI_LANG = "en";
 let LANG = UI_LANG;
 const LOCALES = { fr: "fr-BE", en: "en-IE" };

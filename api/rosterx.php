@@ -1,5 +1,5 @@
 <?php
-/* Roster officiel (Excel « TLV Roster OFFICIAL ») lu côté serveur, pour que Sindri mette à jour le roster de l'outil.
+/* Roster officiel (Excel « TLV Roster OFFICIAL ») lu côté serveur, pour que Muninn mette à jour le roster de l'outil.
    Format : un onglet par année, les mois côte à côte (« January 2026 » au-dessus des jours 1..31), une ligne par personne,
    le nom dans une colonne à gauche des jours. Rien n'est écrit sans le « oui » de la personne (propose → confirm_action).
    Les changements ne sont pas gardés dans la proposition (trop gros) : on relit le fichier à la confirmation et on vérifie
@@ -189,7 +189,7 @@ function rx_file_path($fid) {
     $p = cfg('upload_dir') . "/$fid";
     return $f && is_file($p) ? [$fid, $p, (string) $f['name']] : null;
 }
-/* résumé pour Sindri quand un Excel déposé est un roster (au lieu de tout le texte du classeur) */
+/* résumé pour Muninn quand un Excel déposé est un roster (au lieu de tout le texte du classeur) */
 function rx_summary($path, $name, $fid) {
     $p = rx_parse_file($path); if (!$p) return null;
     $staff = array_filter(coll_docs('staff'), fn($x) => is_array($x)); $ok = 0; $no = [];
@@ -200,7 +200,7 @@ function rx_summary($path, $name, $fid) {
         . "Pour mettre à jour le roster de l'outil, utilise propose_roster_import (fileId $fid, from/to = mois AAAA-MM ; par défaut du mois en cours à la fin du fichier). L'outil lit et compare lui-même : ne recopie pas le classeur.";
 }
 
-/* ---- outils de Sindri ---- */
+/* ---- outils de Muninn ---- */
 function rx_pending_add($who, $item) {
     $tok = bin2hex(random_bytes(4));
     $pend = array_values(array_filter(ai_confirm_list($who), fn($p) => time() - $p['at'] < AI_CONFIRM_TTL));
@@ -265,5 +265,5 @@ function rx_apply($who, $p, &$actions) {
         db()->beginTransaction(); write_doc('roster', $id, $data, $by); db()->commit(); $n++;
         $actions[] = ['op' => $old ? 'update' : 'create', 'coll' => 'roster', 'id' => $id, 'label' => log_label('roster', $data) ?: $id] + ($old ? ['before' => $old] : []);
     }
-    return ['ok' => true, 'rosterMonthsWritten' => $n, 'problems' => $errs, 'note' => "Mode édition de Sindri refermé : les changements sont dans le roster."];
+    return ['ok' => true, 'rosterMonthsWritten' => $n, 'problems' => $errs, 'note' => "Mode édition de Muninn refermé : les changements sont dans le roster."];
 }
