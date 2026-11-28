@@ -8,14 +8,14 @@ const dbxOffice = () => !!(SERVER && API && isOffice());
 async function dbxRefresh() {
   if (!dbxOffice()) return null;
   try { DBX = await API.call("GET", "dropbox/status"); } catch { DBX = null; }
-  if (typeof aiDbxNotify === "function") aiDbxNotify();   // « Nouveaux fichiers Dropbox — Analyser ? » dans Sindri
+  if (typeof aiDbxNotify === "function") aiDbxNotify();   // « Nouveaux fichiers Dropbox — Analyser ? » dans Muninn
   return DBX;
 }
 const dbxWatched = p => ((DBX && DBX.watch) || []).some(w => w.path.toLowerCase() === String(p || "").toLowerCase());
 ACTIONS["dbx-watch"] = async el => {
   const p = el.dataset.p, on = !dbxWatched(p);
   try { const r = await API.call("POST", "dropbox/watch", { path: p, on }); if (DBX) DBX.watch = r.watch;
-    toast(on ? `Sindri suit maintenant « ${p.split("/").pop()} » : il signalera les nouveaux fichiers` : `Suivi Assistant arrêté pour « ${p.split("/").pop()} »`); render(true); }
+    toast(on ? `Muninn suit maintenant « ${p.split("/").pop()} » : il signalera les nouveaux fichiers` : `Suivi Assistant arrêté pour « ${p.split("/").pop()} »`); render(true); }
   catch (e) { toast(tr(e.message)); }
 };
 async function dbxTick(force) {
@@ -43,7 +43,7 @@ async function loadDbx() {
   if (!s) { box.innerHTML = `<div class="err">${esc(tr("Le serveur ne répond pas."))}</div>`; return; }
   const redir = `<div class="row-g"><code class="mono small" style="user-select:all;word-break:break-all">${esc(s.redirectUri || "")}</code><button class="btn sm" data-a="dbx-copy" data-v="${esc(s.redirectUri || "")}">Copier</button></div>`;
   if (!s.connected) {
-    box.innerHTML = `<div class="stack-s"><div>Reliez le compte Dropbox de l'entreprise : documents consultables dans Administration, documents des véhicules copiés automatiquement dans leur dossier, et Sindri peut y chercher. Les identifiants restent sur le serveur.</div>
+    box.innerHTML = `<div class="stack-s"><div>Reliez le compte Dropbox de l'entreprise : documents consultables dans Administration, documents des véhicules copiés automatiquement dans leur dossier, et Muninn peut y chercher. Les identifiants restent sur le serveur.</div>
       <ol class="small stack-s" style="margin:0;padding-left:18px">
         <li>Connecté au compte Dropbox de l'entreprise, ouvrez <b>dropbox.com/developers/apps</b> → <b>Create app</b> → <b>Scoped access</b> → <b>Full Dropbox</b> → nom « my-145-station ».</li>
         <li>Onglet <b>Permissions</b> : cochez <span class="mono">account_info.read</span>, <span class="mono">files.metadata.read</span>, <span class="mono">files.content.read</span>, <span class="mono">files.content.write</span>, puis <b>Submit</b>.</li>
@@ -62,7 +62,7 @@ async function loadDbx() {
       <dt>Copie des documents</dt><dd>${s.vehSync ? `active${s.queue ? ` · <b>${plural(s.queue, "document")} en attente</b>` : " · à jour"}` : "désactivée"}</dd>
       <dt>Couleur du dossier</dt><dd><span class="folder-ic sm c-${esc(s.color)}">${typeof folderSvg !== "undefined" ? folderSvg : ""}</span> ${esc(tr((DBX_COLORS.find(c => c[0] === s.color) || [, s.color])[1]))}</dd></dl>
     ${s.error ? `<div class="banner warn"><b>Dernière erreur :</b> ${esc(s.error)}</div>` : ""}
-    <div class="muted small">Documents des véhicules : chaque fichier ajouté dans une fiche (à la main ou par Sindri) est copié dans le dossier Dropbox du véhicule ; un document remplacé ou passé dans « Anciens documents » est déplacé dans le sous-dossier <span class="mono">Expired</span>. Le dossier d'un véhicule = son lien « Dossier Dropbox », sinon <span class="mono">&lt;dossier des véhicules&gt;/&lt;n°&gt; - &lt;plaque&gt; - &lt;modèle&gt;</span> (créé et lié automatiquement).</div>
+    <div class="muted small">Documents des véhicules : chaque fichier ajouté dans une fiche (à la main ou par Muninn) est copié dans le dossier Dropbox du véhicule ; un document remplacé ou passé dans « Anciens documents » est déplacé dans le sous-dossier <span class="mono">Expired</span>. Le dossier d'un véhicule = son lien « Dossier Dropbox », sinon <span class="mono">&lt;dossier des véhicules&gt;/&lt;n°&gt; - &lt;plaque&gt; - &lt;modèle&gt;</span> (créé et lié automatiquement).</div>
     <div class="row-g wrap"><button class="btn primary" data-a="dbx-pick" title="${esc(tr("Réservé au détenteur du code maître"))}">🔒 Choisir les dossiers</button><button class="btn" data-a="dbx-opts">Réglages</button><button class="btn" data-a="dbx-resync">Copier les documents manquants</button><button class="btn" data-a="dbx-open-admin">Ouvrir dans Administration</button><button class="btn danger" data-a="dbx-off">Déconnecter</button></div></div>`;
 }
 /* juste après l'autorisation Dropbox : proposer le choix des dossiers */
@@ -87,7 +87,7 @@ ACTIONS["dbx-connect"] = async () => {
 /* choix des dossiers visibles et synchronisés : code maître, puis arborescence complète du Dropbox */
 ACTIONS["dbx-pick"] = () => {
   const m = modal(`${mHead("Dossiers Dropbox visibles et synchronisés")}<form autocomplete="off"><div class="body stack-s">
-    <div>Seuls les dossiers choisis (et leurs sous-dossiers) seront visibles dans l'outil, consultables par Sindri et utilisés pour la copie des documents des véhicules. Ce choix est protégé par le <b>code maître</b>.</div>
+    <div>Seuls les dossiers choisis (et leurs sous-dossiers) seront visibles dans l'outil, consultables par Muninn et utilisés pour la copie des documents des véhicules. Ce choix est protégé par le <b>code maître</b>.</div>
     ${field("dp-code", "Code maître", "", { type: "password", required: true, autofocus: true })}<div class="err" id="dp-err"></div></div>
     <footer><button type="button" class="btn" data-close>Annuler</button><button class="btn primary">Continuer</button></footer></form>`, "sm");
   const c = m.querySelector("#dp-code"); c.setAttribute("inputmode", "numeric"); c.setAttribute("autocomplete", "off");
@@ -168,7 +168,7 @@ function dbxView(search) {
     <a class="btn sm" style="margin-left:auto" href="https://www.dropbox.com/home${esc(segs.map(encodeURIComponent).join("/") ? "/" + segs.map(encodeURIComponent).join("/") : "")}" target="_blank" rel="noopener">Ouvrir dans Dropbox ↗</a></div>`;
   const tool = `<div class="panel pad vtool"><input type="search" id="dbx-q" class="fsearch" placeholder="${esc(tr("Rechercher dans Dropbox (Entrée)…"))}" value="${esc(UI.dbxQ || "")}" aria-label="Rechercher dans Dropbox">
     ${UI.dbxQ ? `<button class="btn sm" data-a="dbx-q-clear">Effacer la recherche</button>` : `<span class="muted small">${segs.length ? "dans ce dossier" : "dans tout le Dropbox"}</span>`}
-    ${p && !readOnly ? `<label class="chk line dx-watch" title="${esc(tr("Sindri signale les nouveaux fichiers de ce dossier et propose de les analyser"))}"><input type="checkbox" data-a="dbx-watch" data-p="${esc(p)}" ${dbxWatched(p) ? "checked" : ""}> ✦ Suivi Assistant</label>` : ""}</div>`;
+    ${p && !readOnly ? `<label class="chk line dx-watch" title="${esc(tr("Muninn signale les nouveaux fichiers de ce dossier et propose de les analyser"))}"><input type="checkbox" data-a="dbx-watch" data-p="${esc(p)}" ${dbxWatched(p) ? "checked" : ""}> ✦ Suivi Assistant</label>` : ""}</div>`;
   setTimeout(dbxLoadList, 0);
   return crumb + tool + `<div id="dbx-list" class="panel"><div class="pad muted">Chargement…</div></div>`;
 }
@@ -183,7 +183,7 @@ async function dbxLoadList() {
   const es = r.entries || [];
   el.innerHTML = !es.length ? `<div class="pad muted">${q ? "Aucun résultat." : p ? "Dossier vide." : "Aucun dossier Dropbox autorisé pour l'instant : l'administrateur les choisit dans Paramètres → Liaison Dropbox."}</div>`
     : `<div class="tablewrap"><table class="dx-tbl"><thead><tr><th>Nom</th>${q ? "<th>Dossier</th>" : ""}<th>Modifié</th><th class="r">Taille</th></tr></thead><tbody>${es.map(e => `<tr class="click" data-a="${e.folder ? "dbx-go" : "dbx-file"}" data-p="${esc(e.path)}">
-      <td><span class="row-g nowrap">${dbxIcon(e)} <span>${esc(e.name)}</span>${e.root ? ` <span class="muted small mono">${esc(e.path)}</span>` : ""}${e.folder && dbxWatched(e.path) ? ` <span class="chip sm info" title="${esc(tr("Sindri signale les nouveaux fichiers de ce dossier"))}">✦ Suivi Assistant</span>` : ""}</span></td>${q ? `<td class="small muted">${esc(e.path.split("/").slice(0, -1).join("/") || "/")}</td>` : ""}
+      <td><span class="row-g nowrap">${dbxIcon(e)} <span>${esc(e.name)}</span>${e.root ? ` <span class="muted small mono">${esc(e.path)}</span>` : ""}${e.folder && dbxWatched(e.path) ? ` <span class="chip sm info" title="${esc(tr("Muninn signale les nouveaux fichiers de ce dossier"))}">✦ Suivi Assistant</span>` : ""}</span></td>${q ? `<td class="small muted">${esc(e.path.split("/").slice(0, -1).join("/") || "/")}</td>` : ""}
       <td class="small nowrap">${e.modified ? fmtDate(e.modified.slice(0, 10)) : ""}</td><td class="r small nowrap">${e.folder ? "" : dbxFmtSize(e.size)}</td></tr>`).join("")}</tbody></table></div>
       ${es.length >= 2000 ? `<div class="pad small muted">Liste limitée à 2 000 éléments.</div>` : ""}`;
 }

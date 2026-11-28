@@ -6,7 +6,7 @@
    - Consultation (Administration → dossier Dropbox), recherche, ouverture par lien temporaire (4 h).
    - Documents des véhicules : chaque fichier ajouté dans une fiche est copié dans le dossier Dropbox du véhicule ;
      un document passé dans « Anciens documents » est déplacé dans <dossier>/Expired. File d'attente traitée par dropbox/tick.
-   - Sindri peut chercher, lister et lire (lecture seule). */
+   - Muninn peut chercher, lister et lire (lecture seule). */
 
 const DBX_API = 'https://api.dropboxapi.com/2/';
 const DBX_CONTENT = 'https://content.dropboxapi.com/2/';
@@ -110,7 +110,7 @@ function dbx_mkdir($path) {
 }
 
 /* ---------- dossiers autorisés (choisis par l'administrateur avec le code maître) ----------
-   Seuls ces dossiers (et leurs sous-dossiers) sont visibles dans l'outil, consultables par Sindri et utilisés pour la copie
+   Seuls ces dossiers (et leurs sous-dossiers) sont visibles dans l'outil, consultables par Muninn et utilisés pour la copie
    des documents des véhicules. Aucun dossier choisi = rien de visible. */
 function dbx_scope() { return array_values(array_filter((array) (json_decode(dbk('dbx_folders', '[]'), true) ?: []), 'is_string')); }
 function dbx_in_scope($p) {
@@ -121,7 +121,7 @@ function dbx_in_scope($p) {
 function dbx_guard($p) {
     if (!dbx_in_scope($p)) throw new RuntimeException("Dossier Dropbox non autorisé : seuls les dossiers choisis par l'administrateur sont accessibles (Paramètres → Liaison Dropbox).", 403);
 }
-/* versions limitées aux dossiers autorisés (ERP, Sindri) */
+/* versions limitées aux dossiers autorisés (ERP, Muninn) */
 function dbx_list_scoped($path, $max = 2000) {
     if (dbx_norm_path($path) === '') return array_map(fn($f) => ['name' => basename($f) ?: $f, 'path' => $f, 'folder' => true, 'size' => null, 'modified' => null, 'id' => '', 'root' => true], dbx_scope());
     dbx_guard($path); return dbx_list($path, $max);
@@ -154,10 +154,10 @@ function dbx_unlocked($who, $t) {
         fail(403, 'Session de choix des dossiers expirée : ressaisissez le code maître.');
 }
 
-/* ---------- suivi par Sindri : nouveaux fichiers dans des dossiers suivis ----------
+/* ---------- suivi par Muninn : nouveaux fichiers dans des dossiers suivis ----------
    dbx_watch : [{path, cursor, by, at}] (choisis par le bureau / les administrateurs, dans les dossiers autorisés).
    Les nouveaux fichiers deviennent des événements (dbx_new, numérotés) ; chaque personne a son « vu jusqu'à »
-   (dbx_seen:<id>) et Sindri lui propose « Analyser ? Oui / Non ». Les fichiers copiés par l'outil lui-même sont ignorés. */
+   (dbx_seen:<id>) et Muninn lui propose « Analyser ? Oui / Non ». Les fichiers copiés par l'outil lui-même sont ignorés. */
 const DBX_WATCH_EVERY = 120;   // secondes
 function dbx_watches() { return array_values(array_filter((array) (json_decode(dbk('dbx_watch', '[]'), true) ?: []), fn($w) => !empty($w['path']))); }
 function dbx_mine_add($p) { $m = json_decode(dbk('dbx_mine', '[]'), true) ?: []; $m[] = mb_strtolower($p); kv_set('dbx_mine', json_encode(array_slice($m, -300))); }
@@ -376,7 +376,7 @@ function dropbox_routes($route, $parts, $method, $who, $role) {
     if ($act === 'new-ack' && $method === 'POST') {
         $up = (int) ($b['upTo'] ?? 0); $k = 'dbx_seen:' . dbx_uid($who);
         if ($up > (int) dbk($k, '0')) kv_set($k, (string) $up);
-        if (!empty($b['analyze'])) log_event('settings', 'company', 'update', 'Dropbox', 'Nouveaux fichiers envoyés à Sindri pour analyse');
+        if (!empty($b['analyze'])) log_event('settings', 'company', 'update', 'Dropbox', 'Nouveaux fichiers envoyés à Muninn pour analyse');
         out(['ok' => true]);
     }
     if ($act === 'watch' && $method === 'POST') {

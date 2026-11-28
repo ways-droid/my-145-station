@@ -24,15 +24,15 @@ const AI_DEFAULT_MODEL = 'claude-sonnet-5-5';
 const AI_BUDGET = 40;          // secondes de travail par appel avant de rendre la main au navigateur
 const AI_MAX_STEPS = 30;       // tours d'outils par question (sur l'ensemble des reprises)
 const AI_HIDDEN = ['settings', 'userPrefs'];
-const AI_NAME = 'Sindri';
-// collections que Sindri peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
+const AI_NAME = 'Muninn';
+// collections que Muninn peut écrire (droits d'un employé Bureau, vérifiés par perm_write comme pour une personne)
 const AI_WRITABLE = ['staff', 'roster', 'handovers', 'shiftItems', 'chargeLines', 'partMoves', 'needs', 'situations', 'expiries', 'forms', 'contacts', 'instructions', 'travel', 'hotels', 'aircraft', 'actypes', 'clients', 'products', 'vehicles', 'vehEvents', 'faults', 'driverLogs', 'tires', 'tools', 'labs', 'adminDocs', 'adminFolders', 'notes', 'links'];
 const AI_MAX_WRITES = 25;   // jamais exposées telles quelles à l'assistant
 const AI_LABELS = [
     'staff' => "personnel de la station (name, function, employer, email, phone, licences [{cat, number, expires}], typeRatings [{t: type (code de la base actypes), m: modèle ou vide = tous, e: moteur ou vide = tous, lic: E+I (E EASA, I approbation israélienne, F FAA), crs: true si autorisation compagnie de signer}] — approvals [{code, label, types: [] = tous les types}] = approvals généraux — ratings est recalculé, ne l'écris pas, docs [{type, number, expires}] = visas, permis de travail, badges, examens…)",
     'roster' => "roster de la station, un document par personne et par mois (id <staffId>_<AAAA-MM>, staffId, month, days {jour du mois: {c = code, start, end, note}}). Codes : D jour 08-20, N nuit 20-08, D/N jour ou nuit à affecter, C horaire libre (start-end), T jour de voyage, TLV à la station sans shift, OJT/TRNG formation, OFF repos, code de 3 lettres d'une autre station = détaché / flight mech ; duty = cadre fm (flight mech, noir) ou out (outstation, bleu) ; fiches des déplacements dans travel (kind duty : legs, hotels, taxis, out/back)",
     'handovers' => 'fiches de shift (id <date>-day|night : foreman, extra, checks Station Control, out/in = remise et reprise du shift)',
-    'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, tasks = Tech Log [{text défaut/tâche, action, logPage, wo, techs [{id, h}], mhrs} ; sp = tâche spéciale non maintenance (ex. COMAT offload) : text + spDone ; chaque tâche que tu écris est marquée « encodée par Sindri – à vérifier » : une personne doit la valider avant la remise du shift, tu ne peux pas la valider toi-même], planned, done, mhrs = textes recalculés depuis tasks, atl = LogBook n° arrivée, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
+    'shiftItems' => 'lignes des shifts (ho = id du shift ; kind visit = avion : reg, acType, arr, dep UTC, crs, mech = staffIds, tasks = Tech Log [{text défaut/tâche, action, logPage, wo, techs [{id, h}], mhrs} ; sp = tâche spéciale non maintenance (ex. COMAT offload) : text + spDone ; chaque tâche que tu écris est marquée « encodée par Muninn – à vérifier » : une personne doit la valider avant la remise du shift, tu ne peux pas la valider toi-même], planned, done, mhrs = textes recalculés depuis tasks, atl = LogBook n° arrivée, open ; kind todo = travail non terminé ; kind equip = matériel : user, item, qty)',
     'travel' => 'voyages du personnel (kind flight|hotel, staffId, status booked|cancel ; vol : date, from, to, airline, flightNo, dep, arr, pnr ; hôtel : hotelId, checkIn, checkOut, room, conf ; cost, currency)',
     'aircraft' => 'avions servis par la station (reg = immatriculation, clientId = compagnie, acType, variant = modèle, engines = moteur, modeS = code Mode S hex (choisis dans actypes), licRule = conditions pour signer, arbre {op: "and"|"or", items: [code | sous-arbre]} avec les codes des catégories de settings.condCats (par défaut E, I, F sur le Type Rating ; B1, B2, A, C sur la licence), licences = codes « Type Rating » de licRule, amosRef, active, notes) — la maintenance et la navigabilité restent dans AMOS',
     'actypes' => "types d'appareils, base en arbre (maker = fabricant, code ex. B747, name, models [{name ex. -400, engines [..]}])",
@@ -253,7 +253,7 @@ function ai_system($who, $role) {
     $lines = []; foreach (ai_colls($role) as $c) $lines[] = "- $c : " . AI_LABELS[$c];
     return "Tu es " . AI_NAME . ", collègue de l'équipe de " . ($set['name'] ?? 'la station') . " (station de maintenance en ligne, organisme Part 145), et tu travailles dans son outil de gestion de station avec les droits de la personne qui te parle (au plus ceux d'un employé du bureau). Tu parles à " . (isset($who['label']) ? preg_replace('/^(user|token):/', '', $who['label']) : 'un membre de l\'équipe') . " (rôle : $role).\n"
         . "Nous sommes le " . date('Y-m-d') . " (heure locale de la station ; les horaires des vols sont en UTC). Chaque heure que tu écris porte son repère : « Z » pour UTC (ex. 20:30Z), « LT » pour l'heure locale de la station (ex. 22:30 LT) ; ne donne jamais une heure sans repère. Réponds dans la langue de la question (toujours celle de la personne, quelle qu'elle soit), en anglais par défaut ; l'interface de l'outil est en anglais, comme un collègue : bref, concret, tutoiement si on te tutoie.\n\n"
-        . (($GLOBALS['AI_VIA'] ?? '') === 'whatsapp' ? "Cette conversation passe par WhatsApp : réponses courtes, sans tableau ni titre (listes simples, *gras* WhatsApp). Pour une suppression, demande la confirmation ici (réponds « oui » pour confirmer) ; tout reste annulable depuis le panneau Sindri de l'outil. Tu ne peux pas écouter les messages vocaux.\n\n" : '')
+        . (($GLOBALS['AI_VIA'] ?? '') === 'whatsapp' ? "Cette conversation passe par WhatsApp : réponses courtes, sans tableau ni titre (listes simples, *gras* WhatsApp). Pour une suppression, demande la confirmation ici (réponds « oui » pour confirmer) ; tout reste annulable depuis le panneau Muninn de l'outil. Tu ne peux pas écouter les messages vocaux.\n\n" : '')
         . "Données consultables avec tes outils :\n" . implode("\n", $lines) . "\n\n"
         . "Repères : les données avion et maintenance (CRS, cartes de travail, traçabilité des pièces) sont dans AMOS, pas ici : si on te les demande, dis-le. Tu ne signes ni ne valides aucune maintenance.
 
@@ -475,7 +475,7 @@ function ai_run($who, $role, $msgs) {
             $d = ai_request($req);
         }
         $content = (array) ($d['content'] ?? []);
-        if (($d['stop_reason'] ?? '') === 'max_tokens') {   // réponse coupée : un appel d'outil incomplet est retiré, Sindri continue plus brièvement
+        if (($d['stop_reason'] ?? '') === 'max_tokens') {   // réponse coupée : un appel d'outil incomplet est retiré, Muninn continue plus brièvement
             $content = array_values(array_filter($content, fn($b) => ($b['type'] ?? '') !== 'tool_use'));
             if (!$content) $content = [['type' => 'text', 'text' => '…']];
             $msgs[] = ['role' => 'assistant', 'content' => $content];
@@ -594,7 +594,7 @@ function ai_say_core($who, $role, $b, $via = null) {
     return ['ok' => true, 'reply' => $acc['text'], 'actions' => $acc['actions']] + ai_view_out($t);
 }
 
-/* ---------- ce que Sindri apprend de toute l'équipe (partagé, sans rien de personnel) ---------- */
+/* ---------- ce que Muninn apprend de toute l'équipe (partagé, sans rien de personnel) ---------- */
 const AI_MEM_MAX = 80;
 function ai_memory() { return json_decode(aik('ai_memory', '[]'), true) ?: []; }
 function ai_remember($who, $in) {
@@ -615,7 +615,7 @@ function ai_out_msgs($msgs) {
         return ['role' => 'user', 'content' => str_starts_with($txt, '(Fichier déposé sans consigne') ? '' : $txt, 'files' => $m['_files']];
     }, $msgs);
 }
-/* écritures de Sindri : mêmes contrôles que pour un employé Bureau (perm_write), notées dans l'historique au nom de Sindri */
+/* écritures de Muninn : mêmes contrôles que pour un employé Bureau (perm_write), notées dans l'historique au nom de Muninn */
 /* collections dont l'identifiant est fixé par le contenu, comme dans l'outil :
    roster = <staffId>_<AAAA-MM> (une fiche par personne et par mois), handovers = <AAAA-MM-JJ>-day|night */
 function ai_natural_id($coll, array $data) {
@@ -634,7 +634,7 @@ function ai_natural_id($coll, array $data) {
     return [];
 }
 function ai_by($who) { return AI_NAME . ' (pour ' . preg_replace('/^(user|token):/', '', (string) ($who['label'] ?? '?')) . ')'; }
-/* ---------- Dropbox (lecture seule pour Sindri) ---------- */
+/* ---------- Dropbox (lecture seule pour Muninn) ---------- */
 function ai_dropbox($tool, $in) {
     if (!function_exists('dbx_connected') || !dbx_connected()) return ['error' => "Dropbox n'est pas relié à l'outil."];
     if ($tool === 'dropbox_search') { $r = dbx_search_scoped((string) ($in['query'] ?? ''), (string) ($in['path'] ?? ''), 40); return ['count' => count($r), 'entries' => $r]; }
@@ -653,7 +653,7 @@ function ai_dropbox($tool, $in) {
         $img = ['jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'gif' => 'image/gif', 'webp' => 'image/webp'][$ext] ?? null;
         if ($img) return ['_blocks' => [$label, ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $img, 'data' => base64_encode($bytes)]]]];
         if (in_array($ext, ['txt', 'csv', 'md', 'json', 'xml', 'html', 'htm', 'log'], true) || mb_check_encoding($bytes, 'UTF-8')) return ['path' => $p, 'text' => mb_substr(mb_convert_encoding($bytes, 'UTF-8', 'UTF-8'), 0, 50000)];
-        return ['error' => "Format non lisible par Sindri ($ext) : ouvrez-le depuis Administration → Dropbox."];
+        return ['error' => "Format non lisible par Muninn ($ext) : ouvrez-le depuis Administration → Dropbox."];
     }
     return ['error' => 'Outil inconnu'];
 }
@@ -737,7 +737,7 @@ function ai_rot_create($who, $p, &$actions) {
     foreach ((array) ($p['rows'] ?? []) as $i => $r) {
         $a = $ac[$r['reg']] ?? []; $id = 'rot' . bin2hex(random_bytes(5));
         $dep = trim($r['flightOut'] . ($r['to'] !== '' ? ' to ' . $r['to'] : ''));
-        $note = implode(' · ', array_filter([$r['from'] !== '' ? 'ARR from ' . $r['from'] : '', $dep !== '' ? 'DEP ' . $dep : '', $r['note'], 'planned by Sindri from the schedule']));
+        $note = implode(' · ', array_filter([$r['from'] !== '' ? 'ARR from ' . $r['from'] : '', $dep !== '' ? 'DEP ' . $dep : '', $r['note'], 'planned by Muninn from the schedule']));
         $data = ['kind' => 'visit', 'ho' => $r['ho'], 'reg' => $r['reg'], 'acType' => (string) ($a['acType'] ?? ''), 'clientId' => (string) ($a['clientId'] ?? ''), 'arr' => $r['arr'], 'arrDate' => $r['arrDate'], 'dep' => $r['dep'], 'depDate' => $r['depDate'],
             'flight' => $r['flightIn'], 'crs' => [], 'mech' => [], 'tasks' => [], 'notes' => $note, 'order' => now_ms() + $i];
         try { $data = perm_write('bureau', 'shiftItems', 'put', null, $data, null, $id); } catch (Throwable $e) { $made[] = $r['reg'] . ' ' . $r['ho'] . ' : ' . $e->getMessage(); continue; }
@@ -748,9 +748,9 @@ function ai_rot_create($who, $p, &$actions) {
     return ['ok' => true, 'created' => $made, 'note' => 'Les shifts suivants couverts par chaque escale reçoivent leur ligne automatiquement.'];
 }
 function ai_confirm_list($who) { return json_decode(aik('ai_confirm:' . ai_ukey($who), '[]'), true) ?: []; }
-/* tâches du Tech Log écrites par Sindri (scan d'une log page, chat) : marquées « encodée par Sindri – à vérifier » (ai).
+/* tâches du Tech Log écrites par Muninn (scan d'une log page, chat) : marquées « encodée par Muninn – à vérifier » (ai).
    Seule une personne les valide (ok = {by, at}) ; tant qu'il en reste, le shift ne peut pas être remis (api/perm.php).
-   Une tâche que Sindri ne change pas garde son état ; une tâche qu'il crée ou modifie repart « à vérifier ». */
+   Une tâche que Muninn ne change pas garde son état ; une tâche qu'il crée ou modifie repart « à vérifier ». */
 function ai_mark_tasks($coll, $old, $new) {
     if ($coll !== 'shiftItems' || !is_array($new) || !isset($new['tasks']) || !is_array($new['tasks'])) return $new;
     $prev = []; foreach ((array) (($old ?? [])['tasks'] ?? []) as $t) if (is_array($t) && isset($t['id'])) $prev[(string) $t['id']] = $t;
@@ -768,7 +768,7 @@ function ai_mark_tasks($coll, $old, $new) {
 }
 function ai_write($who, $role, $tool, $in, &$actions) {
     if (!in_array($tool, ['confirm_delete', 'confirm_action'], true) && count(array_filter($actions, fn($a) => !in_array($a['op'] ?? '', ['delete', 'deleted'], true))) >= AI_MAX_WRITES) return ['error' => 'Trop de modifications pour une seule demande : fais une pause et demande à l\'utilisateur de continuer.'];
-    $wrole = $role === 'admin' ? 'bureau' : $role;                 // Sindri a les droits d'un employé Bureau
+    $wrole = $role === 'admin' ? 'bureau' : $role;                 // Muninn a les droits d'un employé Bureau
     $coll = $tool === 'add_vehicle_document' ? 'vehicles' : (string) ($in['collection'] ?? '');
     if ($tool === 'propose_share_note') $coll = 'notes';
     if ($coll === 'roster' && in_array($tool, ['create_record', 'update_record'], true)) return ['error' => "Le roster ne se modifie qu'en mode édition : utilise propose_roster_changes (ou propose_roster_import pour un fichier) et demande la permission."];
@@ -819,7 +819,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
             if ((int) ($GLOBALS['AI_Q'] ?? 0) <= $p['q']) return ['error' => "Refusé : la personne n'a pas encore répondu. Pose-lui la question et attends sa réponse."];
             if (empty($p['shown'])) return ['error' => "Refusé : la question de confirmation n'a jamais été affichée à la personne (réponse interrompue). Refais propose_delete et pose-lui la question."];
             if (!ai_is_yes((string) ($GLOBALS['AI_QTEXT'] ?? ''))) return ['error' => "Refusé : son dernier message n'est pas un « oui » explicite. Rappelle-lui ce qui sera supprimé et demande-lui de répondre « oui » pour confirmer."];
-            if (($p['kind'] ?? '') === 'roster') {   // roster : mode édition de Sindri, le temps d'appliquer
+            if (($p['kind'] ?? '') === 'roster') {   // roster : mode édition de Muninn, le temps d'appliquer
                 kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
                 return rx_apply($who, $p, $actions);
             }
@@ -831,7 +831,7 @@ function ai_write($who, $role, $tool, $in, &$actions) {
                 kv_set('ai_confirm:' . ai_ukey($who), json_encode(array_values(array_filter($pend, fn($x) => $x['token'] !== $p['token'])), JSON_UNESCAPED_UNICODE));
                 $t = null; foreach (wa_team_targets() as $x) if ($x['num'] === $p['num']) $t = $x;
                 if (!$t) return ['error' => "Ce destinataire n'est plus dans la liste de l'équipe."];
-                try { $how = wa_send_team((string) ($who['user']['name'] ?? 'Sindri'), $t, (string) $p['text']); } catch (Throwable $e) { return ['error' => $e->getMessage()]; }
+                try { $how = wa_send_team((string) ($who['user']['name'] ?? 'Muninn'), $t, (string) $p['text']); } catch (Throwable $e) { return ['error' => $e->getMessage()]; }
                 $actions[] = ['op' => 'whatsapp', 'coll' => 'settings', 'id' => 'company', 'label' => 'WhatsApp envoyé à ' . $t['name']];
                 return ['ok' => true, 'sent' => 'Message WhatsApp envoyé à ' . $t['name'] . ($how === 'modèle' ? " (par le modèle « message d'équipe », car elle n'a pas écrit au numéro de la station depuis plus de 24 h)" : '')];
             }
@@ -913,10 +913,10 @@ function ai_write($who, $role, $tool, $in, &$actions) {
     return ['error' => 'Outil inconnu'];
 }
 
-/* résumé du shift rédigé par Sindri pour le handover (toute l'équipe) : un brouillon, relu et corrigé par la personne
+/* résumé du shift rédigé par Muninn pour le handover (toute l'équipe) : un brouillon, relu et corrigé par la personne
    avant d'être enregistré sur la fiche du shift et envoyé avec la page Notion. Rien n'est écrit ici. */
 function ai_shift_summary($who, $role, $b) {
-    if (aik('ai_key') === '') fail(400, "Sindri n'est pas encore configuré : un administrateur doit saisir la clé API dans Paramètres.");
+    if (aik('ai_key') === '') fail(400, "Muninn n'est pas encore configuré : un administrateur doit saisir la clé API dans Paramètres.");
     $ho = (string) ($b['ho'] ?? ''); if (!preg_match('/^\d{4}-\d{2}-\d{2}-(day|night)$/', $ho)) fail(400, 'Shift inconnu');
     $us = ai_usage(); if ($us['usd'] >= ai_cap()) fail(429, 'Plafond mensuel de l\'assistant atteint.');
     $staff = coll_docs('staff'); $nm = fn($id) => (string) ($staff[$id]['name'] ?? '');
@@ -972,7 +972,7 @@ function assistant_routes($route, $parts, $method, $who, $role) {
     }
     if ($act === 'thread' && $method === 'GET') { ai_tables(); out(ai_view_out(ai_thread_load($who))); }
     if ($act === 'topic' && $method === 'POST') { ai_tables(); $t = ai_thread_load($who); $t['msgs'] = []; $t['newTopic'] = true; ai_thread_save($who, $t); out(['ok' => true]); }
-    if ($act === 'mark' && $method === 'POST') {   // état d'une action affichée (annulée, supprimée…) + note de contexte pour Sindri
+    if ($act === 'mark' && $method === 'POST') {   // état d'une action affichée (annulée, supprimée…) + note de contexte pour Muninn
         ai_tables(); $t = ai_thread_load($who); $i = (int) ($b['i'] ?? -1); $k = (int) ($b['a'] ?? -1);
         if (isset($t['view'][$i]['actions'][$k]) && in_array($b['state'] ?? '', ['done', 'undone', 'skip'], true)) $t['view'][$i]['actions'][$k]['state'] = $b['state'];
         if (($n = trim((string) ($b['note'] ?? ''))) !== '') { $t['msgs'][] = ['role' => 'user', 'content' => mb_substr($n, 0, 500)]; $t['msgs'][] = ['role' => 'assistant', 'content' => [['type' => 'text', 'text' => "C'est noté."]]]; }

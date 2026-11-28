@@ -167,10 +167,10 @@ ok "bureau : ajoute un formulaire" "$(curl -s -H "$B" -X PUT -d '{"no":"CT-F-001
 ok "terrain : lit les formulaires" "$(curl -s -H "$HT" $U/docs/forms/fm1)" 'Occurrence report'
 ok "terrain : ne modifie pas un formulaire" "$(curl -s -H "$HT" -X PATCH -d '{"title":"x"}' $U/docs/forms/fm1)" 'rôle'
 ok "droit retiré : de nouveau terrain" "$(curl -s -H "$HT" $U/auth/me)" '"role":"terrain"'
-echo "> tâches encodées par Sindri"
-curl -s -H "$B" -X PUT -d '{"kind":"visit","ho":"2026-11-25-day","reg":"OO-ACE","tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Sindri"}}]}' $U/docs/shiftItems/vai >/dev/null
-ok "remise refusée : tâche Sindri non vérifiée" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-25","shift":"day","out":{"by":"Bea","at":"2026-11-25T18:00:00Z"}}' $U/docs/handovers/2026-11-25-day)" 'Sindri'
-curl -s -H "$B" -X PATCH -d '{"tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Sindri"},"ok":{"by":"Bea","at":"2026-11-25T17:00:00Z"}}]}' $U/docs/shiftItems/vai >/dev/null
+echo "> tâches encodées par Muninn"
+curl -s -H "$B" -X PUT -d '{"kind":"visit","ho":"2026-11-25-day","reg":"OO-ACE","tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Muninn"}}]}' $U/docs/shiftItems/vai >/dev/null
+ok "remise refusée : tâche Muninn non vérifiée" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-25","shift":"day","out":{"by":"Bea","at":"2026-11-25T18:00:00Z"}}' $U/docs/handovers/2026-11-25-day)" 'Muninn'
+curl -s -H "$B" -X PATCH -d '{"tasks":[{"id":"k1","text":"ATC check","ai":{"by":"Muninn"},"ok":{"by":"Bea","at":"2026-11-25T17:00:00Z"}}]}' $U/docs/shiftItems/vai >/dev/null
 ok "remise acceptée après vérification" "$(curl -s -H "$B" -X PUT -d '{"date":"2026-11-25","shift":"day","out":{"by":"Bea","at":"2026-11-25T18:00:00Z"}}' $U/docs/handovers/2026-11-25-day)" '"ok":true'
 echo "> contacts de la station"
 ok "bureau : ajoute un contact" "$(curl -s -H "$B" -X PUT -d '{"cat":"emergency","org":"Airport fire","phone":"+972 3 000"}' $U/docs/contacts/ct1)" '"ok":true'
@@ -495,7 +495,7 @@ ok "réglage admin seulement" "$(curl -s -H "$B" -X POST -d '{"key":"sk-ant-test
 curl -s -H "$A" -X POST -d '{"key":"sk-ant-bad"}' $U/assistant/config >/dev/null
 ok "mauvaise clé" "$(curl -s -H "$A" -X POST -d '{}' $U/assistant/test)" 'clé API'
 curl -s -H "$A" -X POST -d '{"key":"sk-ant-test","model":"claude-haiku-5-5","cap":5}' $U/assistant/config >/dev/null
-ok "résumé du shift : brouillon de Sindri (terrain)" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-11-19-day","lang":"en"}' $U/assistant/shift-summary)" 'data seen'
+ok "résumé du shift : brouillon de Muninn (terrain)" "$(curl -s -H "$HT" -X POST -d '{"ho":"2026-11-19-day","lang":"en"}' $U/assistant/shift-summary)" 'data seen'
 ok "résumé du shift : shift inconnu" "$(curl -s -H "$HT" -X POST -d '{"ho":"x"}' $U/assistant/shift-summary)" 'Shift inconnu'
 ok "test connexion" "$(curl -s -H "$A" -X POST -d '{}' $U/assistant/test)" '"ok":true'
 R=$(curl -s -H "$B" $U/assistant/status); ok "état" "$R" '"configured":true'; ok "modèle choisi" "$R" 'claude-haiku-5-5'; no "clé jamais renvoyée" "$R" 'sk-ant-test'
@@ -507,30 +507,30 @@ curl -s -H "$B" -X PUT -d '{"plate":"1-ABC-123","fleetNo":"042","docs":[]}' $U/d
 printf '%%PDF-1.4 controle technique 1-ABC-123' > $T/ct.pdf
 FID=$(curl -s -H "$B" -F "file=@$T/ct.pdf;type=application/pdf" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
 R=$(curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"\",\"files\":[{\"id\":\"$FID\",\"name\":\"ct.pdf\"}]}]}" $U/assistant/chat)
-ok "fichier rangé par Sindri" "$R" '"op":"update"'; ok "véhicule modifié" "$R" '"id":"veh-t"'
+ok "fichier rangé par Muninn" "$R" '"op":"update"'; ok "véhicule modifié" "$R" '"id":"veh-t"'
 R2=$(curl -s -H "$K" $U/docs/vehicles/veh-t); ok "document ajouté au véhicule" "$R2" "\"file\":\"$FID\""; ok "échéance CT mise à jour" "$R2" '"ctDate":"2027-11-12"'
 no "contenu du fichier pas renvoyé" "$R" '"base64"'; ok "fichier gardé dans la conversation" "$R" '"name":"ct.pdf"'
 ok "document envoyé à Claude" "$(grep -c '"type":"document"' $T/ai.log)" '[12]'
 printf 'reg,arr,dep\n9H-CAZ,23:55,04:00\n' > $T/rot.csv
 FID=$(curl -s -H "$B" -F "file=@$T/rot.csv;type=text/csv" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
 curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"Read this\",\"files\":[{\"id\":\"$FID\",\"name\":\"rot.csv\"}]}]}" $U/assistant/chat >/dev/null
-ok "CSV lu pour Sindri" "$(grep '9H-CAZ,23:55' $T/ai.log | tail -1)" '"title":"rot.csv"'
+ok "CSV lu pour Muninn" "$(grep '9H-CAZ,23:55' $T/ai.log | tail -1)" '"title":"rot.csv"'
 if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
   php -r '$z=new ZipArchive(); $z->open($argv[1], ZipArchive::CREATE); $z->addFromString("xl/sharedStrings.xml","<sst xmlns=\"x\"><si><t>4X-EKA</t></si><si><t>B777</t></si></sst>"); $z->addFromString("xl/workbook.xml","<workbook><sheets><sheet name=\"Fleet\"/></sheets></workbook>"); $z->addFromString("xl/worksheets/sheet1.xml","<worksheet><sheetData><row r=\"1\"><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"B1\" t=\"s\"><v>1</v></c><c r=\"C1\"><v>42</v></c></row></sheetData></worksheet>"); $z->close();' $T/fleet.xlsx
   FID=$(curl -s -H "$B" -F "file=@$T/fleet.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
   curl -s -H "$B" -X POST -d "{\"messages\":[{\"role\":\"user\",\"content\":\"Read this\",\"files\":[{\"id\":\"$FID\",\"name\":\"fleet.xlsx\"}]}]}" $U/assistant/chat >/dev/null
-  ok "Excel lu pour Sindri" "$(grep 'Sheet Fleet' $T/ai.log | tail -1)" 'A=4X-EKA\\tB=B777\\tC=42'
+  ok "Excel lu pour Muninn" "$(grep 'Sheet Fleet' $T/ai.log | tail -1)" 'A=4X-EKA\\tB=B777\\tC=42'
 fi
 curl -s -H "$B" -X PUT -d '{"plate":"1-ABC-123","fleetNo":"042","docs":[]}' $U/docs/vehicles/veh-t >/dev/null
 R=$(curl -s -H "$B" -X POST -d '{"messages":[{"role":"user","content":"Crée une facture"}]}' $U/assistant/chat)
-ok "fiche créée par Sindri" "$R" '"op":"create"'; ok "client créé" "$R" 'Cargo Test'
-ok "historique au nom de Sindri" "$(curl -s -H "$A" "$U/log?q=Sindri")" 'Sindri (pour Bea Bureau)'
+ok "fiche créée par Muninn" "$R" '"op":"create"'; ok "client créé" "$R" 'Cargo Test'
+ok "historique au nom de Muninn" "$(curl -s -H "$A" "$U/log?q=Muninn")" 'Muninn (pour Bea Bureau)'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Total des factures ?"}' $U/assistant/say); ok "fil : réponse enregistrée" "$R" '"role":"bot"'; ok "fil : sujet créé" "$R" '"title":"Total des factures ?"'
 ok "fil retrouvé (autre appareil)" "$(curl -s -H "$B" $U/assistant/thread)" 'Total des factures ?'
 no "fil privé" "$(curl -s -H "$A" $U/assistant/thread)" 'Total des factures ?'
 curl -s -H "$B" -X POST -d '{}' $U/assistant/topic >/dev/null
 R=$(curl -s -H "$B" -X POST -d '{"text":"Retiens : EXP pour Airside"}' $U/assistant/say); ok "nouveau sujet" "$R" '"title":"Retiens : EXP pour Airside"'
-ok "Sindri apprend" "$(curl -s -H "$A" $U/assistant/memory)" 'Airside'
+ok "Muninn apprend" "$(curl -s -H "$A" $U/assistant/memory)" 'Airside'
 curl -s -H "$A" -X POST -d '{"text":"Bonjour"}' $U/assistant/say >/dev/null
 ok "appris partagé avec l'équipe" "$(tail -1 $T/ai.log)" "EXP"
 ok "mémoire réservée aux admins" "$(curl -s -H "$B" $U/assistant/memory)" 'administrateurs'
@@ -542,7 +542,7 @@ php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES
 (DBX_MOCK_DIR=$T/dbx php -S 127.0.0.1:8771 "$D/dropbox-mock.php" >/dev/null 2>&1 &); sleep 0.5
 curl -s -H "$K" -X PUT -d '{"vehicleId":"v-1","description":"Bruit","status":"ouverte","date":"2026-11-01"}' $U/docs/faults/f-ax >/dev/null
 curl -s -H "$K" -X PUT -d '{"vehicleId":"v-1","description":"Voyant","status":"ouverte","date":"2026-11-01"}' $U/docs/faults/f-ax2 >/dev/null
-R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime la panne Bruit"}' $U/assistant/say); ok "Sindri propose et demande confirmation" "$R" 'Rien n.est supprim'; ok "Sindri signale la panne non réparée" "$R" 'pas été réparée'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime la panne Bruit"}' $U/assistant/say); ok "Muninn propose et demande confirmation" "$R" 'Rien n.est supprim'; ok "Muninn signale la panne non réparée" "$R" 'pas été réparée'
 ok "rien supprimé avant la réponse" "$(curl -s -H "$K" $U/docs/faults/f-ax)" 'Bruit'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "après « oui » : supprimée" "$R" 'Fait : .*deleted'; ok "carte de proposition passée à Supprimé" "$R" '"op":"delete"[^}]*"state":"done"'
 ok "panne supprimée" "$(curl -s -o /dev/null -w '%{http_code}' -H "$K" $U/docs/faults/f-ax)" '404'
@@ -551,21 +551,21 @@ ok "panne gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Supprime-la"}' $U/assistant/say); ok "nouvelle demande ≠ confirmation" "$R" 'pas un « oui »'
 ok "panne toujours gardée" "$(curl -s -H "$K" $U/docs/faults/f-ax2)" 'Voyant'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "« oui » explicite : supprimée" "$R" 'Fait : .*deleted'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Roster sindri 2027-01"}' $U/assistant/say); ok "Sindri : pas d'écriture directe du roster" "$R" 'mode .*dition'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Roster changes 2027-01"}' $U/assistant/say); ok "Sindri : roster proposé" "$R" 'new..:..D/N'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster muninn 2027-01"}' $U/assistant/say); ok "Muninn : pas d'écriture directe du roster" "$R" 'mode .*dition'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Roster changes 2027-01"}' $U/assistant/say); ok "Muninn : roster proposé" "$R" 'new..:..D/N'
 curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say >/dev/null
-ok "roster de Sindri lu à sa place" "$(curl -s -H "$A" $U/docs/roster/s1_2027-01)" '"D/N"'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Note sindri"}' $U/assistant/say); ok "Sindri crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
+ok "roster de Muninn lu à sa place" "$(curl -s -H "$A" $U/docs/roster/s1_2027-01)" '"D/N"'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Note muninn"}' $U/assistant/say); ok "Muninn crée une note personnelle (jamais d'équipe d'office)" "$R" 'propose_share_note'
 NAX=$(echo "$R" | grep -o '\\"id\\":\\"ax[0-9a-f]*' | head -1 | grep -o 'ax[0-9a-f]*')
-ok "note de Sindri : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note de Sindri : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
+ok "note de Muninn : personnelle de Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'; ok "note de Muninn : auteur Bea" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"owner":"u3"'
 R=$(curl -s -H "$B" -X POST -d '{"text":"Partage la note='$NAX'"}' $U/assistant/say); ok "partage proposé, rien changé" "$R" 'Rien n.est chang'
 ok "toujours personnelle avant le oui" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"team":false'
 R=$(curl -s -H "$B" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "après « oui » : note d'équipe" "$(curl -s -H "$A" $U/docs/notes/$NAX)" '"team":true'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Joins fichier note='$NAX' file='$FID'"}' $U/assistant/say); ok "Sindri joint un fichier à une note" "$R" 'Joint : .*ok'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Joins fichier note='$NAX' file='$FID'"}' $U/assistant/say); ok "Muninn joint un fichier à une note" "$R" 'Joint : .*ok'
 ok "pièce jointe dans la note" "$(curl -s -H "$B" $U/docs/notes/$NAX)" '"files":\[{"id":"'$FID'"'
 curl -s -H "$B" -X PUT -d '{"title":"Perso Bea","body":"secret"}' $U/docs/notes/n0 >/dev/null
-R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Sindri ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
-R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Sindri lit un PDF Dropbox" "$R" 'Lu : text,document'
+R=$(curl -s -H "$A" -X POST -d '{"text":"Montre la note"}' $U/assistant/say); ok "Muninn ne voit pas la note personnelle d'un autre" "$R" 'Vu : .*Introuvable'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Cherche le CT dans Dropbox"}' $U/assistant/say); ok "Muninn lit un PDF Dropbox" "$R" 'Lu : text,document'
 no "fichier lu non gardé dans le fil" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN) ? implode("", $p->query("SELECT data FROM ways_ai_thread")->fetchAll(PDO::FETCH_COLUMN)) : "";' $T/t.db)" 'JVBERi0'
 ok "consommation suivie" "$(curl -s -H "$B" $U/assistant/status)" '"questions":25'
 echo "> notes"
@@ -612,7 +612,7 @@ curl -s -H "$A" -X POST -d '{"contacts":[{"num":"0475 12 34 56","kind":"user","r
 ok "numéro de l'équipe normalisé" "$(curl -s -H "$A" $U/whatsapp/status)" '"num":"32475123456"'
 : > $T/meta.log
 wa "$(wamsg 32475123456 wamid.D1 'Combien de véhicules ?')" >/dev/null; sleep 2
-R=$(cat $T/meta.log); ok "membre reconnu par son GSM : Sindri répond" "$R" '"to":"32475123456"'; ok "« en train d'écrire »" "$R" 'typing_indicator'; no "pas de réponse « inconnu » au membre" "$R" 'réservé'
+R=$(cat $T/meta.log); ok "membre reconnu par son GSM : Muninn répond" "$R" '"to":"32475123456"'; ok "« en train d'écrire »" "$R" 'typing_indicator'; no "pas de réponse « inconnu » au membre" "$R" 'réservé'
 : > $T/meta.log
 wa "$(wamsg 32475123456 wamid.D1 'Combien de véhicules ?')" >/dev/null; sleep 1
 ok "message en double ignoré" "$(cat $T/meta.log | wc -l | tr -d ' ')" '^0$'
@@ -624,18 +624,18 @@ ok "réponse envoyée à Bea" "$(cat $T/meta.log)" '"to":"32475123456"'
 VO='{"object":"whatsapp_business_account","entry":[{"id":"456","changes":[{"field":"messages","value":{"messaging_product":"whatsapp","metadata":{"phone_number_id":"123"},"messages":[{"from":"32475123456","id":"wamid.B2","timestamp":"1","type":"audio","audio":{"id":"media-2"}}]}}]}]}'
 wa "$VO" >/dev/null; sleep 1; ok "message vocal : explication" "$(tail -1 $T/meta.log)" 'vocaux'
 : > $T/meta.log
-R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "Sindri envoie un fichier sur WhatsApp" "$R" 'Envoi : .*\\"ok\\":true'
+R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "Muninn envoie un fichier sur WhatsApp" "$R" 'Envoi : .*\\"ok\\":true'
 ok "fichier téléversé chez Meta" "$(cat $T/meta.log)" 'upload":"image'; ok "fichier envoyé à Bea seulement" "$(cat $T/meta.log)" '"to":"32475123456","type":"image"'
 R=$(curl -s -H "$A" -X POST -d '{"text":"Envoie-moi la photo"}' $U/assistant/say); ok "sans numéro WhatsApp : explication" "$R" 'ne connais pas ton num'
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->exec("UPDATE ways_kv SET v=\"1\" WHERE k=\"wa_in:32475123456\"");' $T/t.db
 R=$(curl -s -H "$B" -X POST -d '{"text":"Envoie-moi encore la photo"}' $U/assistant/say); ok "après 24 h : explication" "$R" '24 h'
-# message à un collègue (demandé à Sindri) : confirmation, fenêtre de 24 h, modèle
+# message à un collègue (demandé à Muninn) : confirmation, fenêtre de 24 h, modèle
 R=$(curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say); ok "hors 24 h sans modèle : explication" "$R" 'doit cr'
 php -r '$p=new PDO("sqlite:".$argv[1]); $p->prepare("REPLACE INTO ways_kv VALUES (?,?)")->execute(["wa_in:32475123456",(string)time()]);' $T/t.db
 : > $T/meta.log
 R=$(curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say); ok "message préparé, rien envoyé" "$R" 'Rien n.est envoy'; no "rien parti avant le oui" "$(cat $T/meta.log)" 'Passe au garage'
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "envoyé après oui" "$R" 'Message WhatsApp envoy'
-ok "texte signé de l'expéditeur, au bon numéro" "$(cat $T/meta.log)" '"to":"32475123456","type":"text","text":{"preview_url":false,"body":"💬 \*Message de .*lise Dupont\* (via Sindri) :'
+ok "texte signé de l'expéditeur, au bon numéro" "$(cat $T/meta.log)" '"to":"32475123456","type":"text","text":{"preview_url":false,"body":"💬 \*Message de .*lise Dupont\* (via Muninn) :'
 ok "contexte gardé pour la réponse de Bea" "$(php -r '$p=new PDO("sqlite:".$argv[1]); echo $p->query("SELECT v FROM ways_kv WHERE k=\"wa_relay:32475123456\"")->fetchColumn();' $T/t.db)" 'Passe au garage'
 R=$(curl -s -H "$A" -X POST -d '{"create":1}' $U/whatsapp/template); ok "modèle créé chez Meta" "$(cat $T/meta.log)" '"category":"UTILITY"'
 R=$(curl -s -H "$A" -X POST -d '{}' $U/whatsapp/template); ok "modèle approuvé" "$R" '"status":"APPROVED"'
@@ -644,7 +644,7 @@ php -r '$p=new PDO("sqlite:".$argv[1]); $p->exec("UPDATE ways_kv SET v=\"1\" WHE
 curl -s -H "$A" -X POST -d '{"text":"Dis à Bea de passer au garage"}' $U/assistant/say >/dev/null
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "hors 24 h : envoyé par le modèle" "$R" 'par le mod'
 ok "modèle avec nom et texte" "$(cat $T/meta.log)" '"type":"template","template":{"name":"message_equipe"'
-# roster officiel Excel déposé à Sindri : résumé, permission (« mode édition » de Sindri), puis écriture
+# roster officiel Excel déposé à Muninn : résumé, permission (« mode édition » de Muninn), puis écriture
 if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
   php test/roster-fixture.php $T/roster.xlsx
   FID=$(curl -s -H "$A" -F "file=@$T/roster.xlsx;type=application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" $U/files | php -r '$d=json_decode(stream_get_contents(STDIN),true); echo $d["id"] ?? "";')
@@ -657,7 +657,7 @@ if php -r 'exit(class_exists("ZipArchive") ? 0 : 1);'; then
   V=$(curl -s -H "$A" $U/docs/roster/s1_2026-11); ok "roster : cadre noir = flight mech" "$V" '"6":{"c":"CGN","duty":"fm"}'; ok "roster : cadre bleu = outstation" "$V" '"9":{"c":"BOM","duty":"out"}'; ok "roster : remarque gardée" "$V" 'D/N !!'
   ok "roster : décembre (T+D → D)" "$(curl -s -H "$A" $U/docs/roster/s2_2026-12)" '"2":{"c":"D","note":"T+D"}'
 fi
-R=$(curl -s -H "$A" -X POST -d '{"text":"Roster direct"}' $U/assistant/say); ok "roster : pas d'écriture directe par Sindri" "$R" 'mode .*dition'
+R=$(curl -s -H "$A" -X POST -d '{"text":"Roster direct"}' $U/assistant/say); ok "roster : pas d'écriture directe par Muninn" "$R" 'mode .*dition'
 R=$(curl -s -H "$A" -X POST -d '{"text":"Mets Marc OFF"}' $U/assistant/say); ok "roster : changement proposé" "$R" 'new..:..OFF'
 R=$(curl -s -H "$A" -X POST -d '{"text":"oui"}' $U/assistant/say); ok "roster : changement écrit après oui" "$(curl -s -H "$A" $U/docs/roster/s1_2026-11)" '"21":{"c":"OFF"}'
 # planning lu dans une capture (rotations) : proposition, puis création après oui
